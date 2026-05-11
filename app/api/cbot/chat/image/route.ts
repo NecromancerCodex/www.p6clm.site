@@ -16,10 +16,8 @@ export async function POST(req: NextRequest) {
     const messageRaw = formData.get("message");
     const messageStr = messageRaw != null ? String(messageRaw).trim() : "";
     const imageEntry = formData.get("image");
-    const hasImage =
-      imageEntry instanceof File
-        ? imageEntry.size > 0
-        : imageEntry instanceof Blob && imageEntry.size > 0;
+    // FormDataEntryValue = File | string — File 아닌 쪽은 string이라 instanceof Blob 불가(TS 오류)
+    const hasImage = imageEntry instanceof File && imageEntry.size > 0;
 
     if (!messageStr && !hasImage) {
       return NextResponse.json(
