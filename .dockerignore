@@ -1,0 +1,18 @@
+# ================================================================
+# Frontend .dockerignore
+# ================================================================
+
+node_modules/
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+!README.md
+dist/
+.vscode/
+.idea/
+Dockerfile
+npm-debug.log
+coverage/
