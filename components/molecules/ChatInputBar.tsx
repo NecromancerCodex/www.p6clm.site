@@ -1,11 +1,31 @@
 "use client";
 
-import { ArrowUp, ImageIcon, X } from "lucide-react";
-import { useRef, useCallback } from "react";
+import { ArrowUp, ImageIcon, Mic, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
+import { useCallback, useRef } from "react";
 
 import { AutoResizeTextarea } from "../atoms/AutoResizeTextarea";
 import { useChatStore } from "../../stores/chatStore";
+
+/** SSR 시 싱글톤 RecognitionManager가 빈 채로 고정되는 문제 방지 — 브라우저에서만 로드 */
+const VoiceMicButton = dynamic(
+  () => import("./VoiceMicButton").then((m) => m.VoiceMicButton),
+  {
+    ssr: false,
+    loading: () => (
+      <button
+        type="button"
+        className="cbot-mic-btn"
+        disabled
+        aria-label="음성 입력 로딩 중"
+        aria-busy="true"
+      >
+        <Mic size={17} strokeWidth={2} />
+      </button>
+    ),
+  }
+);
 
 export function ChatInputBar() {
   const input             = useChatStore((s) => s.input);
@@ -92,26 +112,29 @@ export function ChatInputBar() {
         <AutoResizeTextarea
           ref={textareaRef}
           className="cbot-textarea"
-          placeholder="무엇이든 물어보세요 (이미지 첨부 가능)"
+          placeholder="무엇이든 물어보세요 (이미지·음성 입력 가능)"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
 
-        <button
-          className="cbot-send-btn"
-          type="button"
-          aria-label="전송"
-          onClick={() => sendMessage().then(() => textareaRef.current?.focus())}
-          disabled={!canSend}
-        >
-          <ArrowUp size={17} strokeWidth={2.5} />
-        </button>
+        <div className="cbot-right-controls">
+          <VoiceMicButton />
+          <button
+            className="cbot-send-btn"
+            type="button"
+            aria-label="전송"
+            onClick={() => sendMessage().then(() => textareaRef.current?.focus())}
+            disabled={!canSend}
+          >
+            <ArrowUp size={17} strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
 
       <p className="cbot-hint">
-        ConstructBot은 KCS/KDS 기준을 근거로 답변합니다. 현장 사진도 분석 가능합니다.
+        ConstructBot은 KCS/KDS 기준을 근거로 답변합니다. 음성: 마이크 탭 → 말하기 → 다시 탭하면 입력창에 반영(아래 상태 문구 확인). Chrome/Edge·HTTPS 권장.
       </p>
     </div>
   );

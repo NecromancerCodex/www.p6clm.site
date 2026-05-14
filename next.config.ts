@@ -6,6 +6,7 @@ const CLM_BACKEND =
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ["http://192.168.0.20:1999", "http://localhost:1999"],
+  transpilePackages: ["speak-tts", "react-speech-recognition"],
 
   async rewrites() {
     return [
