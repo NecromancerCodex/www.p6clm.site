@@ -2,6 +2,8 @@
 node_modules/
 .pnp
 .pnp.js
+# pnpm 로컬 콘텐츠 주소형 캐시 (1.5GB+, 절대 추적 금지)
+.pnpm-store/
 
 # build / Next.js
 .next/

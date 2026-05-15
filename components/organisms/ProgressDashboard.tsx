@@ -12,7 +12,8 @@ import { NcrFormView, SirFormView } from "../documents/DocumentFormViews";
 const API_BASE = "/api/clm";
 
 export interface DocumentHistoryItem {
-  id: number;
+  id: string;
+  source: string;
   session_id: string;
   doc_type: string;
   doc_category: string | null;
@@ -177,7 +178,7 @@ export function ProgressDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeCat, setActiveCat] = useState<CategoryId>("quality");
   const [activeDocType, setActiveDocType] = useState<string | null>("defect_report");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterDayKey, setFilterDayKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {

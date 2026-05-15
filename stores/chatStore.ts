@@ -9,11 +9,19 @@
  */
 import { create } from "zustand";
 
+export interface TriggeredJob {
+  job_id: string;
+  doc_type: string;
+  doc_category: string;
+  project_name: string;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  imageUrl?: string; // 사용자가 업로드한 이미지 미리보기 URL
+  imageUrl?: string;     // 사용자가 업로드한 이미지 미리보기 URL
+  triggeredJob?: TriggeredJob; // supervisor가 문서 생성을 비동기 트리거한 경우
 }
 
 interface ChatState {
@@ -112,6 +120,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         id: `a-${Date.now()}`,
         role: "assistant",
         content: data.response ?? "응답을 받지 못했습니다.",
+        triggeredJob: data.triggered_job ?? undefined,
       };
       set((s) => ({ messages: [...s.messages, assistantMsg] }));
     } catch (err) {
