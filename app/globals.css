@@ -1800,6 +1800,8 @@ select {
 .cbot-user-image {
   border-radius: 8px;
   display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 /* 어시스턴트 마크다운 기본 스타일 */
@@ -3006,5 +3008,316 @@ select {
   .progress-preview-scroll {
     padding: 0;
     overflow: visible;
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   ATOMS · 신규 (IconButton / Backdrop)
+   ══════════════════════════════════════════════════ */
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted-strong);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.ui-backdrop {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 40;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease-out;
+  cursor: pointer;
+  /* 데스크탑에서는 모바일 드로어가 없으므로 완전히 비활성 */
+  display: none;
+}
+
+/* ══════════════════════════════════════════════════
+   WORKSPACE LAYOUT · ws-main / ws-mobile-topbar
+   ══════════════════════════════════════════════════ */
+
+.ws-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ws-mobile-topbar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+  z-index: 5;
+}
+
+.ws-hamburger {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.ws-mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.ws-mobile-brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ws-sidebar-close {
+  display: none;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════
+   RESPONSIVE · 모바일 (≤ 768px)
+   ══════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* ── Sidebar: off-canvas 드로어 ── */
+  .ws-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    width: min(280px, 80vw);
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.24s var(--ease-out);
+    box-shadow: none;
+  }
+
+  .ws-sidebar.is-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18);
+  }
+
+  .ws-sidebar-close {
+    display: inline-flex;
+  }
+
+  .ui-backdrop {
+    display: block;
+  }
+
+  .ui-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .ws-mobile-topbar {
+    display: flex;
+  }
+
+  /* ── 컨텐츠 패딩 축소 ── */
+  .ws-inner-pad {
+    padding: 18px 16px;
+    max-width: none;
+  }
+
+  .ws-docs-wrap {
+    padding: 16px 12px;
+  }
+
+  .ws-section-title {
+    font-size: 1.1rem;
+  }
+
+  .ws-section-desc {
+    font-size: 0.84rem;
+    margin-bottom: 18px;
+  }
+
+  .ws-feature-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* ── ChatWindow ── */
+  .cbot-page {
+    /* ws-main 내부에서 동작하므로 100% 로 (topbar 높이 자동 제외) */
+    height: 100%;
+  }
+
+  .cbot-messages {
+    padding: 0 12px 16px;
+  }
+
+  .cbot-msg-row {
+    padding: 6px 0;
+  }
+
+  .cbot-bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .cbot-empty-text {
+    font-size: 1.1rem;
+    text-align: center;
+    padding: 0 16px;
+  }
+
+  .cbot-input-area {
+    padding: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  }
+
+  .cbot-input-wrap {
+    padding: 6px 6px 6px 12px;
+    border-radius: 22px;
+    gap: 4px;
+  }
+
+  .cbot-attach-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .cbot-send-btn,
+  .cbot-mic-stack-anchor {
+    width: 34px;
+    height: 34px;
+  }
+
+  .cbot-hint {
+    font-size: 0.7rem;
+    line-height: 1.45;
+    margin-top: 6px;
+  }
+
+  .cbot-header {
+    padding: 10px 14px;
+  }
+
+  /* ── DocAutoGen ── */
+  .dag-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 18px 16px 14px;
+  }
+
+  .dag-header h2 {
+    font-size: 1.05rem;
+  }
+
+  .dag-desc {
+    font-size: 0.84rem;
+  }
+
+  .dag-body {
+    padding: 14px;
+    gap: 14px;
+  }
+
+  /* 카테고리 탭은 가로 스크롤 (wrap 대신) */
+  .dag-cat-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -14px;
+    padding: 0 14px 4px;
+    scroll-snap-type: x proximity;
+  }
+
+  .dag-cat-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dag-cat-btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    scroll-snap-align: start;
+  }
+
+  .dag-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .dag-left,
+  .dag-right {
+    min-width: 0;
+  }
+
+  .dag-context-area {
+    padding: 12px;
+  }
+
+  .dag-gen-btn {
+    width: 100%;
+    padding: 12px 16px;
+  }
+
+  .dag-doc-item {
+    padding: 11px 12px;
+    font-size: 0.88rem;
+  }
+
+  .dag-result-body {
+    font-size: 0.82rem;
+  }
+}
+
+/* ── 작은 모바일 (≤ 380px) ── */
+@media (max-width: 380px) {
+  .cbot-bubble {
+    max-width: 92%;
+    font-size: 0.88rem;
+  }
+
+  .ws-mobile-brand span,
+  .ws-mobile-brand strong {
+    font-size: 0.9rem;
+  }
+
+  .dag-header h2 {
+    font-size: 1rem;
   }
 }
