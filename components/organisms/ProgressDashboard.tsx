@@ -172,14 +172,44 @@ function ProgressDocumentPreview({
   );
 }
 
+function isValidCategoryId(s: string | null): s is CategoryId {
+  return s != null && DOC_CATEGORIES.some((c) => c.id === s);
+}
+
+/**
+ * 초기 URL 쿼리를 SSR-safe 하게 읽음.
+ *
+ * Next.js `useSearchParams` hook 은 첫 render / hydration 직전에 null 을 줄 수
+ * 있어 `useState` 초기값으로 부적합. mount 시점에 `window.location.search` 를
+ * 직접 파싱하여 *반드시* 정확한 값을 얻는다.
+ */
+function readInitialQuery(): { cat: CategoryId | null; jobId: string | null } {
+  if (typeof window === "undefined") return { cat: null, jobId: null };
+  const params = new URLSearchParams(window.location.search);
+  const rawCat = params.get("cat");
+  return {
+    cat: isValidCategoryId(rawCat) ? rawCat : null,
+    jobId: params.get("job"),
+  };
+}
+
 export function ProgressDashboard() {
+  // cbot TriggeredJobCard 가 ?cat=&job= 으로 직접 이동하는 경우 초기 탭/문서 자동 점프.
+  // lazy initializer — mount 시점 1회만 평가.
+  const [initialQuery] = useState(readInitialQuery);
+
   const [items, setItems] = useState<DocumentHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeCat, setActiveCat] = useState<CategoryId>("quality");
+  const [activeCat, setActiveCat] = useState<CategoryId>(initialQuery.cat ?? "quality");
   const [activeDocType, setActiveDocType] = useState<string | null>("defect_report");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterDayKey, setFilterDayKey] = useState<string | null>(null);
+
+  // job 자동 적용 1회 flag — items 로딩 완료 후 한 번만 시도.
+  const jobInitRef = useRef(false);
+  // catChanged effect 에서 docType/selectedId reset 을 *한 사이클* 차단하는 flag.
+  const jobApplyingRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -230,6 +260,12 @@ export function ProgressDashboard() {
     const catChanged = prevCatRef.current !== activeCat;
     if (catChanged) prevCatRef.current = activeCat;
 
+    // job 자동 적용 직후의 cat 변경 사이클이면 docType/selectedId 보존 (1회만 차단).
+    if (jobApplyingRef.current && catChanged) {
+      jobApplyingRef.current = false;
+      return;
+    }
+
     setActiveDocType((prev) => {
       const ids = categoryDef.documents.map((d) => d.id);
       const prevOk = prev != null && ids.includes(prev);
@@ -239,6 +275,20 @@ export function ProgressDashboard() {
     });
     if (catChanged) setSelectedId(null);
   }, [activeCat, categoryDef.documents, docTypeCounts]);
+
+  // cbot 알림 클릭 → ?job=<job_id> 으로 진입 시 해당 row 자동 선택 (items 로딩 후 1회).
+  useEffect(() => {
+    const targetJobId = initialQuery.jobId;
+    if (jobInitRef.current || !targetJobId || items.length === 0) return;
+    const matched = items.find((it) => it.session_id === targetJobId);
+    if (!matched) return;
+    jobInitRef.current = true;
+    jobApplyingRef.current = true;
+    const cat = resolveItemCategory(matched.doc_type, matched.doc_category) as CategoryId;
+    setActiveCat(cat);
+    setActiveDocType(matched.doc_type);
+    setSelectedId(matched.id);
+  }, [items, initialQuery.jobId]);
 
   const historyRows = useMemo(() => {
     if (!activeDocType) return [];

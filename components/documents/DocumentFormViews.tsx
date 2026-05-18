@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import type { NCRDocument, SafetyInspectionDocument } from "../../stores/docStore";
 
 /* ── 번호 목록 텍스트 렌더러 ──────────────────────────────────── */
@@ -387,7 +388,12 @@ export function SirFormView({
               <tr>
                 <th>재점검 의견</th>
                 <td colSpan={3} className="sir-opinion-cell">
-                  {sir.reinspection_opinion}
+                  {sir.reinspection_opinion.split(/<br\s*\/?>/i).map((part, i, arr) => (
+                    <Fragment key={i}>
+                      {part}
+                      {i < arr.length - 1 && <br />}
+                    </Fragment>
+                  ))}
                 </td>
               </tr>
             </tbody>

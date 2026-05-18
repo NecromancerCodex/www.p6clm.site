@@ -3046,6 +3046,12 @@ select {
   color: #14532d;
 }
 
+.cbot-job-card.is-rejected {
+  border: 1px solid #fcd34d;
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+  color: #78350f;
+}
+
 .cbot-job-card.is-error {
   border: 1px solid #fecaca;
   background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
@@ -3065,6 +3071,11 @@ select {
 
 .cbot-job-card.is-done .cbot-job-card-icon {
   background: #16a34a;
+  color: #fff;
+}
+
+.cbot-job-card.is-rejected .cbot-job-card-icon {
+  background: #d97706;
   color: #fff;
 }
 
@@ -3098,6 +3109,10 @@ select {
 
 .cbot-job-card.is-done .cbot-job-card-sub {
   color: rgba(20, 83, 45, 0.75);
+}
+
+.cbot-job-card.is-rejected .cbot-job-card-sub {
+  color: rgba(120, 53, 15, 0.78);
 }
 
 .cbot-job-card.is-error .cbot-job-card-sub {

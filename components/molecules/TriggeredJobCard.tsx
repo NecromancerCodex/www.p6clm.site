@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, FileText, AlertTriangle } from "lucide-react";
+import { AlertTriangle, Check, FileText, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -16,9 +16,11 @@ interface TriggeredJobCardProps {
 /**
  * supervisor 가 비동기로 트리거한 doc-generate 작업의 진행 상태 카드.
  *
- * - 마운트되면 jobsSlice.trackJob(job) 으로 폴링 시작(멱등)
- * - phase 에 따라 스켈레톤(polling) / 완료 배지(done) / 오류(error) 렌더
- * - 완료/오류 시 jobsSlice 가 시스템 어시스턴트 메시지를 자동으로 push
+ * phase:
+ *   - polling  : 진행 중 (스켈레톤 + 스피너)
+ *   - done     : 정상 완료 (녹색 + 체크)
+ *   - rejected : 양식 거부 → 일반 보고서로 폴백 (앰버 + 경고). silent suppression 방지.
+ *   - error    : 파이프라인 오류/타임아웃 (적색)
  */
 export function TriggeredJobCard({ job }: TriggeredJobCardProps) {
   const status = useChatStore((s) => s.jobStatuses[job.job_id]);
@@ -32,9 +34,14 @@ export function TriggeredJobCard({ job }: TriggeredJobCardProps) {
   const docLabel = labelForDocType(job.doc_type);
   const catLabel = labelForCategory(job.doc_category);
 
+  // /progress 직접 이동 시 카테고리 탭 + 해당 job 으로 자동 점프하도록 query param.
+  const progressHref = `/progress?cat=${encodeURIComponent(
+    job.doc_category || "quality",
+  )}&job=${encodeURIComponent(job.job_id)}`;
+
   if (phase === "done") {
     return (
-      <Link href="/progress" className="cbot-job-card is-done" aria-label={`${docLabel} 보러 가기`}>
+      <Link href={progressHref} className="cbot-job-card is-done" aria-label={`${docLabel} 보러 가기`}>
         <span className="cbot-job-card-icon" aria-hidden>
           <Check size={18} strokeWidth={2.5} />
         </span>
@@ -47,15 +54,36 @@ export function TriggeredJobCard({ job }: TriggeredJobCardProps) {
     );
   }
 
+  if (phase === "rejected") {
+    return (
+      <Link
+        href={progressHref}
+        className="cbot-job-card is-rejected"
+        aria-label={`${docLabel} 양식 거부 — /progress 에서 대체 보고서 확인`}
+      >
+        <span className="cbot-job-card-icon" aria-hidden>
+          <ShieldAlert size={18} strokeWidth={2.2} />
+        </span>
+        <span className="cbot-job-card-body">
+          <span className="cbot-job-card-title">{docLabel} 양식 거부 · 일반 보고서로 대체</span>
+          <span className="cbot-job-card-sub">
+            {status?.reason ?? "양식 생성이 거부되었습니다."} · /progress 에서 확인
+          </span>
+        </span>
+        <span className="cbot-job-card-arrow" aria-hidden>→</span>
+      </Link>
+    );
+  }
+
   if (phase === "error") {
     return (
-      <Link href="/progress" className="cbot-job-card is-error" aria-label={`${docLabel} 오류 — /progress 에서 확인`}>
+      <Link href={progressHref} className="cbot-job-card is-error" aria-label={`${docLabel} 오류 — /progress 에서 확인`}>
         <span className="cbot-job-card-icon" aria-hidden>
           <AlertTriangle size={18} strokeWidth={2.2} />
         </span>
         <span className="cbot-job-card-body">
           <span className="cbot-job-card-title">{docLabel} 작성 중 오류</span>
-          <span className="cbot-job-card-sub">{status?.error ?? "알 수 없는 오류"}</span>
+          <span className="cbot-job-card-sub">{status?.reason ?? "알 수 없는 오류"}</span>
         </span>
         <span className="cbot-job-card-arrow" aria-hidden>→</span>
       </Link>
@@ -65,7 +93,7 @@ export function TriggeredJobCard({ job }: TriggeredJobCardProps) {
   // polling — 진행 중 카드(스켈레톤)
   return (
     <Link
-      href="/progress"
+      href={progressHref}
       className="cbot-job-card is-polling"
       aria-label={`${docLabel} 작성 진행 중 — /progress 에서 확인`}
     >

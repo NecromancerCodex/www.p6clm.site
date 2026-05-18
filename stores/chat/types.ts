@@ -41,13 +41,21 @@ export interface MediaSlice {
 
 /* ── Job 추적 (supervisor 가 트리거한 비동기 doc-generate) ─────────── */
 
-export type JobPhase = "polling" | "done" | "error";
+/**
+ * - polling  : 진행 중
+ * - done     : 정상 완료 (요청한 양식이 만들어짐)
+ * - rejected : 백엔드가 done 으로 응답했지만, 요청한 양식(NCR/SIR 등)이 생성 거부되어
+ *              일반 텍스트 보고서로 폴백된 경우. silent suppression 방지 차원에서 별도 phase.
+ * - error    : 파이프라인 오류 / 타임아웃
+ */
+export type JobPhase = "polling" | "done" | "rejected" | "error";
 
 export interface JobStatus {
   phase: JobPhase;
   startedAt: number;
   completedAt?: number;
-  error?: string;
+  /** error 또는 rejected 시 사용자에게 노출할 사유. */
+  reason?: string;
 }
 
 export interface JobsSlice {
