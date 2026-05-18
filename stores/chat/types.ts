@@ -39,4 +39,21 @@ export interface MediaSlice {
   clearPendingImage: () => void;
 }
 
-export type ChatStore = MessageSlice & InputSlice & MediaSlice;
+/* ── Job 추적 (supervisor 가 트리거한 비동기 doc-generate) ─────────── */
+
+export type JobPhase = "polling" | "done" | "error";
+
+export interface JobStatus {
+  phase: JobPhase;
+  startedAt: number;
+  completedAt?: number;
+  error?: string;
+}
+
+export interface JobsSlice {
+  jobStatuses: Record<string, JobStatus>;
+  /** 멱등 — 이미 추적 중이면 무시. 폴링 후 완료/오류 시 시스템 메시지 자동 push. */
+  trackJob: (job: TriggeredJob) => void;
+}
+
+export type ChatStore = MessageSlice & InputSlice & MediaSlice & JobsSlice;

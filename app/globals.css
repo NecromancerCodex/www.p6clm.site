@@ -3012,6 +3012,142 @@ select {
 }
 
 /* ══════════════════════════════════════════════════
+   CBOT · Triggered Job Card (진행 → 완료 상태 카드)
+   ══════════════════════════════════════════════════ */
+
+.cbot-job-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 0.9em;
+  font-weight: 600;
+  max-width: 460px;
+  transition: transform 0.15s var(--ease-out), box-shadow 0.18s, border-color 0.15s;
+}
+
+.cbot-job-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.cbot-job-card.is-polling {
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%);
+  color: #1e3a8a;
+}
+
+.cbot-job-card.is-done {
+  border: 1px solid #86efac;
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  color: #14532d;
+}
+
+.cbot-job-card.is-error {
+  border: 1px solid #fecaca;
+  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+  color: #7f1d1d;
+}
+
+.cbot-job-card-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.cbot-job-card.is-done .cbot-job-card-icon {
+  background: #16a34a;
+  color: #fff;
+}
+
+.cbot-job-card.is-error .cbot-job-card-icon {
+  background: #dc2626;
+  color: #fff;
+}
+
+.cbot-job-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1.4;
+  min-width: 0;
+}
+
+.cbot-job-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.94em;
+}
+
+.cbot-job-card-sub {
+  font-weight: 400;
+  font-size: 0.85em;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.cbot-job-card.is-done .cbot-job-card-sub {
+  color: rgba(20, 83, 45, 0.75);
+}
+
+.cbot-job-card.is-error .cbot-job-card-sub {
+  color: rgba(127, 29, 29, 0.78);
+}
+
+.cbot-job-card-arrow {
+  flex-shrink: 0;
+  font-size: 0.95em;
+  opacity: 0.6;
+}
+
+.cbot-job-spin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 폴링 스켈레톤 — 흐르는 그라데이션 막대 3개 */
+.cbot-job-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.cbot-job-skel-bar {
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(
+    90deg,
+    rgba(99, 102, 241, 0.18) 0%,
+    rgba(99, 102, 241, 0.42) 50%,
+    rgba(99, 102, 241, 0.18) 100%
+  );
+  background-size: 200% 100%;
+  animation: cbot-job-shimmer 1.4s var(--ease-out) infinite;
+}
+
+.cbot-job-skel-bar--a { width: 100%; }
+.cbot-job-skel-bar--b { width: 78%; animation-delay: 0.15s; }
+.cbot-job-skel-bar--c { width: 52%; animation-delay: 0.3s; }
+
+@keyframes cbot-job-shimmer {
+  0%   { background-position: 200% 0; opacity: 0.55; }
+  50%  { background-position: 0 0;    opacity: 1; }
+  100% { background-position: -200% 0; opacity: 0.55; }
+}
+
+/* ══════════════════════════════════════════════════
    ATOMS · 신규 (IconButton / Backdrop)
    ══════════════════════════════════════════════════ */
 

@@ -11,14 +11,16 @@
 import { create } from "zustand";
 
 import { createInputSlice } from "./chat/inputSlice";
+import { createJobsSlice } from "./chat/jobsSlice";
 import { createMediaSlice } from "./chat/mediaSlice";
 import { createMessageSlice } from "./chat/messageSlice";
 import type { ChatStore } from "./chat/types";
 
-export type { ChatStore, Message, TriggeredJob } from "./chat/types";
+export type { ChatStore, JobPhase, JobStatus, Message, TriggeredJob } from "./chat/types";
 
 export const useChatStore = create<ChatStore>()((...a) => ({
   ...createMessageSlice(...a),
   ...createInputSlice(...a),
   ...createMediaSlice(...a),
+  ...createJobsSlice(...a),
 }));

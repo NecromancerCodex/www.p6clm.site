@@ -1,42 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import type { Message } from "../../stores/chatStore";
 import { AssistantTtsButton } from "./AssistantTtsButton";
+import { TriggeredJobCard } from "./TriggeredJobCard";
 
 interface MessageBubbleProps {
   message: Message;
 }
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  design_review:   "설계 검토 보고서",
-  design_change:   "도면 변경 요청서",
-  design_fit:      "설계 적합성 검토서",
-  process_plan:    "공정 계획서",
-  process_status:  "공정 현황 보고서",
-  process_delay:   "공정 지연 분석서",
-  const_plan:      "시공 계획서",
-  daily_report:    "작업 일보",
-  const_check:     "시공 품질 확인서",
-  quality_inspect: "품질 검사 보고서",
-  material_check:  "자재 검수 확인서",
-  defect_report:   "부적합 처리 보고서 (NCR)",
-  safety_inspect:  "정기 안전 점검 보고서",
-  risk_assess:     "위험성 평가서",
-  accident_report: "사고 조사 보고서",
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  design:       "설계관리",
-  process:      "공정관리",
-  construction: "시공관리",
-  quality:      "품질관리",
-  safety:       "안전관리",
-};
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
@@ -287,38 +261,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}
       </div>
 
-      {/* supervisor가 비동기 doc-generate를 트리거한 경우 — 진행도 링크 카드 */}
+      {/* supervisor 가 비동기 doc-generate 를 트리거한 경우 — 진행/완료 상태 카드 */}
       {!isUser && message.triggeredJob && (
-        <Link
-          href="/progress"
-          className="cbot-job-card"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 10,
-            marginTop: 8,
-            padding: "10px 14px",
-            border: "1px solid #c7d2fe",
-            background: "linear-gradient(180deg,#eef2ff 0%,#e0e7ff 100%)",
-            borderRadius: 10,
-            textDecoration: "none",
-            color: "#1e3a8a",
-            fontSize: "0.9em",
-            fontWeight: 600,
-            maxWidth: 460,
-          }}
-        >
-          <span aria-hidden style={{ fontSize: "1.1em" }}>📝</span>
-          <span style={{ flex: 1, lineHeight: 1.4 }}>
-            <span style={{ display: "block" }}>
-              {DOC_TYPE_LABELS[message.triggeredJob.doc_type] ?? message.triggeredJob.doc_type} 작성 중
-            </span>
-            <span style={{ display: "block", fontWeight: 400, color: "#475569", fontSize: "0.88em" }}>
-              /progress → {CATEGORY_LABELS[message.triggeredJob.doc_category] ?? message.triggeredJob.doc_category} 탭에서 확인
-            </span>
-          </span>
-          <span style={{ color: "#1e40af", fontSize: "0.85em" }}>→</span>
-        </Link>
+        <TriggeredJobCard job={message.triggeredJob} />
       )}
     </div>
   );
