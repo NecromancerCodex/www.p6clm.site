@@ -104,8 +104,9 @@ export function VoiceMicButton() {
       resetTranscript();
       setStatusLine("✓ 인식 완료 — 전송");
       scheduleClear(1600);
-      // Zustand set 은 동기 — 위 setInput 직후 store 의 input 이 갱신된 상태에서 전송된다.
-      void sendMessage();
+      // sendMessage 에 merged 직접 전달 — store snapshot race 우회 (모바일 환경에서
+      // setInput 직후 sendMessage 가 옛 input 을 읽어 silent return 되는 케이스 방지).
+      void sendMessage(merged);
     },
     [clearTimers, resetTranscript, scheduleClear, setInput, sendMessage]
   );

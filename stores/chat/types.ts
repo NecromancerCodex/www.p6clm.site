@@ -24,7 +24,12 @@ export interface MessageSlice {
   messages: Message[];
   isLoading: boolean;
   clearMessages: () => void;
-  sendMessage: () => Promise<void>;
+  /**
+   * `overrideText` 가 주어지면 store.input 대신 그 값을 전송한다.
+   * 음성 STT 처럼 `setInput → sendMessage` 사이 store snapshot race 위험이 있는
+   * 경로에서 호출자가 *명시적으로* 보낼 텍스트를 넘기는 용도.
+   */
+  sendMessage: (overrideText?: string) => Promise<void>;
 }
 
 export interface InputSlice {

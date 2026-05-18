@@ -8,9 +8,10 @@ export const createMessageSlice: StateCreator<ChatStore, [], [], MessageSlice> =
 
   clearMessages: () => set({ messages: [] }),
 
-  sendMessage: async () => {
+  sendMessage: async (overrideText?: string) => {
     const { input, messages, isLoading, pendingImage, pendingImagePreview } = get();
-    const text = input.trim();
+    // overrideText 우선 — VoiceMicButton 같이 setInput 직후 호출하는 경로의 race 회피.
+    const text = (overrideText ?? input).trim();
     if ((!text && !pendingImage) || isLoading) return;
 
     const defaultCaption = "첨부 이미지를 분석해 주세요.";
