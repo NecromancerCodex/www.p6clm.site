@@ -2171,6 +2171,84 @@ select {
   }
 }
 
+/* ── Mobile (≤768px) — A4 폭(794px) 강제 해제 ─────────────
+   iPhone 13 mini(375px) 등에서 가로 스크롤 없이 보기.
+   데스크탑 A4 양식은 유지, 모바일에선 viewport 폭 채움.
+   SIR / NCR 양쪽 양식 모두 동일 패턴 적용. */
+@media (max-width: 768px) {
+  .sir-wrapper,
+  .ncr-wrapper {
+    padding: 8px !important;
+    width: 100% !important;
+    align-items: stretch !important;
+  }
+  .sir-top-bar,
+  .ncr-top-bar,
+  .sir-form,
+  .ncr-form,
+  .progress-a4-host .sir-wrapper,
+  .progress-a4-host .ncr-wrapper,
+  .progress-a4-host .sir-form,
+  .progress-a4-host .ncr-form,
+  .progress-a4-paper {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    min-height: auto !important;
+    box-sizing: border-box;
+  }
+  .sir-form,
+  .ncr-form {
+    padding: 14px !important;
+    font-size: 10.5px !important;
+  }
+
+  /* NCR header grid — 2열 → 1열 스택 */
+  .ncr-header-grid,
+  .ncr-two-col,
+  .ncr-disposition-row { grid-template-columns: 1fr !important; }
+
+  /* 헤더·섹션 타이틀 축소 */
+  .sir-doc-title { font-size: 13px !important; }
+  .sir-section-title { font-size: 11px !important; padding: 3px 7px !important; }
+
+  /* 모든 표: 고정 레이아웃 + 단어 줄바꿈 */
+  .sir-info-table,
+  .sir-checklist-table,
+  .sir-action-table {
+    font-size: 10px !important;
+    table-layout: fixed;
+    word-break: break-word;
+  }
+  .sir-info-table th,
+  .sir-info-table td,
+  .sir-checklist-table th,
+  .sir-checklist-table td,
+  .sir-action-table th,
+  .sir-action-table td {
+    padding: 3px 5px !important;
+    white-space: normal !important;
+  }
+  .sir-info-table th,
+  .sir-action-table th {
+    width: 30% !important;
+  }
+  /* 체크리스트 4 컬럼 비율 — 모바일에 맞춰 재배분 */
+  .sir-checklist-table th:nth-child(1),
+  .sir-checklist-table td:nth-child(1) { width: 22% !important; }
+  .sir-checklist-table th:nth-child(2),
+  .sir-checklist-table td:nth-child(2) { width: 28% !important; }
+  .sir-checklist-table th:nth-child(3),
+  .sir-checklist-table td:nth-child(3) { width: 10% !important; }
+  .sir-checklist-table th:nth-child(4),
+  .sir-checklist-table td:nth-child(4) { width: 40% !important; }
+  .sir-target-cell { white-space: normal !important; }
+
+  /* 사진 그리드·서명 행 세로 스택 */
+  .sir-photo-grid { grid-template-columns: 1fr !important; }
+  .sir-sig-row { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
 /* ── Progress (문서 이력) ─────────────────────────────── */
 .progress-dashboard {
   margin-top: 16px;
