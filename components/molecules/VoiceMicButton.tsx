@@ -18,6 +18,7 @@ import { useChatStore } from "../../stores/chatStore";
 export function VoiceMicButton() {
   const input = useChatStore((s) => s.input);
   const setInput = useChatStore((s) => s.setInput);
+  const sendMessage = useChatStore((s) => s.sendMessage);
   const isLoading = useChatStore((s) => s.isLoading);
 
   const [statusLine, setStatusLine] = useState("");
@@ -49,10 +50,13 @@ export function VoiceMicButton() {
     if (prevListening.current && !listening) {
       const t = transcript.trim();
       if (t) {
-        setInput(input ? `${input.replace(/\s+$/, "")} ${t}`.trim() : t);
+        const merged = input ? `${input.replace(/\s+$/, "")} ${t}`.trim() : t;
+        setInput(merged);
         resetTranscript();
-        setStatusLine("✓ 입력창에 반영했습니다");
-        scheduleClear(2800);
+        setStatusLine("✓ 인식 완료 — 전송");
+        scheduleClear(1600);
+        // Zustand set 은 동기 — 위 setInput 직후 store 의 input 이 갱신된 상태에서 전송된다.
+        void sendMessage();
       } else {
         setStatusLine("인식된 음성이 없습니다. 다시 탭해 시도하거나 Chrome/Edge를 사용해 주세요.");
         scheduleClear(4000);
@@ -60,7 +64,7 @@ export function VoiceMicButton() {
     }
 
     prevListening.current = listening;
-  }, [listening, transcript, input, setInput, resetTranscript, scheduleClear]);
+  }, [listening, transcript, input, setInput, sendMessage, resetTranscript, scheduleClear]);
 
   useEffect(() => {
     if (listening && transcript) {
