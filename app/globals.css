@@ -2898,7 +2898,8 @@ select {
 .progress-history-row {
   width: 100%;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;          /* wrap 금지 — 좁아도 main이 ellipsis로 처리 */
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   padding: 10px 10px;
@@ -2910,6 +2911,7 @@ select {
   font: inherit;
   color: inherit;
   transition: background 0.12s, border-color 0.12s;
+  overflow: hidden;
 }
 
 .progress-history-row:hover {
@@ -2927,20 +2929,27 @@ select {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-width: 0;
-  flex: 1;
+  min-width: 0;             /* 한국어 wrap 방지의 핵심 — flex item이 컨텐츠보다 작아질 수 있게 */
+  flex: 1 1 0;
+  overflow: hidden;
 }
 
 .progress-history-title {
   font-size: 0.82rem;
   font-weight: 500;
   color: #1e293b;
-  word-break: break-word;
+  /* 좁은 컬럼에서 한 줄 ellipsis. hover 시 full text는 title attribute에서. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .progress-history-meta {
   font-size: 0.72rem;
   color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .progress-history-side {
@@ -2951,6 +2960,274 @@ select {
   font-size: 0.72rem;
   color: #64748b;
   flex-shrink: 0;
+}
+
+.progress-history-li {
+  position: relative;
+  /* 기존 row의 width:100% 동작을 유지하기 위해 block 유지.
+     actions는 absolute로 우측에 띄움 — flex 컨테이너로 만들면 한국어 제목이
+     한 글자씩 wrap되는 문제 발생. */
+}
+
+.progress-history-li > .progress-history-row {
+  /* actions 공간 확보 (28px 버튼 2개 + gap + padding) */
+  padding-right: 44px;
+}
+
+.progress-history-actions {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* button 위에 떠 있어야 하므로 row 클릭과 충돌 방지 */
+  z-index: 1;
+}
+
+.progress-history-action {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.progress-history-action:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.progress-history-action--danger:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* ── DocumentDetail ─────────────────────────────────────────────────────── */
+
+.docdetail-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 20px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.docdetail-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.docdetail-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.docdetail-title h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.docdetail-doc-type {
+  font-size: 0.72rem;
+  color: #6366f1;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.docdetail-meta {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.docdetail-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.docdetail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.docdetail-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.docdetail-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.docdetail-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #475569;
+}
+
+.docdetail-btn--ghost:hover {
+  background: #f1f5f9;
+}
+
+.docdetail-btn--primary {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+  color: #fff;
+}
+
+.docdetail-btn--primary:hover {
+  background: #0284c7;
+  border-color: #0284c7;
+}
+
+.docdetail-btn--danger {
+  background: #fff;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.docdetail-btn--danger:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.docdetail-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.docdetail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.docdetail-field--full {
+  grid-column: 1 / -1;
+}
+
+.docdetail-field > span {
+  font-size: 0.72rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.docdetail-field input,
+.docdetail-field textarea {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #0f172a;
+  resize: vertical;
+}
+
+.docdetail-field input:focus,
+.docdetail-field textarea:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);
+}
+
+.docdetail-save-error {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.78rem;
+}
+
+.docdetail-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.docdetail-preview-heading {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.docdetail-a4-host {
+  display: flex;
+  justify-content: center;
+  background: #e2e8f0;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.docdetail-raw-json,
+.docdetail-raw-text {
+  width: 100%;
+  max-width: 794px;
+  margin: 0;
+  padding: 16px;
+  background: #fff;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: #0f172a;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.docdetail-loading,
+.docdetail-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 32px;
+  color: #475569;
+}
+
+.docdetail-error strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #b91c1c;
 }
 
 .progress-preview-col {

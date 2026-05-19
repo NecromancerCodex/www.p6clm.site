@@ -10,6 +10,7 @@
  */
 import { create } from "zustand";
 
+import { createCrudSlice } from "./doc/crudSlice";
 import { createGenerateSlice } from "./doc/generateSlice";
 import { createInputSlice } from "./doc/inputSlice";
 import { createSelectionSlice } from "./doc/selectionSlice";
@@ -28,4 +29,5 @@ export const useDocStore = create<DocStore>()((...a) => ({
   ...createSelectionSlice(...a),
   ...createInputSlice(...a),
   ...createGenerateSlice(...a),
+  ...createCrudSlice(...a),
 }));

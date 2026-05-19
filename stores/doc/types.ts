@@ -1,9 +1,14 @@
 /**
  * docStore 공통 타입
  *
- * 슬라이스(selectionSlice / inputSlice / generateSlice)가 공유하는
+ * 슬라이스(selectionSlice / inputSlice / generateSlice / crudSlice)가 공유하는
  * 도메인 모델 및 통합 스토어 타입.
  */
+import type {
+  DocumentListFilters,
+  DocumentPatchBody,
+  DocumentRead,
+} from "../../lib/api/documents";
 
 export interface NCRDocument {
   document_number: string;
@@ -82,4 +87,19 @@ export interface GenerateSlice {
   reset: () => void;
 }
 
-export type DocStore = SelectionSlice & InputSlice & GenerateSlice;
+export type CrudLoadStatus = "idle" | "loading" | "ready" | "error";
+
+export interface CrudSlice {
+  items: DocumentRead[];
+  loadStatus: CrudLoadStatus;
+  loadError: string;
+  lastNextOffset: number | null;
+  selected: DocumentRead | null;
+  loadList: (filters?: DocumentListFilters) => Promise<void>;
+  loadOne: (id: string) => Promise<DocumentRead | null>;
+  patch: (id: string, body: DocumentPatchBody) => Promise<DocumentRead | null>;
+  remove: (id: string) => Promise<boolean>;
+  clearSelected: () => void;
+}
+
+export type DocStore = SelectionSlice & InputSlice & GenerateSlice & CrudSlice;

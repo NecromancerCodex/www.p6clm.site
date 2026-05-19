@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCw, FileText, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { RefreshCw, FileText, AlertCircle, Pencil, Trash2 } from "lucide-react";
 
 import type { CategoryId, NCRDocument, SafetyInspectionDocument } from "../../stores/docStore";
 import { DOC_CATEGORIES, docLabelForType, resolveItemCategory } from "../../lib/docCategories";
+import { deleteDocument, listDocuments } from "../../lib/api/documents";
 import { CategoryTab } from "../molecules/CategoryTab";
 import { ProgressInsights } from "../molecules/ProgressInsights";
 import { NcrFormView, SirFormView } from "../documents/DocumentFormViews";
-
-const API_BASE = "/api/clm";
 
 export interface DocumentHistoryItem {
   id: string;
@@ -23,11 +23,6 @@ export interface DocumentHistoryItem {
   created_at: string;
   document_json?: Record<string, unknown> | null;
   preview_text?: string | null;
-}
-
-interface HistoryResponse {
-  items: DocumentHistoryItem[];
-  total_returned: number;
 }
 
 function dayKeyLocal(iso: string): string {
@@ -211,17 +206,28 @@ export function ProgressDashboard() {
   // catChanged effect 에서 docType/selectedId reset 을 *한 사이클* 차단하는 flag.
   const jobApplyingRef = useRef(false);
 
+  const router = useRouter();
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/documents/history?limit=200`);
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { detail?: string };
-        throw new Error(body.detail ?? `HTTP ${res.status}`);
-      }
-      const data: HistoryResponse = await res.json();
-      setItems(data.items ?? []);
+      const data = await listDocuments({ limit: 200 });
+      setItems(
+        (data.items ?? []).map((it) => ({
+          id: it.id,
+          source: it.source,
+          session_id: it.session_id,
+          doc_type: it.doc_type,
+          doc_category: it.doc_category,
+          project_name: it.project_name,
+          title: it.title,
+          status: it.status,
+          created_at: it.created_at,
+          document_json: it.document_json,
+          preview_text: it.preview_text,
+        })),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "불러오기 실패");
       setItems([]);
@@ -229,6 +235,30 @@ export function ProgressDashboard() {
       setLoading(false);
     }
   }, []);
+
+  const handleEdit = useCallback(
+    (id: string) => {
+      router.push(`/document/${encodeURIComponent(id)}/edit`);
+    },
+    [router],
+  );
+
+  const handleDelete = useCallback(
+    async (id: string, title: string | null) => {
+      const label = title?.trim() || id;
+      if (!window.confirm(`"${label}" 문서를 삭제할까요?\n(soft delete — 이력은 보존됩니다)`)) return;
+      const prev = items;
+      setItems((cur) => cur.filter((it) => it.id !== id));
+      if (selectedId === id) setSelectedId(null);
+      try {
+        await deleteDocument(id);
+      } catch (e) {
+        setItems(prev);
+        window.alert(`삭제 실패: ${e instanceof Error ? e.message : "알 수 없는 오류"}`);
+      }
+    },
+    [items, selectedId],
+  );
 
   useEffect(() => {
     void load();
@@ -418,11 +448,12 @@ export function ProgressDashboard() {
           ) : (
             <ul className="progress-history-list">
               {historyRows.map((row) => (
-                <li key={row.id}>
+                <li key={row.id} className="progress-history-li">
                   <button
                     type="button"
                     className={`progress-history-row${selectedId === row.id ? " is-selected" : ""}`}
                     onClick={() => setSelectedId(row.id)}
+                    title={row.title || "(제목 없음)"}
                   >
                     <div className="progress-history-main">
                       <span className="progress-history-title">{row.title || "(제목 없음)"}</span>
@@ -435,6 +466,32 @@ export function ProgressDashboard() {
                       <span className={`progress-status progress-status--${row.status}`}>{row.status}</span>
                     </div>
                   </button>
+                  <div className="progress-history-actions">
+                    <button
+                      type="button"
+                      className="progress-history-action"
+                      title="편집"
+                      aria-label={`${row.title || row.id} 편집`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(row.id);
+                      }}
+                    >
+                      <Pencil size={14} strokeWidth={1.8} />
+                    </button>
+                    <button
+                      type="button"
+                      className="progress-history-action progress-history-action--danger"
+                      title="삭제"
+                      aria-label={`${row.title || row.id} 삭제`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleDelete(row.id, row.title);
+                      }}
+                    >
+                      <Trash2 size={14} strokeWidth={1.8} />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
