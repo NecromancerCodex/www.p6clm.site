@@ -36,11 +36,12 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
     label: "공정관리",
     icon: "📊",
     color: "purple",
-    description: "공정 계획·현황·지연 분석 문서",
+    description: "P6 공정표 기반 공정 보고서 (공사관리 연동)",
     documents: [
-      { id: "process_plan", label: "공정 계획서" },
-      { id: "process_status", label: "공정 현황 보고서" },
-      { id: "process_delay", label: "공정 지연 분석서" },
+      { id: "proc_daily", label: "공사일보" },
+      { id: "proc_weekly", label: "주간 공정현황 보고" },
+      { id: "proc_monthly", label: "월간 공정현황 보고" },
+      { id: "proc_supervision", label: "감리 보고서" },
     ],
   },
   {

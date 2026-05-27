@@ -15,13 +15,14 @@ import {
 } from "../../lib/api/schedule";
 
 const DOC_TYPES: { id: ScheduleDocType; label: string; desc: string }[] = [
-  { id: "process_plan", label: "공정 계획서", desc: "공기·주공정선·관리 착안사항" },
-  { id: "process_status", label: "공정 현황 보고서", desc: "기준일 진도 vs 계획" },
-  { id: "process_delay", label: "공정 지연 분석서", desc: "지연 원인·만회 대책" },
+  { id: "proc_daily", label: "공사일보", desc: "금일 공정·익일 예정" },
+  { id: "proc_weekly", label: "주간 공정현황 보고", desc: "금주 진도·차주 계획" },
+  { id: "proc_monthly", label: "월간 공정현황 보고", desc: "월 진도·마일스톤·만회" },
+  { id: "proc_supervision", label: "감리 보고서", desc: "감리 관점 적정성·지적" },
 ];
 
 export function ScheduleAnalyzer() {
-  const [docType, setDocType] = useState<ScheduleDocType>("process_status");
+  const [docType, setDocType] = useState<ScheduleDocType>("proc_weekly");
   const [projectName, setProjectName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);

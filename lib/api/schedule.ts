@@ -9,12 +9,17 @@
 
 const API_BASE = "/api/clm";
 
-export type ScheduleDocType = "process_plan" | "process_status" | "process_delay";
+export type ScheduleDocType =
+  | "proc_daily"
+  | "proc_weekly"
+  | "proc_monthly"
+  | "proc_supervision";
 
 export const SCHEDULE_DOC_LABELS: Record<ScheduleDocType, string> = {
-  process_plan: "공정 계획서",
-  process_status: "공정 현황 보고서",
-  process_delay: "공정 지연 분석서",
+  proc_daily: "공사일보",
+  proc_weekly: "주간 공정현황 보고",
+  proc_monthly: "월간 공정현황 보고",
+  proc_supervision: "감리 보고서",
 };
 
 export interface ScheduleMetrics {
