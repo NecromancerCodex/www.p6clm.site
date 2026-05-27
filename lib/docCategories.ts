@@ -61,11 +61,12 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
     label: "품질관리",
     icon: "✅",
     color: "teal",
-    description: "품질 검사·자재 검수·부적합 보고 문서",
+    description:
+      "품질 검사·자재 검수가 시작점입니다. 적합이면 그대로 완료, 부적합이면 NCR이 자동 발행되고 NCR에서 CAR(시정조치)을 생성합니다.",
     documents: [
       { id: "quality_inspect", label: "품질 검사 보고서" },
       { id: "material_check", label: "자재 검수 확인서" },
-      { id: "defect_report", label: "부적합 처리 보고서 (NCR)", isNcr: true },
+      { id: "defect_report", label: "부적합 처리 보고서 (NCR) — 직접 발행", isNcr: true },
     ],
   },
   {

@@ -83,7 +83,15 @@ export interface GenerateSlice {
   rawResult: string;
   errorMsg: string;
   stepsLog: string[];
+  // 품질 파이프라인 (Phase 5)
+  judgement: string | null;                          // 적합 | 부적합 | 조건부 적합 | 검토필요
+  nonconformityDetected: boolean;                    // 부적합 → NCR 파생됨
+  derivedNcr: Record<string, unknown> | null;        // 자동 파생 NCR
+  carStatus: "idle" | "submitting" | "polling" | "done" | "error";
+  carResult: Record<string, unknown> | null;         // CAR 문서
+  carRaw: string;                                    // CAR 마크다운
   generate: () => Promise<void>;
+  generateCar: (ncr: Record<string, unknown>) => Promise<void>;  // [CAR 생성] 버튼
   reset: () => void;
 }
 

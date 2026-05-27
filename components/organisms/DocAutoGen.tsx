@@ -30,6 +30,12 @@ export function DocAutoGen() {
   const imageFile = useDocStore((s) => s.imageFile);
   const imagePreview = useDocStore((s) => s.imagePreview);
   const stepsLog = useDocStore((s) => s.stepsLog);
+  const judgement = useDocStore((s) => s.judgement);
+  const nonconformityDetected = useDocStore((s) => s.nonconformityDetected);
+  const derivedNcr = useDocStore((s) => s.derivedNcr);
+  const carStatus = useDocStore((s) => s.carStatus);
+  const carRaw = useDocStore((s) => s.carRaw);
+  const generateCar = useDocStore((s) => s.generateCar);
 
   const setActiveCat = useDocStore((s) => s.setActiveCat);
   const setActiveDoc = useDocStore((s) => s.setActiveDoc);
@@ -298,7 +304,51 @@ export function DocAutoGen() {
                     ))}
                   </div>
                 )}
+
+                {/* 품질/자재 검수 판정 — 적합/부적합 배지 */}
+                {judgement && (
+                  <div className={`dag-judgement ${nonconformityDetected ? "is-fail" : "is-pass"}`}>
+                    <strong>AI 추천 판정: {judgement}</strong>
+                    {nonconformityDetected ? (
+                      <span> ⚠️ 부적합 — NCR이 자동 발행되었습니다 (최종 판정은 품질관리자 확정)</span>
+                    ) : (
+                      <span> ✅ 적합 — 최상위 문서로 완료 (NCR 불필요)</span>
+                    )}
+                  </div>
+                )}
+
                 <pre className="dag-result-body">{rawResult}</pre>
+
+                {/* 부적합 → 자동 파생 NCR + [CAR 생성] */}
+                {nonconformityDetected && derivedNcr && (
+                  <div className="dag-derived-ncr">
+                    <p className="dag-result-label">자동 발행된 NCR</p>
+                    <strong>{String((derivedNcr as Record<string, unknown>).ncr_number ?? "NCR")}</strong>
+                    <p className="dag-ncr-desc">{String((derivedNcr as Record<string, unknown>).description ?? "")}</p>
+                    {carStatus === "done" && carRaw ? (
+                      <div className="dag-car-result">
+                        <p className="dag-result-label">시정조치 보고서 (CAR)</p>
+                        <pre className="dag-result-body">{carRaw}</pre>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`dag-gen-btn${carStatus === "submitting" || carStatus === "polling" ? " is-loading" : ""}`}
+                        onClick={() => void generateCar(derivedNcr as Record<string, unknown>)}
+                        disabled={carStatus === "submitting" || carStatus === "polling"}
+                      >
+                        {carStatus === "submitting" || carStatus === "polling" ? (
+                          <>
+                            <Spinner size="sm" />
+                            CAR 생성 중...
+                          </>
+                        ) : (
+                          <>✦ CAR 생성 (시정조치 보고서)</>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

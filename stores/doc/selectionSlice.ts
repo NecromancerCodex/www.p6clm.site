@@ -4,7 +4,7 @@ import type { DocStore, SelectionSlice } from "./types";
 
 export const createSelectionSlice: StateCreator<DocStore, [], [], SelectionSlice> = (set) => ({
   activeCat: "quality",
-  activeDoc: "defect_report",
+  activeDoc: "quality_inspect",
 
   setActiveCat: (activeCat) =>
     set({
@@ -19,6 +19,12 @@ export const createSelectionSlice: StateCreator<DocStore, [], [], SelectionSlice
       imageFile: null,
       imagePreview: null,
       stepsLog: [],
+      judgement: null,
+      nonconformityDetected: false,
+      derivedNcr: null,
+      carStatus: "idle",
+      carResult: null,
+      carRaw: "",
     }),
 
   setActiveDoc: (activeDoc) =>
@@ -29,5 +35,11 @@ export const createSelectionSlice: StateCreator<DocStore, [], [], SelectionSlice
       sirResult: null,
       rawResult: "",
       errorMsg: "",
+      judgement: null,
+      nonconformityDetected: false,
+      derivedNcr: null,
+      carStatus: "idle",
+      carResult: null,
+      carRaw: "",
     }),
 });

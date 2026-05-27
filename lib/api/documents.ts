@@ -69,6 +69,7 @@ export interface DocumentCreateBody {
   context?: string;
   project_name?: string;
   image_base64?: string;
+  linked_ncr?: Record<string, unknown> | null; // CAR 생성 시 대상 NCR 데이터
 }
 
 export interface JobCreatedResponse {
@@ -165,6 +166,7 @@ export function createDocument(body: DocumentCreateBody): Promise<JobCreatedResp
       context: body.context ?? "",
       project_name: body.project_name ?? "POSCO CONSTRUCTION",
       image_base64: body.image_base64 ?? null,
+      linked_ncr: body.linked_ncr ?? null,
     }),
   });
 }
@@ -191,6 +193,12 @@ export interface JobStatusResponse {
   result?: {
     ncr?: Record<string, unknown> | null;
     safety_inspection?: Record<string, unknown> | null;
+    quality_inspection?: Record<string, unknown> | null;
+    material_inspection?: Record<string, unknown> | null;
+    quality_judgement?: string | null;
+    nonconformity_detected?: boolean;
+    derived_ncr?: Record<string, unknown> | null;
+    car?: Record<string, unknown> | null;
     final_response?: string;
     steps_taken?: string[];
   };

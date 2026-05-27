@@ -18,7 +18,29 @@ const INITIAL_RESULT = {
   rawResult: "",
   errorMsg: "",
   stepsLog: [],
+  judgement: null,
+  nonconformityDetected: false,
+  derivedNcr: null,
+  carStatus: "idle" as const,
+  carResult: null,
+  carRaw: "",
 };
+
+async function pollJob(jobId: string) {
+  for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    try {
+      const job = await getJob(jobId);
+      if (job.status === "done" && job.result) return job;
+      if (job.status === "error") throw new Error(job.error ?? "파이프라인 오류");
+    } catch (pollErr) {
+      if (pollErr instanceof DocumentApiError && pollErr.status >= 500) continue;
+      if (pollErr instanceof Error && pollErr.message === "파이프라인 오류") throw pollErr;
+      continue;
+    }
+  }
+  throw new Error("처리 시간이 초과되었습니다. (최대 10분)");
+}
 
 export const createGenerateSlice: StateCreator<DocStore, [], [], GenerateSlice> = (set, get) => ({
   ...INITIAL_RESULT,
@@ -27,7 +49,7 @@ export const createGenerateSlice: StateCreator<DocStore, [], [], GenerateSlice> 
     set({
       ...INITIAL_RESULT,
       activeCat: "quality",
-      activeDoc: "defect_report",
+      activeDoc: "quality_inspect",
       context: "",
       imageFile: null,
       imagePreview: null,
@@ -37,7 +59,7 @@ export const createGenerateSlice: StateCreator<DocStore, [], [], GenerateSlice> 
     const { activeCat, activeDoc, context, imageFile } = get();
     if (!activeDoc) return;
 
-    set({ status: "submitting", ncrResult: null, rawResult: "", errorMsg: "", stepsLog: [] });
+    set({ ...INITIAL_RESULT, status: "submitting" });
 
     try {
       const created = imageFile
@@ -53,40 +75,45 @@ export const createGenerateSlice: StateCreator<DocStore, [], [], GenerateSlice> 
           });
 
       set({ status: "polling" });
+      const job = await pollJob(created.job_id);
+      const r = job.result!;
 
-      for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-        let job;
-        try {
-          job = await getJob(created.job_id);
-        } catch (pollErr) {
-          // 일시적 네트워크 오류는 다음 시도로 — DocumentApiError가 아닌 경우만 즉시 중단
-          if (pollErr instanceof DocumentApiError && pollErr.status >= 500) continue;
-          continue;
-        }
-
-        if (job.status === "done" && job.result) {
-          set({
-            stepsLog: job.result.steps_taken ?? [],
-            ncrResult: (job.result.ncr as never) ?? null,
-            sirResult: (job.result.safety_inspection as never) ?? null,
-            rawResult: job.result.final_response ?? "",
-            status: "done",
-          });
-          return;
-        }
-        if (job.status === "error") throw new Error(job.error ?? "파이프라인 오류");
-      }
-
-      throw new Error("처리 시간이 초과되었습니다. (최대 10분)");
+      set({
+        stepsLog: r.steps_taken ?? [],
+        ncrResult: (r.ncr as never) ?? null,
+        sirResult: (r.safety_inspection as never) ?? null,
+        rawResult: r.final_response ?? "",
+        judgement: r.quality_judgement ?? null,
+        nonconformityDetected: !!r.nonconformity_detected,
+        derivedNcr: r.derived_ncr ?? null,
+        status: "done",
+      });
     } catch (err: unknown) {
       const message =
-        err instanceof DocumentApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "알 수 없는 오류";
+        err instanceof DocumentApiError ? err.detail : err instanceof Error ? err.message : "알 수 없는 오류";
       set({ errorMsg: message, status: "error" });
+    }
+  },
+
+  // NCR 화면 [CAR 생성] — 대상 NCR 데이터를 백엔드 linked_ncr 로 전달
+  generateCar: async (ncr) => {
+    set({ carStatus: "submitting", carResult: null, carRaw: "" });
+    try {
+      const created = await createDocument({
+        category: "quality",
+        doc_type: "car",
+        context: "",
+        project_name: "POSCO CONSTRUCTION",
+        linked_ncr: ncr,
+      });
+      set({ carStatus: "polling" });
+      const job = await pollJob(created.job_id);
+      const r = job.result!;
+      set({ carResult: r.car ?? null, carRaw: r.final_response ?? "", carStatus: "done" });
+    } catch (err: unknown) {
+      const message =
+        err instanceof DocumentApiError ? err.detail : err instanceof Error ? err.message : "CAR 생성 오류";
+      set({ errorMsg: message, carStatus: "error" });
     }
   },
 });

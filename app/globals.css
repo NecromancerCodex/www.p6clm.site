@@ -620,6 +620,53 @@ select {
   background: var(--surface-soft);
 }
 
+/* ── 품질 파이프라인: 판정 배지 / 파생 NCR / CAR (Phase 5) ── */
+.dag-judgement {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid transparent;
+}
+.dag-judgement.is-pass {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+.dag-judgement.is-fail {
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #9a3412;
+}
+.dag-derived-ncr {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #fdba74;
+  border-radius: 12px;
+  background: #fffaf5;
+}
+.dag-derived-ncr > strong {
+  display: block;
+  font-size: 1rem;
+  color: #9a3412;
+  margin: 4px 0 8px;
+}
+.dag-ncr-desc {
+  font-size: 0.85rem;
+  color: var(--text-soft, #475569);
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+.dag-car-result {
+  margin-top: 14px;
+  border-top: 1px dashed #fdba74;
+  padding-top: 12px;
+}
+
 /* Error */
 .dag-error {
   flex: 1;
