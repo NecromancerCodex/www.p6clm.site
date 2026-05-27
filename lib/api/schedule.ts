@@ -113,6 +113,53 @@ export interface ScheduleParseResult {
   warnings: string[];
 }
 
+export interface SnapshotMeta {
+  id: number;
+  project_name: string | null;
+  data_date: string | null;
+  file_name: string | null;
+  source_format: string | null;
+  activity_count: number;
+  created_at: string | null;
+}
+
+export interface SnapshotFull extends SnapshotMeta {
+  tasks: GanttTask[];
+  summary: ScheduleSummary;
+}
+
+/** 업로드 → 파싱·분석 → CLM DB(schedule_snapshots) 저장. 저장 id + 데이터 반환. */
+export async function uploadSchedule(
+  file: File,
+  projectName?: string,
+): Promise<SnapshotFull> {
+  const form = new FormData();
+  form.append("file", file);
+  if (projectName?.trim()) form.append("project_name", projectName.trim());
+  const res = await fetch(`${API_BASE}/schedule/upload`, { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const detail = (body && (body.detail ?? body.error)) || `${res.status} ${res.statusText}`;
+    throw new ScheduleApiError(res.status, String(detail));
+  }
+  return (await res.json()) as SnapshotFull;
+}
+
+/** 저장된 스냅샷 목록 (메타데이터). */
+export async function listSnapshots(): Promise<SnapshotMeta[]> {
+  const res = await fetch(`${API_BASE}/schedule/snapshots`);
+  if (!res.ok) throw new ScheduleApiError(res.status, `${res.status} ${res.statusText}`);
+  const j = await res.json();
+  return (j.items ?? []) as SnapshotMeta[];
+}
+
+/** 단일 스냅샷 전체 (tasks + summary). */
+export async function getSnapshot(id: number): Promise<SnapshotFull> {
+  const res = await fetch(`${API_BASE}/schedule/snapshots/${id}`);
+  if (!res.ok) throw new ScheduleApiError(res.status, `${res.status} ${res.statusText}`);
+  return (await res.json()) as SnapshotFull;
+}
+
 /** PMXML 파일 업로드 → 공정표(Gantt) task + 진도 요약 (stateless, 저장 X). */
 export async function parseSchedule(
   file: File,

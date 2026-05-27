@@ -4041,3 +4041,5 @@ select {
 .ws-subnav-item.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
 .ws-subnav-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.45; flex: 0 0 auto; }
 .ws-subnav-item.active .ws-subnav-dot { opacity: 1; }
+
+.sch-snap-select { flex: 1 1 280px; min-width: 200px; cursor: pointer; }

@@ -1,37 +1,20 @@
 "use client";
 
-import { Activity, FileUp, Loader2, AlertTriangle } from "lucide-react";
+import { Activity, Loader2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useEffect } from "react";
 
-import { parseSchedule, ScheduleApiError } from "../../lib/api/schedule";
 import { useScheduleStore } from "../../stores/scheduleStore";
 
 export function ScheduleProgress() {
-  const { summary, projectName: storedProject, setResult } = useScheduleStore();
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const {
+    snapshots, selectedId, summary, loading, error, loadedOnce,
+    loadSnapshots, selectSnapshot,
+  } = useScheduleStore();
 
-  const onSubmit = useCallback(async () => {
-    if (!file) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await parseSchedule(file);
-      setResult({
-        fileName: file.name,
-        projectName: res.project_name,
-        tasks: res.tasks,
-        summary: res.summary,
-      });
-    } catch (e) {
-      setError(e instanceof ScheduleApiError ? e.detail : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [file, setResult]);
+  useEffect(() => {
+    if (!loadedOnce) loadSnapshots();
+  }, [loadedOnce, loadSnapshots]);
 
   return (
     <div className="ws-inner-pad">
@@ -40,29 +23,33 @@ export function ScheduleProgress() {
         공정 진도율
       </div>
       <p className="ws-section-desc">
-        업로드된 공정표의 기준일 시점 진도율·지연 활동을 분석합니다.{" "}
-        {storedProject ? (
-          <>현재 프로젝트: <strong>{storedProject}</strong></>
-        ) : (
-          <><Link href="/schedule/construction">공정표</Link>에서 먼저 업로드하거나 아래에서 업로드하세요.</>
-        )}
+        CLM에 저장된 공정표의 기준일 시점 진도율·지연 활동을 보여 줍니다.
       </p>
 
-      {!summary && (
+      {snapshots.length > 0 && (
         <div className="sch-toolbar">
-          <button type="button" className="sch-dropzone sch-toolbar-file" onClick={() => inputRef.current?.click()}>
-            <FileUp size={16} />
-            <span>{file ? file.name : ".xml / .xer 선택"}</span>
-          </button>
-          <input ref={inputRef} type="file" accept=".xml,.xer" hidden
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <button type="button" className="sch-submit sch-toolbar-go" onClick={onSubmit} disabled={loading || !file}>
-            {loading ? <><Loader2 size={15} className="sch-spin" /> 분석 중</> : "진도 분석"}
-          </button>
+          <select
+            className="sch-input sch-snap-select"
+            value={selectedId ?? ""}
+            onChange={(e) => selectSnapshot(Number(e.target.value))}
+          >
+            {snapshots.map((s) => (
+              <option key={s.id} value={s.id}>
+                {(s.project_name || s.file_name || `#${s.id}`)} · {s.activity_count}건 ·{" "}
+                {s.created_at ? new Date(s.created_at).toLocaleDateString() : ""}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
+      {loading && <div className="sch-hint"><Loader2 size={14} className="sch-spin" /> 불러오는 중…</div>}
       {error && <div className="sch-error"><AlertTriangle size={15} /> {error}</div>}
+      {loadedOnce && !loading && snapshots.length === 0 && !error && (
+        <div className="sch-hint">
+          저장된 공정표가 없습니다. <Link href="/schedule/construction">공정표</Link>에서 먼저 업로드하세요.
+        </div>
+      )}
 
       {summary && (
         <>
