@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, FileText, BarChart2, Info, ChevronRight, HardHat, X } from "lucide-react";
+import { Bot, FileText, BarChart2, CalendarRange, Info, ChevronRight, HardHat, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -12,6 +12,7 @@ import { useUiStore } from "../../stores/uiStore";
 const NAV_ITEMS = [
   { path: "/home",     label: "AI 대화",   icon: Bot      },
   { path: "/document", label: "문서 작성", icon: FileText },
+  { path: "/schedule", label: "공정관리", icon: CalendarRange },
   { path: "/progress", label: "진행도",    icon: BarChart2 },
   { path: "/about",    label: "소개",      icon: Info     },
 ];
