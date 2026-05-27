@@ -7,6 +7,8 @@ export interface DocDef {
   id: string;
   label: string;
   isNcr?: boolean;
+  /** 파생 문서 — 생성 폼에선 숨김(버튼으로만 생성), 이력 조회에는 표시. 예: CAR */
+  derived?: boolean;
 }
 
 export interface DocCategoryDef {
@@ -67,6 +69,7 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
       { id: "quality_inspect", label: "품질 검사 보고서" },
       { id: "material_check", label: "자재 검수 확인서" },
       { id: "defect_report", label: "부적합 처리 보고서 (NCR) — 직접 발행", isNcr: true },
+      { id: "car", label: "시정조치 보고서 (CAR)", derived: true },
     ],
   },
   {

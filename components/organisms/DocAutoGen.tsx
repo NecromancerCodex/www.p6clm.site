@@ -92,16 +92,19 @@ export function DocAutoGen() {
           <div className="dag-left">
             <p className="dag-left-desc">{category.description}</p>
             <ul className="dag-doc-list">
-              {category.documents.map((doc) => (
-                <DocListItem
-                  key={doc.id}
-                  id={doc.id}
-                  label={doc.label}
-                  isNcr={"isNcr" in doc ? (doc as { isNcr?: boolean }).isNcr : false}
-                  active={activeDoc === doc.id}
-                  onClick={() => setActiveDoc(doc.id)}
-                />
-              ))}
+              {/* 파생 문서(CAR)는 생성 폼에서 숨김 — NCR 결과의 [CAR 생성] 버튼으로만 생성 */}
+              {category.documents
+                .filter((doc) => !("derived" in doc && (doc as { derived?: boolean }).derived))
+                .map((doc) => (
+                  <DocListItem
+                    key={doc.id}
+                    id={doc.id}
+                    label={doc.label}
+                    isNcr={"isNcr" in doc ? (doc as { isNcr?: boolean }).isNcr : false}
+                    active={activeDoc === doc.id}
+                    onClick={() => setActiveDoc(doc.id)}
+                  />
+                ))}
             </ul>
 
             {activeDoc && (
