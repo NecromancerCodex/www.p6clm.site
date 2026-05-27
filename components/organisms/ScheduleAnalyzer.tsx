@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { ScheduleFormView } from "../documents/DocumentFormViews";
 import {
   analyzeSchedule,
   ScheduleApiError,
@@ -177,11 +178,19 @@ export function ScheduleAnalyzer() {
             </div>
           )}
 
-          <div className="sch-report a4">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {result.report_markdown ?? "_(보고서 내용 없음)_"}
-            </ReactMarkdown>
-          </div>
+          {result.document ? (
+            <ScheduleFormView
+              doc={result.document}
+              stepsLog={result.steps_taken}
+              showPipeline={false}
+            />
+          ) : (
+            <div className="sch-report a4">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {result.report_markdown ?? "_(보고서 내용 없음)_"}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
       )}
     </div>

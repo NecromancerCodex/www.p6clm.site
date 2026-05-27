@@ -33,6 +33,46 @@ export interface ScheduleMetrics {
   delayed_count?: number;
 }
 
+/** 지연·임계 공정 1행 (양식 테이블용). */
+export interface ScheduleDocDelayedRow {
+  code: string;
+  name: string;
+  wbs_path: string;
+  reason: string;
+  delay_days: number;
+  percent_complete: number;
+  is_critical: boolean;
+  planned_finish: string;
+}
+
+/** 백엔드가 내려주는 구조화 공정 보고서 (ScheduleFormView 가 그대로 렌더). */
+export interface ScheduleReportDoc {
+  doc_type: ScheduleDocType;
+  title: string;
+  document_number: string;
+  construction_name: string;
+  data_date: string;
+  report_date: string;
+  status_level: "지연" | "정상";
+  project_start: string;
+  project_finish: string;
+  total_duration_days: number;
+  overall_percent: number;
+  planned_percent: number;
+  schedule_variance: number;
+  activity_count: number;
+  milestone_count: number;
+  completed_count: number;
+  in_progress_count: number;
+  not_started_count: number;
+  critical_count: number;
+  delayed_count: number;
+  delayed: ScheduleDocDelayedRow[];
+  milestones: { name: string; date: string }[];
+  narrative: string;
+  grounding: string;
+}
+
 export interface ScheduleAnalyzeResult {
   success: boolean;
   job_id: string;
@@ -41,6 +81,7 @@ export interface ScheduleAnalyzeResult {
   project_name: string | null;
   report_markdown: string | null;
   metrics: ScheduleMetrics | null;
+  document: ScheduleReportDoc | null;
   alert_required: boolean;
   steps_taken: string[];
 }

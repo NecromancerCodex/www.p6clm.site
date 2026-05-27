@@ -4030,6 +4030,27 @@ select {
 .sch-progress-legend .dot.planned { background: #cbd5e1; }
 .sch-progress-legend .dot.actual { background: var(--green); }
 
+/* ── 공정 보고서 폼 뷰(ScheduleFormView) 전용 ─────────────────────────────── */
+.sch-prog-wrap { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sch-prog-row { display: flex; align-items: center; gap: 10px; }
+.sch-prog-label { flex: 0 0 36px; font-size: 0.8rem; color: var(--muted); }
+.sch-prog-track { flex: 1 1 auto; height: 14px; background: var(--surface-muted); border-radius: 7px; overflow: hidden; }
+.sch-prog-fill { height: 100%; border-radius: 7px; transition: width 0.4s ease; }
+.sch-prog-actual { background: var(--green); }
+.sch-prog-planned { background: #94a3b8; }
+.sch-prog-val { flex: 0 0 46px; text-align: right; font-size: 0.82rem; font-weight: 600; color: var(--muted-strong); }
+
+/* 폼 안의 마크다운(서술/근거) 정리 — sir 폼 톤에 맞춤 */
+.sch-md { font-size: 0.88rem; line-height: 1.6; color: var(--text); }
+.sch-md p { margin: 0 0 8px; }
+.sch-md h2, .sch-md h3, .sch-md h4 { font-size: 0.95rem; margin: 12px 0 6px; color: var(--muted-strong); }
+.sch-md ul, .sch-md ol { padding-left: 20px; margin: 6px 0; }
+.sch-md li { margin: 2px 0; }
+.sch-md table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.sch-md th, .sch-md td { border: 1px solid var(--line); padding: 5px 8px; font-size: 0.82rem; text-align: left; }
+.sch-md th { background: var(--surface-soft); }
+.sch-md code { background: var(--surface-soft); padding: 1px 5px; border-radius: 4px; font-size: 0.82rem; }
+
 .sch-h3 { font-size: 0.98rem; font-weight: 700; color: var(--muted-strong); margin: 22px 0 10px; }
 .sch-empty { color: var(--muted); font-size: 0.86rem; }
 .sch-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }

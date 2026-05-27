@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type {
   NCRDocument,
   SafetyInspectionDocument,
@@ -8,6 +10,7 @@ import type {
   MaterialInspectionDoc,
   CARDoc,
 } from "../../stores/doc/types";
+import type { ScheduleReportDoc } from "../../lib/api/schedule";
 
 /* ── 번호 목록 텍스트 렌더러 ──────────────────────────────────── */
 
@@ -424,6 +427,274 @@ export function SirFormView({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── 공정 현황 보고서 폼 뷰 (Primavera P6 분석 결과) ──────────── */
+
+export function ScheduleFormView({
+  doc,
+  stepsLog = [],
+  onReset,
+  showPipeline = true,
+}: {
+  doc: ScheduleReportDoc;
+  stepsLog?: string[];
+  onReset?: () => void;
+  showPipeline?: boolean;
+}) {
+  // 진도 편차에 따른 상태 배지 색 (안전점검 risk 배지 클래스 재사용).
+  const statusClass = doc.status_level === "지연" ? "sir-risk-high" : "sir-risk-low";
+  const varianceStr = `${doc.schedule_variance > 0 ? "+" : ""}${doc.schedule_variance}%p`;
+  const criticalDelayed = doc.delayed.filter((d) => d.is_critical).length;
+
+  async function copyAsText() {
+    const rows = doc.delayed
+      .map(
+        (d) =>
+          `  [${d.is_critical ? "임계" : "지연"}] ${d.name} (${d.wbs_path}) — ${d.reason}, ${d.delay_days}일`,
+      )
+      .join("\n");
+    const text = [
+      doc.title,
+      `문서번호: ${doc.document_number}`,
+      ``,
+      `[1. 보고 기본 정보]`,
+      `공사명:   ${doc.construction_name}`,
+      `기준일:   ${doc.data_date}`,
+      `전체 공기: ${doc.project_start} ~ ${doc.project_finish} (총 ${doc.total_duration_days}일)`,
+      ``,
+      `[2. 공정 현황 요약]`,
+      `실적 진도: ${doc.overall_percent}%  /  계획 진도: ${doc.planned_percent}%  /  편차: ${varianceStr}`,
+      `완료 ${doc.completed_count} / 진행 ${doc.in_progress_count} / 미착수 ${doc.not_started_count}  ·  임계공정 ${doc.critical_count}개`,
+      ``,
+      `[3. 지연·임계 공정]`,
+      rows || "  (지연 공정 없음)",
+      ``,
+      `[4. 종합 의견]`,
+      doc.narrative,
+    ].join("\n");
+    await navigator.clipboard.writeText(text);
+  }
+
+  return (
+    <div className="sir-wrapper">
+      <div className="sir-top-bar">
+        {showPipeline && stepsLog.length > 0 ? (
+          <div className="dag-steps-log">
+            {stepsLog.map((s, i) => (
+              <span key={i} className="dag-step-badge">
+                ✓ {s}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="dag-steps-log" />
+        )}
+        <div className="ncr-actions">
+          <button type="button" className="dag-copy-btn" onClick={copyAsText}>
+            텍스트 복사
+          </button>
+          <button type="button" className="dag-copy-btn" onClick={() => window.print()}>
+            🖨️ 인쇄
+          </button>
+          {onReset ? (
+            <button type="button" className="dag-reset-btn" onClick={onReset}>
+              다시 선택
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="sir-form">
+        <div className="sir-doc-header">
+          <div className="sir-doc-title">{doc.title}</div>
+          <div className="sir-doc-meta">
+            <span>문서번호: {doc.document_number}</span>
+            <span className={`sir-risk-badge ${statusClass}`}>{doc.status_level}</span>
+          </div>
+        </div>
+
+        {/* 1. 보고 기본 정보 */}
+        <div className="sir-section">
+          <div className="sir-section-title">1. 보고 기본 정보</div>
+          <table className="sir-info-table">
+            <tbody>
+              <tr>
+                <th>공사명</th>
+                <td colSpan={3}>{doc.construction_name}</td>
+              </tr>
+              <tr>
+                <th>기준일 (Data Date)</th>
+                <td>{doc.data_date}</td>
+                <th>보고 유형</th>
+                <td>{doc.title}</td>
+              </tr>
+              <tr>
+                <th>전체 공기</th>
+                <td colSpan={3}>
+                  {doc.project_start} ~ {doc.project_finish} (총 {doc.total_duration_days}일)
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* 2. 공정 현황 요약 */}
+        <div className="sir-section">
+          <div className="sir-section-title">
+            2. 공정 현황 요약
+            <span className="sir-summary-badge">
+              실적 <strong>{doc.overall_percent}%</strong> &nbsp;/&nbsp; 계획{" "}
+              <strong>{doc.planned_percent}%</strong> &nbsp;·&nbsp; 편차{" "}
+              <strong>{varianceStr}</strong>
+            </span>
+          </div>
+          <table className="sir-info-table">
+            <tbody>
+              <tr>
+                <th>실적 진도율</th>
+                <td>{doc.overall_percent}%</td>
+                <th>계획 진도율</th>
+                <td>{doc.planned_percent}%</td>
+              </tr>
+              <tr>
+                <th>진행 현황</th>
+                <td colSpan={3}>
+                  완료 {doc.completed_count} / 진행 {doc.in_progress_count} / 미착수{" "}
+                  {doc.not_started_count} (총 {doc.activity_count}개 · 마일스톤{" "}
+                  {doc.milestone_count}개)
+                </td>
+              </tr>
+              <tr>
+                <th>임계공정</th>
+                <td>{doc.critical_count}개</td>
+                <th>지연 공정</th>
+                <td>{doc.delayed_count}개</td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="sch-prog-wrap">
+            <ProgressBar label="실적" pct={doc.overall_percent} variant="actual" />
+            <ProgressBar label="계획" pct={doc.planned_percent} variant="planned" />
+          </div>
+        </div>
+
+        {/* 3. 지연·임계 공정 */}
+        <div className="sir-section">
+          <div className="sir-section-title">
+            3. 지연·임계 공정 (지적 사항)
+            <span className="sir-summary-badge">
+              지연 <strong>{doc.delayed_count}</strong>건 &nbsp;/&nbsp; 임계{" "}
+              <strong>{doc.critical_count}</strong>건
+            </span>
+          </div>
+          {doc.delayed.length > 0 ? (
+            <table className="sir-checklist-table">
+              <thead>
+                <tr>
+                  <th style={{ width: "24%" }}>공정명</th>
+                  <th style={{ width: "26%" }}>WBS 경로</th>
+                  <th style={{ width: "10%" }}>상태</th>
+                  <th style={{ width: "10%" }}>지연</th>
+                  <th>사유</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doc.delayed.map((d, i) => (
+                  <tr key={i} className={d.is_critical ? "sir-row-fail" : ""}>
+                    <td className="sir-target-cell">{d.name}</td>
+                    <td>{d.wbs_path || "-"}</td>
+                    <td className={`sir-pf-cell ${d.is_critical ? "sir-pf-fail" : "sir-pf-na"}`}>
+                      {d.is_critical ? "⚠ 임계" : "지연"}
+                    </td>
+                    <td>{d.delay_days}일</td>
+                    <td className="sir-findings-cell">
+                      {d.reason} (진도 {d.percent_complete}%, 계획종료 {d.planned_finish})
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="sir-photo-guidance">지연·임계 공정 없음 — 계획 대비 정상 추세입니다.</div>
+          )}
+          {doc.milestones.length > 0 && (
+            <div className="sir-regulation-box">
+              <span className="sir-reg-label">다가오는 마일스톤</span>
+              <ul className="sir-reg-list">
+                {doc.milestones.map((m, i) => (
+                  <li key={i}>
+                    {m.name} — 목표 {m.date}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* 4. 관련 기준·근거 / 종합 의견 */}
+        <div className="sir-section">
+          <div className="sir-section-title">4. 관련 기준·근거 / 종합 의견</div>
+          {doc.grounding ? (
+            <div className="sir-regulation-box">
+              <span className="sir-reg-label">관련 기준·근거 (KCS/KDS·법령)</span>
+              <div className="sch-md">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{doc.grounding}</ReactMarkdown>
+              </div>
+            </div>
+          ) : null}
+          <div className="sch-md sir-opinion-cell">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {doc.narrative || "_(종합 의견 없음)_"}
+            </ReactMarkdown>
+          </div>
+          <div className="sir-photo-guidance">
+            ※ 위 근거·의견은 공정표 분석에 기반한 검토용 참고자료입니다. 공기연장·지체상금·법적 책임의
+            확정이 아니며, 적용 여부·최신 기준은 별도 확인이 필요합니다.
+          </div>
+        </div>
+
+        <div className="sir-sig-row">
+          <div className="sir-sig-box">
+            <div className="sir-sig-title">작성자</div>
+            <div className="sir-sig-area" />
+            <div className="sir-sig-name">(현장 공무)</div>
+          </div>
+          <div className="sir-sig-box">
+            <div className="sir-sig-title">검토자</div>
+            <div className="sir-sig-area" />
+            <div className="sir-sig-name">(서명)</div>
+          </div>
+          <div className="sir-sig-box">
+            <div className="sir-sig-title">승인</div>
+            <div className="sir-sig-area" />
+            <div className="sir-sig-name">(서명)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressBar({
+  label,
+  pct,
+  variant,
+}: {
+  label: string;
+  pct: number;
+  variant: "actual" | "planned";
+}) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  return (
+    <div className="sch-prog-row">
+      <span className="sch-prog-label">{label}</span>
+      <div className="sch-prog-track">
+        <div className={`sch-prog-fill sch-prog-${variant}`} style={{ width: `${clamped}%` }} />
+      </div>
+      <span className="sch-prog-val">{pct}%</span>
     </div>
   );
 }
