@@ -3932,3 +3932,65 @@ select {
 .sch-report hr { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
 .sch-report ul { padding-left: 20px; }
 .sch-report li { margin: 3px 0; }
+
+/* ── 공정관리: 공정표/진도율 추가 UI ───────────────────────────────────────── */
+.sch-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  margin-top: 10px; padding: 12px;
+  background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--radius-m);
+}
+.sch-toolbar-proj { flex: 0 1 220px; }
+.sch-toolbar-file { flex: 1 1 240px; padding: 9px 12px; }
+.sch-toolbar-go { flex: 0 0 auto; padding: 9px 16px; }
+.sch-viewmode { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-s); overflow: hidden; margin-left: auto; }
+.sch-vm-btn { padding: 7px 14px; font-size: 0.85rem; background: var(--surface); border: none; cursor: pointer; color: var(--muted); border-left: 1px solid var(--line); }
+.sch-vm-btn:first-child { border-left: none; }
+.sch-vm-btn.active { background: var(--primary); color: #fff; font-weight: 600; }
+.sch-hint { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 0.86rem; }
+
+.sch-metric.big .sch-metric-val { font-size: 1.4rem; color: var(--primary); }
+
+.sch-progress-bar-wrap { margin: 18px 0; }
+.sch-progress-track { position: relative; height: 18px; background: var(--surface-muted); border-radius: 9px; overflow: hidden; }
+.sch-progress-planned { position: absolute; top: 0; left: 0; height: 100%; background: #cbd5e1; }
+.sch-progress-actual { position: absolute; top: 0; left: 0; height: 100%; background: var(--green); border-radius: 9px; }
+.sch-progress-actual.behind { background: var(--amber); }
+.sch-progress-legend { display: flex; gap: 16px; margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+.sch-progress-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
+.sch-progress-legend .dot.planned { background: #cbd5e1; }
+.sch-progress-legend .dot.actual { background: var(--green); }
+
+.sch-h3 { font-size: 0.98rem; font-weight: 700; color: var(--muted-strong); margin: 22px 0 10px; }
+.sch-empty { color: var(--muted); font-size: 0.86rem; }
+.sch-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.sch-table th, .sch-table td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; }
+.sch-table th { background: var(--surface-soft); font-weight: 600; color: var(--muted-strong); }
+.sch-table td.num { text-align: right; }
+.sch-table td.warn { color: var(--red); font-weight: 600; }
+.sch-table tr.is-cp { background: #fff7ed; }
+.sch-milestones { list-style: none; padding: 0; margin: 0; }
+.sch-milestones li { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 0.88rem; border-bottom: 1px dashed var(--line); }
+.sch-milestones em { margin-left: auto; color: var(--muted); font-style: normal; font-size: 0.82rem; }
+.sch-milestones .diamond { width: 9px; height: 9px; background: var(--primary); transform: rotate(45deg); display: inline-block; }
+
+.sch-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 56px 20px; margin-top: 16px; color: var(--muted);
+  background: var(--surface-soft); border: 1px dashed var(--line-strong); border-radius: var(--radius-xl);
+}
+.sch-placeholder strong { font-size: 1rem; color: var(--muted-strong); }
+.sch-placeholder span { font-size: 0.84rem; }
+
+/* ── 사이드바 확장형 공정관리 그룹 ─────────────────────────────────────────── */
+.ws-nav-group { width: 100%; background: none; border: none; cursor: pointer; font: inherit; text-align: left; }
+.ws-subnav { margin: 2px 0 6px; padding-left: 8px; }
+.ws-subnav-section { margin-bottom: 6px; }
+.ws-subnav-title { font-size: 0.72rem; font-weight: 600; color: var(--muted); padding: 6px 10px 3px; text-transform: none; }
+.ws-subnav-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 14px;
+  font-size: 0.84rem; color: var(--muted-strong); text-decoration: none; border-radius: var(--radius-s);
+}
+.ws-subnav-item:hover { background: var(--surface-soft); }
+.ws-subnav-item.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.ws-subnav-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.45; flex: 0 0 auto; }
+.ws-subnav-item.active .ws-subnav-dot { opacity: 1; }
