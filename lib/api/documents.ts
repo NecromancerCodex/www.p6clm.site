@@ -164,7 +164,7 @@ export function createDocument(body: DocumentCreateBody): Promise<JobCreatedResp
       category: body.category,
       doc_type: body.doc_type,
       context: body.context ?? "",
-      project_name: body.project_name ?? "POSCO CONSTRUCTION",
+      project_name: body.project_name ?? "",
       image_base64: body.image_base64 ?? null,
       linked_ncr: body.linked_ncr ?? null,
     }),
@@ -179,7 +179,7 @@ export function createDocumentWithFile(
   form.append("category", body.category);
   form.append("doc_type", body.doc_type);
   form.append("context", body.context ?? "");
-  form.append("project_name", body.project_name ?? "POSCO CONSTRUCTION");
+  form.append("project_name", body.project_name ?? "");
   if (file) form.append("file", file);
   return request<JobCreatedResponse>(`/documents/upload`, {
     method: "POST",

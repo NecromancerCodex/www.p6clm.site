@@ -57,6 +57,94 @@ export interface SafetyInspectionDocument {
   notes?: string;
 }
 
+// ── 품질 파이프라인 구조화 문서 (A4 뷰용) ──────────────────────────────────
+export interface QualityCheckRow {
+  item: string;
+  criterion: string;
+  result: string;
+  judgement: "적합" | "부적합" | "해당없음";
+  note?: string;
+}
+export interface QualityInspectionDoc {
+  document_number: string;
+  report_title: string;
+  site_name: string;
+  construction_location?: string;
+  contractor?: string;
+  supervisor_org?: string;
+  inspection_date: string;
+  inspector: string;
+  work_type: string;
+  inspection_location: string;
+  witness?: string;
+  inspection_purpose: string;
+  criteria_documents: string[];
+  related_standards: string[];
+  checklist: QualityCheckRow[];
+  judgement: string;
+  nonconformities: Array<{
+    location: string; description: string; cause?: string; photo_ref?: string; required_action: string;
+  }>;
+  actions: Array<{ nonconformity: string; action: string; completed: string; reinspection_result: string }>;
+  photo_captions: string[];
+  overall_opinion: string;
+  attachments: string[];
+  author?: string;
+  reviewer?: string;
+  approver?: string;
+}
+export interface MaterialInspectionDoc {
+  document_number: string;
+  created_date: string;
+  site_name: string;
+  construction_name?: string;
+  inspection_location?: string;
+  inspection_date: string;
+  inspector: string;
+  witness?: string;
+  cooperator?: string;
+  supplier?: string;
+  delivery_vehicle_no?: string;
+  work_type: string;
+  overview: Record<string, string>;
+  checklist: QualityCheckRow[];
+  judgement: string;
+  disposition: string;
+  ncr_number?: string;
+  nonconformities: Array<Record<string, string>>;
+  related_standards: string[];
+  attachments: string[];
+  inspection_opinion: string;
+  inspector_sign?: string;
+  site_manager_sign?: string;
+  supervisor_sign?: string;
+  cooperator_sign?: string;
+}
+export interface CARDoc {
+  document_number: string;
+  created_date: string;
+  site_name?: string;
+  construction_name?: string;
+  author?: string;
+  author_org?: string;
+  author_title?: string;
+  linked: Record<string, string>;
+  nc_summary: Record<string, string>;
+  cause: Record<string, unknown>;
+  corrective: Record<string, string>;
+  preventive: Record<string, string>;
+  action_result: Record<string, string>;
+  reinspection: Record<string, string>;
+  closure_status: string;
+  closure_opinion: string;
+  attachments: string[];
+  sign_action_responsible?: string;
+  sign_quality_manager?: string;
+  sign_site_manager?: string;
+  sign_supervisor?: string;
+  sign_client?: string;
+}
+
 export type CategoryId = "design" | "process" | "construction" | "quality" | "safety";
 export type DocStatus = "idle" | "submitting" | "polling" | "done" | "error";
 
@@ -84,12 +172,14 @@ export interface GenerateSlice {
   errorMsg: string;
   stepsLog: string[];
   // 품질 파이프라인 (Phase 5)
+  qualityResult: QualityInspectionDoc | null;        // 품질검사 구조화 (A4 뷰)
+  materialResult: MaterialInspectionDoc | null;      // 자재검수 구조화 (A4 뷰)
   judgement: string | null;                          // 적합 | 부적합 | 조건부 적합 | 검토필요
   nonconformityDetected: boolean;                    // 부적합 → NCR 파생됨
   derivedNcr: Record<string, unknown> | null;        // 자동 파생 NCR
   carStatus: "idle" | "submitting" | "polling" | "done" | "error";
-  carResult: Record<string, unknown> | null;         // CAR 문서
-  carRaw: string;                                    // CAR 마크다운
+  carDoc: CARDoc | null;                             // CAR 구조화 (A4 뷰)
+  carRaw: string;                                    // CAR 마크다운(fallback)
   generate: () => Promise<void>;
   generateCar: (ncr: Record<string, unknown>) => Promise<void>;  // [CAR 생성] 버튼
   reset: () => void;

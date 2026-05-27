@@ -262,7 +262,7 @@ export function DocumentDetail({ id, mode }: Props) {
   }
 
   const dj = doc.document_json;
-  const projectName = doc.project_name?.trim() || "POSCO CONSTRUCTION";
+  const projectName = doc.project_name?.trim() || "현장 미지정";
 
   return (
     <div className="docdetail-shell">

@@ -18,11 +18,13 @@ const INITIAL_RESULT = {
   rawResult: "",
   errorMsg: "",
   stepsLog: [],
+  qualityResult: null,
+  materialResult: null,
   judgement: null,
   nonconformityDetected: false,
   derivedNcr: null,
   carStatus: "idle" as const,
-  carResult: null,
+  carDoc: null,
   carRaw: "",
 };
 
@@ -64,14 +66,14 @@ export const createGenerateSlice: StateCreator<DocStore, [], [], GenerateSlice> 
     try {
       const created = imageFile
         ? await createDocumentWithFile(
-            { category: activeCat, doc_type: activeDoc, context, project_name: "POSCO CONSTRUCTION" },
+            { category: activeCat, doc_type: activeDoc, context, project_name: "" },
             imageFile,
           )
         : await createDocument({
             category: activeCat,
             doc_type: activeDoc,
             context,
-            project_name: "POSCO CONSTRUCTION",
+            project_name: "",
           });
 
       set({ status: "polling" });
@@ -83,6 +85,8 @@ export const createGenerateSlice: StateCreator<DocStore, [], [], GenerateSlice> 
         ncrResult: (r.ncr as never) ?? null,
         sirResult: (r.safety_inspection as never) ?? null,
         rawResult: r.final_response ?? "",
+        qualityResult: (r.quality_inspection as never) ?? null,
+        materialResult: (r.material_inspection as never) ?? null,
         judgement: r.quality_judgement ?? null,
         nonconformityDetected: !!r.nonconformity_detected,
         derivedNcr: r.derived_ncr ?? null,
@@ -97,19 +101,19 @@ export const createGenerateSlice: StateCreator<DocStore, [], [], GenerateSlice> 
 
   // NCR 화면 [CAR 생성] — 대상 NCR 데이터를 백엔드 linked_ncr 로 전달
   generateCar: async (ncr) => {
-    set({ carStatus: "submitting", carResult: null, carRaw: "" });
+    set({ carStatus: "submitting", carDoc: null, carRaw: "" });
     try {
       const created = await createDocument({
         category: "quality",
         doc_type: "car",
         context: "",
-        project_name: "POSCO CONSTRUCTION",
+        project_name: "",
         linked_ncr: ncr,
       });
       set({ carStatus: "polling" });
       const job = await pollJob(created.job_id);
       const r = job.result!;
-      set({ carResult: r.car ?? null, carRaw: r.final_response ?? "", carStatus: "done" });
+      set({ carDoc: (r.car as never) ?? null, carRaw: r.final_response ?? "", carStatus: "done" });
     } catch (err: unknown) {
       const message =
         err instanceof DocumentApiError ? err.detail : err instanceof Error ? err.message : "CAR 생성 오류";

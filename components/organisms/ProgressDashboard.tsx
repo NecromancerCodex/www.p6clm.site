@@ -335,7 +335,7 @@ export function ProgressDashboard() {
   }, [historyRows, selectedId]);
 
   const selected = selectedId != null ? items.find((i) => i.id === selectedId) : undefined;
-  const projectName = selected?.project_name?.trim() || "POSCO CONSTRUCTION";
+  const projectName = selected?.project_name?.trim() || "현장 미지정";
 
   if (loading) {
     return (

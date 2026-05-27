@@ -666,6 +666,29 @@ select {
   border-top: 1px dashed #fdba74;
   padding-top: 12px;
 }
+.car-closure-edit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.car-closure-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: #fff;
+  cursor: pointer;
+}
+.car-closure-hint {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-soft, #64748b);
+}
 
 /* Error */
 .dag-error {

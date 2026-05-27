@@ -7,7 +7,13 @@ import { DOC_CATEGORIES } from "../../lib/docCategories";
 import { CategoryTab } from "../molecules/CategoryTab";
 import { DocListItem } from "../molecules/DocListItem";
 import { Spinner } from "../atoms/Spinner";
-import { NcrFormView, SirFormView } from "../documents/DocumentFormViews";
+import {
+  NcrFormView,
+  SirFormView,
+  QualityFormView,
+  MaterialFormView,
+  CarFormView,
+} from "../documents/DocumentFormViews";
 
 const PIPELINE_STEPS = [
   { key: "orchestrator_node[GPT-5-mini]", label: "GPT 오케스트레이터", icon: "🎯" },
@@ -30,11 +36,12 @@ export function DocAutoGen() {
   const imageFile = useDocStore((s) => s.imageFile);
   const imagePreview = useDocStore((s) => s.imagePreview);
   const stepsLog = useDocStore((s) => s.stepsLog);
-  const judgement = useDocStore((s) => s.judgement);
+  const qualityResult = useDocStore((s) => s.qualityResult);
+  const materialResult = useDocStore((s) => s.materialResult);
   const nonconformityDetected = useDocStore((s) => s.nonconformityDetected);
   const derivedNcr = useDocStore((s) => s.derivedNcr);
   const carStatus = useDocStore((s) => s.carStatus);
-  const carRaw = useDocStore((s) => s.carRaw);
+  const carDoc = useDocStore((s) => s.carDoc);
   const generateCar = useDocStore((s) => s.generateCar);
 
   const setActiveCat = useDocStore((s) => s.setActiveCat);
@@ -273,12 +280,47 @@ export function DocAutoGen() {
             {status === "done" && ncrResult && (
               <NcrFormView ncr={ncrResult} stepsLog={stepsLog} onReset={reset} />
             )}
-
             {status === "done" && sirResult && (
               <SirFormView sir={sirResult} stepsLog={stepsLog} onReset={reset} />
             )}
+            {status === "done" && qualityResult && (
+              <QualityFormView doc={qualityResult} stepsLog={stepsLog} onReset={reset} />
+            )}
+            {status === "done" && materialResult && (
+              <MaterialFormView doc={materialResult} stepsLog={stepsLog} onReset={reset} />
+            )}
 
-            {status === "done" && rawResult && !ncrResult && !sirResult && (
+            {/* 부적합 → 자동 발행 NCR + [CAR 생성] → CAR A4 뷰 */}
+            {status === "done" && (qualityResult || materialResult) && nonconformityDetected && derivedNcr && (
+              <div className="dag-derived-ncr">
+                <p className="dag-result-label">자동 발행된 NCR</p>
+                <strong>{String((derivedNcr as Record<string, unknown>).ncr_number ?? "NCR")}</strong>
+                <p className="dag-ncr-desc">{String((derivedNcr as Record<string, unknown>).description ?? "")}</p>
+                {carStatus === "done" && carDoc ? (
+                  <div className="dag-car-result">
+                    <CarFormView doc={carDoc} onReset={undefined} />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={`dag-gen-btn${carStatus === "submitting" || carStatus === "polling" ? " is-loading" : ""}`}
+                    onClick={() => void generateCar(derivedNcr as Record<string, unknown>)}
+                    disabled={carStatus === "submitting" || carStatus === "polling"}
+                  >
+                    {carStatus === "submitting" || carStatus === "polling" ? (
+                      <>
+                        <Spinner size="sm" />
+                        CAR 생성 중...
+                      </>
+                    ) : (
+                      <>✦ CAR 생성 (시정조치 보고서)</>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {status === "done" && rawResult && !ncrResult && !sirResult && !qualityResult && !materialResult && (
               <div className="dag-result">
                 <div className="dag-result-header">
                   <div>
@@ -298,60 +340,7 @@ export function DocAutoGen() {
                     </button>
                   </div>
                 </div>
-                {stepsLog.length > 0 && (
-                  <div className="dag-steps-log">
-                    {stepsLog.map((s, i) => (
-                      <span key={i} className="dag-step-badge">
-                        ✓ {s}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* 품질/자재 검수 판정 — 적합/부적합 배지 */}
-                {judgement && (
-                  <div className={`dag-judgement ${nonconformityDetected ? "is-fail" : "is-pass"}`}>
-                    <strong>AI 추천 판정: {judgement}</strong>
-                    {nonconformityDetected ? (
-                      <span> ⚠️ 부적합 — NCR이 자동 발행되었습니다 (최종 판정은 품질관리자 확정)</span>
-                    ) : (
-                      <span> ✅ 적합 — 최상위 문서로 완료 (NCR 불필요)</span>
-                    )}
-                  </div>
-                )}
-
                 <pre className="dag-result-body">{rawResult}</pre>
-
-                {/* 부적합 → 자동 파생 NCR + [CAR 생성] */}
-                {nonconformityDetected && derivedNcr && (
-                  <div className="dag-derived-ncr">
-                    <p className="dag-result-label">자동 발행된 NCR</p>
-                    <strong>{String((derivedNcr as Record<string, unknown>).ncr_number ?? "NCR")}</strong>
-                    <p className="dag-ncr-desc">{String((derivedNcr as Record<string, unknown>).description ?? "")}</p>
-                    {carStatus === "done" && carRaw ? (
-                      <div className="dag-car-result">
-                        <p className="dag-result-label">시정조치 보고서 (CAR)</p>
-                        <pre className="dag-result-body">{carRaw}</pre>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className={`dag-gen-btn${carStatus === "submitting" || carStatus === "polling" ? " is-loading" : ""}`}
-                        onClick={() => void generateCar(derivedNcr as Record<string, unknown>)}
-                        disabled={carStatus === "submitting" || carStatus === "polling"}
-                      >
-                        {carStatus === "submitting" || carStatus === "polling" ? (
-                          <>
-                            <Spinner size="sm" />
-                            CAR 생성 중...
-                          </>
-                        ) : (
-                          <>✦ CAR 생성 (시정조치 보고서)</>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
