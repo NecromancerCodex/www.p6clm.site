@@ -70,8 +70,8 @@ export function GanttView() {
 
   const onPick = useCallback((f: File | null) => {
     setError(null);
-    if (f && !/\.xml$/i.test(f.name)) {
-      setError("Primavera P6 XML(.xml) 파일만 업로드할 수 있습니다.");
+    if (f && !/\.(xml|xer)$/i.test(f.name)) {
+      setError("Primavera P6 공정표(.xml 또는 .xer) 파일만 업로드할 수 있습니다.");
       return;
     }
     setFile(f);
@@ -109,7 +109,7 @@ export function GanttView() {
         공정표 조회
       </div>
       <p className="ws-section-desc">
-        Primavera P6 공정표(<code>PMXML .xml</code>)를 업로드하면 WBS 트리·주공정선(임계공정)·
+        Primavera P6 공정표(<code>.xer</code> 또는 <code>PMXML .xml</code>)를 업로드하면 WBS 트리·주공정선(임계공정)·
         계획 대비 실적을 간트 차트로 표시합니다.
       </p>
 
@@ -123,9 +123,9 @@ export function GanttView() {
         />
         <button type="button" className="sch-dropzone sch-toolbar-file" onClick={() => inputRef.current?.click()}>
           <FileUp size={16} />
-          <span>{file ? file.name : ".xml 선택"}</span>
+          <span>{file ? file.name : ".xml / .xer 선택"}</span>
         </button>
-        <input ref={inputRef} type="file" accept=".xml,text/xml,application/xml" hidden
+        <input ref={inputRef} type="file" accept=".xml,.xer,text/xml,application/xml" hidden
           onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
         <button type="button" className="sch-submit sch-toolbar-go" onClick={onSubmit} disabled={loading || !file || !ganttReady}>
           {loading ? <><Loader2 size={15} className="sch-spin" /> 분석 중</> : "공정표 생성"}

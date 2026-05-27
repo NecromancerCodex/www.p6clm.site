@@ -32,8 +32,8 @@ export function ScheduleAnalyzer() {
 
   const onPick = useCallback((f: File | null) => {
     setError(null);
-    if (f && !/\.xml$/i.test(f.name)) {
-      setError("Primavera P6 XML(.xml) 파일만 업로드할 수 있습니다.");
+    if (f && !/\.(xml|xer)$/i.test(f.name)) {
+      setError("Primavera P6 공정표(.xml 또는 .xer) 파일만 업로드할 수 있습니다.");
       return;
     }
     setFile(f);
@@ -67,7 +67,7 @@ export function ScheduleAnalyzer() {
         공정관리 — Primavera P6 공정표 분석
       </div>
       <p className="ws-section-desc">
-        P6 Professional에서 <code>Export → XML (PMXML)</code>로 내보낸 공정표를 업로드하면,
+        P6 Professional에서 <code>Export(XER 또는 PMXML)</code>로 내보낸 공정표를 업로드하면,
         진도·주공정선(임계공정)·지연을 분석해 공정 보고서를 자동 생성합니다. 생성 결과는{" "}
         <Link href="/progress">진행도 → 공정관리</Link> 탭에도 저장됩니다.
       </p>
@@ -106,19 +106,19 @@ export function ScheduleAnalyzer() {
         </div>
 
         <div className="sch-field">
-          <label className="sch-label">공정표 파일 (PMXML)</label>
+          <label className="sch-label">공정표 파일 (XER / PMXML)</label>
           <button
             type="button"
             className="sch-dropzone"
             onClick={() => inputRef.current?.click()}
           >
             <FileUp size={20} strokeWidth={1.8} />
-            <span>{file ? file.name : "클릭하여 .xml 파일 선택"}</span>
+            <span>{file ? file.name : "클릭하여 .xml / .xer 파일 선택"}</span>
           </button>
           <input
             ref={inputRef}
             type="file"
-            accept=".xml,text/xml,application/xml"
+            accept=".xml,.xer,text/xml,application/xml"
             hidden
             onChange={(e) => onPick(e.target.files?.[0] ?? null)}
           />

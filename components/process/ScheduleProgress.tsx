@@ -52,9 +52,9 @@ export function ScheduleProgress() {
         <div className="sch-toolbar">
           <button type="button" className="sch-dropzone sch-toolbar-file" onClick={() => inputRef.current?.click()}>
             <FileUp size={16} />
-            <span>{file ? file.name : ".xml 선택"}</span>
+            <span>{file ? file.name : ".xml / .xer 선택"}</span>
           </button>
-          <input ref={inputRef} type="file" accept=".xml" hidden
+          <input ref={inputRef} type="file" accept=".xml,.xer" hidden
             onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           <button type="button" className="sch-submit sch-toolbar-go" onClick={onSubmit} disabled={loading || !file}>
             {loading ? <><Loader2 size={15} className="sch-spin" /> 분석 중</> : "진도 분석"}
