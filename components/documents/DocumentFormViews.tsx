@@ -1329,6 +1329,70 @@ function EditCell({
   );
 }
 
+/** 인라인 편집 select — enum 필드(판정·처분·위험도 등) 용. */
+function EditSelect({
+  value,
+  options,
+  editable,
+  onChange,
+}: {
+  value: string;
+  options: string[];
+  editable: boolean;
+  onChange: (v: string) => void;
+}) {
+  if (!editable) return <>{value || "-"}</>;
+  return (
+    <select
+      className="dd-edit-input"
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {!options.includes(value) && value ? <option value={value}>{value}</option> : null}
+      {options.map((o) => (
+        <option key={o} value={o}>{o}</option>
+      ))}
+    </select>
+  );
+}
+
+/** path 기반 onChange 헬퍼 빌더 — 각 FormView 가 자기 doc 으로 호출. */
+function makeSetField<T extends object>(
+  doc: T,
+  onChange: ((next: Record<string, unknown>) => void) | undefined,
+) {
+  return (path: string, val: string | string[]) => {
+    if (!onChange) return;
+    const parts = path.split(".");
+    const next: Record<string, unknown> = { ...(doc as unknown as Record<string, unknown>) };
+    let cur: Record<string, unknown> = next;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const k = parts[i];
+      const child = cur[k];
+      cur[k] = child && typeof child === "object" && !Array.isArray(child) ? { ...(child as object) } : {};
+      cur = cur[k] as Record<string, unknown>;
+    }
+    cur[parts[parts.length - 1]] = val;
+    onChange(next);
+  };
+}
+
+/** 배열 항목 수정 — 예: setItem("checklist", 2, { judgement: "부적합" }) */
+function makeSetItem<T extends object>(
+  doc: T,
+  onChange: ((next: Record<string, unknown>) => void) | undefined,
+) {
+  return (arrayPath: string, index: number, patch: Record<string, unknown>) => {
+    if (!onChange) return;
+    const next: Record<string, unknown> = { ...(doc as unknown as Record<string, unknown>) };
+    const arr = Array.isArray(next[arrayPath]) ? [...(next[arrayPath] as unknown[])] : [];
+    if (index < 0 || index >= arr.length) return;
+    arr[index] = { ...(arr[index] as Record<string, unknown>), ...patch };
+    next[arrayPath] = arr;
+    onChange(next);
+  };
+}
+
 export function CarFormView({
   doc,
   stepsLog = [],
