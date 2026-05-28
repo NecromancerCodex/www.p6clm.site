@@ -3261,6 +3261,60 @@ select {
   white-space: pre-wrap;
 }
 
+/* 전자서명 패드 */
+.sig-edit { display: flex; flex-direction: column; gap: 4px; }
+.sig-area-edit { padding: 0; }
+.sig-canvas {
+  width: 100%; height: 50px;
+  background: #fefce8;
+  border: 1px dashed #cbd5e1;
+  border-radius: 4px;
+  cursor: crosshair;
+  touch-action: none;
+}
+.sig-canvas:hover { background: #fff; }
+.sig-controls {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 2px;
+}
+.sig-clear {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sig-clear:hover { background: #e2e8f0; }
+.sig-thumb {
+  width: 40px; height: 20px; object-fit: contain;
+  border: 1px solid #e2e8f0; border-radius: 3px;
+}
+.sig-img {
+  max-width: 100%; max-height: 50px;
+  object-fit: contain;
+}
+
+/* 사진 첨부 셀 */
+.photo-cell { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.photo-cell-empty { color: #94a3b8; font-style: italic; font-size: 0.85em; }
+.photo-cell-img {
+  max-width: 100%; max-height: 320px;
+  object-fit: contain;
+  border: 1px solid #e2e8f0; border-radius: 4px;
+}
+.photo-cell-controls { display: flex; gap: 6px; }
+.photo-cell-btn {
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  background: #3b82f6; color: white;
+  border: 0; border-radius: 4px;
+  cursor: pointer;
+}
+.photo-cell-btn:hover { background: #2563eb; }
+.photo-cell-btn--danger { background: #ef4444; }
+.photo-cell-btn--danger:hover { background: #dc2626; }
+
 .docdetail-save-error {
   grid-column: 1 / -1;
   display: inline-flex;
@@ -3468,6 +3522,7 @@ select {
   .progress-toolbar,
   .progress-intro,
   .progress-cat-row,
+  .progress-insights,
   .progress-doc-types,
   .progress-list-col,
   .progress-preview-header {

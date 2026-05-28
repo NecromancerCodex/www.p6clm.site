@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -198,6 +198,17 @@ export function NcrFormView({
           <div className="ncr-section-title">검증 (Verification)</div>
           <div className="ncr-section-body">
             <EditCell value={ncr.verification} editable={!!editable} onChange={(v) => setField("verification", v)} multiline />
+          </div>
+        </div>
+        <div className="ncr-section">
+          <div className="ncr-section-title">현장 사진 — 조치 전 (Before)</div>
+          <div className="ncr-section-body">
+            <PhotoCell
+              value={ncr.photo_before || ""}
+              editable={!!editable}
+              onChange={(v) => setField("photo_before", v)}
+              label="조치 전 현장 사진"
+            />
           </div>
         </div>
         <div className="ncr-two-col">
@@ -948,16 +959,48 @@ function FormTopBar({ stepsLog = [], onReset }: { stepsLog?: string[]; onReset?:
   );
 }
 
-function SigRow({ roles }: { roles: Array<[string, string]> }) {
+/**
+ * SigRow — 서명자 행. 각 항목 [title, value, fieldKey?].
+ * editable + fieldKey + onSign 있으면 SignaturePad(캔버스) 활성화 → data URL 저장.
+ * fieldKey 없으면 read-only (구 호출자 호환).
+ */
+function SigRow({
+  roles,
+  editable = false,
+  onSign,
+}: {
+  roles: Array<[string, string] | [string, string, string]>;
+  editable?: boolean;
+  onSign?: (fieldKey: string, dataUrl: string) => void;
+}) {
   return (
     <div className="sir-sig-row">
-      {roles.map(([title, name], i) => (
-        <div key={i} className="sir-sig-box">
-          <div className="sir-sig-title">{title}</div>
-          <div className="sir-sig-area" />
-          <div className="sir-sig-name">{name || "(서명)"}</div>
-        </div>
-      ))}
+      {roles.map((r, i) => {
+        const [title, value, fieldKey] = r as [string, string, string | undefined];
+        const canEdit = editable && !!fieldKey && !!onSign;
+        if (canEdit) {
+          return (
+            <SignaturePad
+              key={i}
+              value={value || ""}
+              editable
+              onChange={(v) => onSign!(fieldKey!, v)}
+              title={title}
+            />
+          );
+        }
+        // read-only: 이미지면 img, 아니면 텍스트
+        const isImg = typeof value === "string" && value.startsWith("data:image/");
+        return (
+          <div key={i} className="sir-sig-box">
+            <div className="sir-sig-title">{title}</div>
+            <div className="sir-sig-area">
+              {isImg ? <img src={value} alt={`${title} 서명`} className="sig-img" /> : null}
+            </div>
+            <div className="sir-sig-name">{isImg ? "" : (value || "(서명)")}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1135,7 +1178,15 @@ export function QualityFormView({
           </div>
         )}
 
-        <SigRow roles={[["작성자", doc.author || ""], ["검토자", doc.reviewer || ""], ["승인자", doc.approver || ""]]} />
+        <SigRow
+          editable={!!editable}
+          onSign={(k, v) => setField(k, v)}
+          roles={[
+            ["작성자", doc.author || "", "author"],
+            ["검토자", doc.reviewer || "", "reviewer"],
+            ["승인자", doc.approver || "", "approver"],
+          ]}
+        />
       </div>
     </div>
   );
@@ -1317,10 +1368,16 @@ export function MaterialFormView({
           <div className="sir-photo-guidance"><EditCell value={doc.inspection_opinion || ""} editable={!!editable} onChange={(v) => setField("inspection_opinion", v)} multiline /></div>
         </div>
 
-        <SigRow roles={[
-          ["검수자", doc.inspector_sign || doc.inspector], ["현장대리인", doc.site_manager_sign || ""],
-          ["감리/감독자", doc.supervisor_sign || ""], ["협력업체", doc.cooperator_sign || ""],
-        ]} />
+        <SigRow
+          editable={!!editable}
+          onSign={(k, v) => setField(k, v)}
+          roles={[
+            ["검수자", doc.inspector_sign || doc.inspector, "inspector_sign"],
+            ["현장대리인", doc.site_manager_sign || "", "site_manager_sign"],
+            ["감리/감독자", doc.supervisor_sign || "", "supervisor_sign"],
+            ["협력업체", doc.cooperator_sign || "", "cooperator_sign"],
+          ]}
+        />
       </div>
     </div>
   );
@@ -1544,6 +1601,141 @@ function makeSetItem<T extends object>(
   };
 }
 
+/* ── 전자서명 패드 — 캔버스 드로잉 → data URL 저장 ─────────────────
+ * value: data:image/png;base64,... 면 이미지, 아니면 텍스트(이름)로 표시.
+ * editable=true: 캔버스 + 지우기 버튼. 마우스 떼면 onChange(dataUrl).
+ */
+function SignaturePad({
+  value,
+  editable,
+  onChange,
+  title,
+}: {
+  value: string;
+  editable: boolean;
+  onChange: (v: string) => void;
+  title: string;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawingRef = useRef(false);
+  const isImg = typeof value === "string" && value.startsWith("data:image/");
+
+  const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!editable) return;
+    const c = canvasRef.current; if (!c) return;
+    c.setPointerCapture(e.pointerId);
+    const ctx = c.getContext("2d"); if (!ctx) return;
+    const r = c.getBoundingClientRect();
+    ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.strokeStyle = "#0f172a";
+    ctx.beginPath();
+    ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
+    drawingRef.current = true;
+  };
+  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!editable || !drawingRef.current) return;
+    const c = canvasRef.current; if (!c) return;
+    const ctx = c.getContext("2d"); if (!ctx) return;
+    const r = c.getBoundingClientRect();
+    ctx.lineTo(e.clientX - r.left, e.clientY - r.top);
+    ctx.stroke();
+  };
+  const end = () => {
+    if (!editable || !drawingRef.current) return;
+    drawingRef.current = false;
+    const c = canvasRef.current; if (!c) return;
+    onChange(c.toDataURL("image/png"));
+  };
+  const clear = () => {
+    const c = canvasRef.current;
+    if (c) c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
+    onChange("");
+  };
+
+  if (!editable) {
+    return (
+      <div className="sir-sig-box">
+        <div className="sir-sig-title">{title}</div>
+        <div className="sir-sig-area">
+          {isImg ? <img src={value} alt={`${title} 서명`} className="sig-img" /> : null}
+        </div>
+        <div className="sir-sig-name">{isImg ? "" : (value || "(서명)")}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="sir-sig-box sig-edit">
+      <div className="sir-sig-title">{title}</div>
+      <div className="sir-sig-area sig-area-edit">
+        <canvas
+          ref={canvasRef}
+          width={180}
+          height={50}
+          className="sig-canvas"
+          onPointerDown={start}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerLeave={end}
+          onPointerCancel={end}
+        />
+      </div>
+      <div className="sig-controls">
+        {isImg ? <img src={value} alt="현재 서명" className="sig-thumb" /> : null}
+        <button type="button" className="sig-clear" onClick={clear}>지우기</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── 사진 첨부 셀 — 파일 → base64 data URL ─────────────────────── */
+function PhotoCell({
+  value,
+  editable,
+  onChange,
+  label = "사진",
+}: {
+  value: string;
+  editable: boolean;
+  onChange: (v: string) => void;
+  label?: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const isImg = typeof value === "string" && value.startsWith("data:image/");
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 8 * 1024 * 1024) {
+      window.alert("사진은 8MB 이하만 가능합니다. (현재: " + (f.size / 1024 / 1024).toFixed(1) + "MB)");
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => onChange(String(reader.result || ""));
+    reader.readAsDataURL(f);
+    e.target.value = "";
+  };
+  if (!editable && !isImg) {
+    return <span className="photo-cell-empty">(사진 없음)</span>;
+  }
+  return (
+    <div className="photo-cell">
+      {isImg ? <img src={value} alt={label} className="photo-cell-img" /> : null}
+      {editable && (
+        <div className="photo-cell-controls">
+          <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={onFile} />
+          <button type="button" className="photo-cell-btn" onClick={() => ref.current?.click()}>
+            {isImg ? "📷 사진 교체" : "📷 사진 첨부"}
+          </button>
+          {isImg && (
+            <button type="button" className="photo-cell-btn photo-cell-btn--danger" onClick={() => onChange("")}>
+              제거
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CarFormView({
   doc,
   stepsLog = [],
@@ -1700,6 +1892,17 @@ export function CarFormView({
                 <td><EditCell value={String(ar.result ?? "")} editable={editable} onChange={(v) => setField("action_result.result", v)} /></td>
               </tr>
               <tr><th>실제 조치</th><td colSpan={3}><EditCell value={String(ar.actual_content ?? "")} editable={editable} onChange={(v) => setField("action_result.actual_content", v)} multiline /></td></tr>
+              <tr>
+                <th>조치 후 사진</th>
+                <td colSpan={3}>
+                  <PhotoCell
+                    value={String(doc.photo_after ?? "")}
+                    editable={editable}
+                    onChange={(v) => setField("photo_after", v)}
+                    label="조치 후 현장 사진"
+                  />
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -1737,10 +1940,16 @@ export function CarFormView({
           </table>
         </div>
 
-        <SigRow roles={[
-          ["조치 담당자", doc.sign_action_responsible || ""], ["품질관리자", doc.sign_quality_manager || ""],
-          ["현장대리인", doc.sign_site_manager || ""], ["감리/감독자", doc.sign_supervisor || ""],
-        ]} />
+        <SigRow
+          editable={!!editable}
+          onSign={(k, v) => setField(k, v)}
+          roles={[
+            ["조치 담당자", doc.sign_action_responsible || "", "sign_action_responsible"],
+            ["품질관리자", doc.sign_quality_manager || "", "sign_quality_manager"],
+            ["현장대리인", doc.sign_site_manager || "", "sign_site_manager"],
+            ["감리/감독자", doc.sign_supervisor || "", "sign_supervisor"],
+          ]}
+        />
       </div>
     </div>
   );

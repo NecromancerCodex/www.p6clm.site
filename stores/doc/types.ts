@@ -31,6 +31,8 @@ export interface NCRDocument {
   verification: string;
   completion_date: string;
   notes: string;
+  /** 조치 전 현장 사진 — data URL (base64). 사용자 업로드 전용. */
+  photo_before?: string;
 }
 
 export interface SafetyCheckItem {
@@ -143,6 +145,8 @@ export interface CARDoc {
   sign_site_manager?: string;
   sign_supervisor?: string;
   sign_client?: string;
+  /** 조치 후 현장 사진 — data URL (base64). 사용자 업로드 전용. */
+  photo_after?: string;
 }
 
 // ── 자동 파생 NCR (품질/자재 부적합 → source-linked NCR) A4 뷰용 ──────────
