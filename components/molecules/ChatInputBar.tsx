@@ -59,6 +59,26 @@ export function ChatInputBar() {
     [setPendingImage]
   );
 
+  // 클립보드 이미지 붙여넣기 (Ctrl+V). 이미지가 있으면 첨부, 없으면 일반 텍스트 붙여넣기 허용.
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault(); // 이미지 경로/바이너리가 텍스트로 들어가는 것 방지
+            setPendingImage(file);
+            return;
+          }
+        }
+      }
+    },
+    [setPendingImage]
+  );
+
   const canSend = (input.trim().length > 0 || pendingImagePreview !== null) && !isLoading;
 
   return (
@@ -116,6 +136,7 @@ export function ChatInputBar() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           disabled={isLoading}
         />
 
@@ -134,7 +155,7 @@ export function ChatInputBar() {
       </div>
 
       <p className="cbot-hint">
-        ConstructBot은 KCS/KDS 기준을 근거로 답변합니다. 음성: 마이크 탭 → 말하기 → 다시 탭하면 입력창에 반영(아래 상태 문구 확인). Chrome/Edge·HTTPS 권장.
+        ConstructBot은 KCS/KDS 기준을 근거로 답변합니다. 이미지: 첨부 버튼 또는 붙여넣기(Ctrl+V). 음성: 마이크 탭 → 말하기 → 다시 탭하면 입력창에 반영(아래 상태 문구 확인). Chrome/Edge·HTTPS 권장.
       </p>
     </div>
   );
