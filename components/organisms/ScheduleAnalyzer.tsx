@@ -70,7 +70,7 @@ export function ScheduleAnalyzer() {
       <p className="ws-section-desc">
         P6 Professional에서 <code>Export(XER 또는 PMXML)</code>로 내보낸 공정표를 업로드하면,
         진도·주공정선(임계공정)·지연을 분석해 공정 보고서를 자동 생성합니다. 생성 결과는{" "}
-        <Link href="/progress">진행도 → 공정관리</Link> 탭에도 저장됩니다.
+        <Link href="/progress">문서저장소 → 공정관리</Link> 탭에도 저장됩니다.
       </p>
 
       {/* 입력 카드 */}

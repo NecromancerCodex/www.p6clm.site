@@ -201,10 +201,10 @@ export function DocumentDetail({ id, mode }: Props) {
           type="button"
           className="docdetail-btn docdetail-btn--ghost"
           onClick={() => router.push("/progress")}
-          aria-label="진행도로 돌아가기"
+          aria-label="문서저장소로 돌아가기"
         >
           <ArrowLeft size={14} strokeWidth={1.8} />
-          진행도
+          문서저장소
         </button>
 
         <div className="docdetail-title">

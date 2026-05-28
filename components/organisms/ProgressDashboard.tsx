@@ -342,11 +342,6 @@ export function ProgressDashboard() {
         </button>
       </div>
 
-      <p className="progress-intro">
-        설계·공정·시공·품질·안전 5개 구역과 동일한 기준으로 이력을 묶었습니다. 보고서 종류를 고른 뒤 항목을 누르면
-        문서 작성 화면과 같은 A4 양식으로 미리보기됩니다.
-      </p>
-
       <div className="progress-cat-row">
         {DOC_CATEGORIES.map((cat) => (
           <CategoryTab

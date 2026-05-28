@@ -40,7 +40,7 @@ const PROCESS_GROUP = {
 };
 
 const NAV_ITEMS_AFTER = [
-  { path: "/progress", label: "진행도", icon: BarChart2 },
+  { path: "/progress", label: "문서저장소", icon: BarChart2 },
   { path: "/about",    label: "소개",   icon: Info     },
 ];
 
