@@ -1077,7 +1077,12 @@ export function QualityFormView({
           <div className="sir-section-title">3. 검사 기준</div>
           <div className="sir-regulation-box">
             <ul className="sir-reg-list">
-              {[...(doc.criteria_documents || []), ...(doc.related_standards || [])].map((x, i) => (
+              {Array.from(
+                new Set([
+                  ...(doc.criteria_documents || []),
+                  ...(doc.related_standards || []),
+                ]),
+              ).map((x, i) => (
                 <li key={i}>{x}</li>
               ))}
             </ul>
