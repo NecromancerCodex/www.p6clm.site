@@ -86,6 +86,15 @@ export interface ScheduleReportDoc {
     affected_milestones: string[];
   }[];
   integrity_warnings: string[];
+  doc_recommendations: {
+    activity_name: string;
+    wbs_path: string;
+    work_type: string;
+    when: string;
+    is_critical: boolean;
+    doc_types: { type: string; label: string }[];
+  }[];
+  doc_rec_summary: { type: string; label: string; count: number }[];
   active_today: {
     code: string;
     name: string;

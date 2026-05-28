@@ -4062,6 +4062,12 @@ select {
 .sch-impact-ms { color: #b91c1c; font-weight: 500; }
 .sch-tag-cp { display: inline-block; background: #b91c1c; color: #fff; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 2px; }
 
+/* 필요문서 추천 */
+.sch-recsum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.sch-recsum-chip { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; font-size: 0.8rem; padding: 4px 10px; border-radius: 14px; }
+.sch-recsum-chip strong { color: #1d4ed8; }
+.sch-docbadge { display: inline-block; background: var(--surface-soft); border: 1px solid var(--line); color: var(--muted-strong); font-size: 0.76rem; padding: 2px 8px; border-radius: 4px; margin: 2px 4px 2px 0; }
+
 .sch-h3 { font-size: 0.98rem; font-weight: 700; color: var(--muted-strong); margin: 22px 0 10px; }
 .sch-empty { color: var(--muted); font-size: 0.86rem; }
 .sch-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }

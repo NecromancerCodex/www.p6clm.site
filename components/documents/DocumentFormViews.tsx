@@ -754,9 +754,60 @@ export function ScheduleFormView({
           )}
         </div>
 
-        {/* 5. 관련 기준·근거 / 종합 의견 */}
+        {/* 5. 필요문서 추천 (선행 준비) */}
+        {doc.doc_recommendations.length > 0 && (
+          <div className="sir-section">
+            <div className="sir-section-title">
+              5. 필요문서 추천 (선행 준비 — AI 추천, 사람 확정)
+            </div>
+            {doc.doc_rec_summary.length > 0 && (
+              <div className="sch-recsum">
+                {doc.doc_rec_summary.map((s) => (
+                  <span key={s.type} className="sch-recsum-chip">
+                    {s.label} <strong>{s.count}</strong>건
+                  </span>
+                ))}
+              </div>
+            )}
+            <table className="sir-checklist-table">
+              <thead>
+                <tr>
+                  <th style={{ width: "26%" }}>공정명</th>
+                  <th style={{ width: "16%" }}>공종</th>
+                  <th style={{ width: "16%" }}>시점</th>
+                  <th>필요 문서 (생성 후보)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {doc.doc_recommendations.map((r, i) => (
+                  <tr key={i} className={r.is_critical ? "sir-row-fail" : ""}>
+                    <td className="sir-target-cell">{r.activity_name}</td>
+                    <td>{r.work_type}</td>
+                    <td>
+                      {r.when}
+                      {r.is_critical ? <span className="sch-tag-cp"> 임계</span> : null}
+                    </td>
+                    <td>
+                      {r.doc_types.map((d) => (
+                        <span key={d.type} className="sch-docbadge">
+                          {d.label}
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="sir-photo-guidance">
+              ※ 위 문서는 해당 공정 착수·진행 전 준비가 권장되는 후보입니다. 실제 생성·작성·확정은
+              담당자가 판단합니다. 부적합·사고 발생 시의 NCR·시정조치(CAR)·사고조사는 별도(사후) 문서입니다.
+            </div>
+          </div>
+        )}
+
+        {/* 6. 관련 기준·근거 / 종합 의견 */}
         <div className="sir-section">
-          <div className="sir-section-title">5. 관련 기준·근거 / 종합 의견</div>
+          <div className="sir-section-title">6. 관련 기준·근거 / 종합 의견</div>
           {doc.grounding ? (
             <div className="sir-regulation-box">
               <span className="sir-reg-label">관련 기준·근거 (KCS/KDS·법령)</span>
