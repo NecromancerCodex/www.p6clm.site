@@ -4,12 +4,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, FileText, AlertCircle, Pencil, Trash2 } from "lucide-react";
 
-import type { CategoryId, NCRDocument, SafetyInspectionDocument } from "../../stores/docStore";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+import type {
+  CategoryId,
+  NCRDocument,
+  SafetyInspectionDocument,
+  QualityInspectionDoc,
+  MaterialInspectionDoc,
+  CARDoc,
+  DerivedNCRDoc,
+} from "../../stores/docStore";
 import { DOC_CATEGORIES, docLabelForType, resolveItemCategory } from "../../lib/docCategories";
 import { deleteDocument, listDocuments } from "../../lib/api/documents";
 import { CategoryTab } from "../molecules/CategoryTab";
 import { ProgressInsights } from "../molecules/ProgressInsights";
-import { NcrFormView, SirFormView } from "../documents/DocumentFormViews";
+import {
+  NcrFormView,
+  SirFormView,
+  QualityFormView,
+  MaterialFormView,
+  CarFormView,
+  DerivedNcrFormView,
+} from "../documents/DocumentFormViews";
 
 export interface DocumentHistoryItem {
   id: string;
@@ -135,26 +153,36 @@ function ProgressDocumentPreview({
 }) {
   const dj = row.document_json;
 
+  // 문서 작성 화면(DocAutoGen)과 *동일한* A4 폼뷰로 doc_type 라우팅.
   if (dj && typeof dj === "object" && !Array.isArray(dj)) {
-    if (row.doc_type === "defect_report" && isNcrPayload(dj)) {
-      return (
-        <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
-      );
-    }
-    if (row.doc_type === "safety_inspect" && isSirPayload(dj)) {
-      return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
-    }
-    if (isSirPayload(dj)) {
-      return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
-    }
-    if (isNcrPayload(dj)) {
-      return (
-        <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
-      );
+    switch (row.doc_type) {
+      case "quality_inspect":
+        return <QualityFormView doc={dj as unknown as QualityInspectionDoc} stepsLog={[]} />;
+      case "material_check":
+        return <MaterialFormView doc={dj as unknown as MaterialInspectionDoc} stepsLog={[]} />;
+      case "car":
+        return <CarFormView doc={dj as unknown as CARDoc} stepsLog={[]} />;
+      case "defect_report":
+        // 파생 NCR(품질/자재 부적합 발) 은 DerivedNCR 모양 → 전용 뷰. 직접 발행은 NcrFormView.
+        if ("items" in dj && "source_document_type" in dj)
+          return <DerivedNcrFormView doc={dj as unknown as DerivedNCRDoc} />;
+        return (
+          <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
+        );
+      case "safety_inspect":
+        return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
+      default:
+        // 레거시/미상 — payload 형태로 추정 (doc_type 누락 호환)
+        if (isNcrPayload(dj))
+          return (
+            <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
+          );
+        if (isSirPayload(dj)) return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
     }
   }
 
-  const text = row.preview_text?.trim() || row.title || "(저장된 본문이 없습니다.)";
+  // 구조화 JSON 없는 옛 문서(json=N) — raw <pre> 대신 마크다운 렌더.
+  const text = row.preview_text?.trim() || row.title || "_(저장된 본문이 없습니다.)_";
 
   return (
     <div className="progress-a4-paper progress-a4-paper--text">
@@ -162,7 +190,9 @@ function ProgressDocumentPreview({
         <span className="progress-a4-text-label">{docLabelForType(row.doc_type)}</span>
         <time dateTime={row.created_at}>{formatDate(row.created_at)}</time>
       </header>
-      <pre className="progress-a4-text-body">{text}</pre>
+      <div className="progress-a4-text-body sch-md">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      </div>
     </div>
   );
 }
