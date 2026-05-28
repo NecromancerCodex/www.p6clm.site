@@ -145,6 +145,29 @@ export interface CARDoc {
   sign_client?: string;
 }
 
+// ── 자동 파생 NCR (품질/자재 부적합 → source-linked NCR) A4 뷰용 ──────────
+export interface DerivedNCRItemDoc {
+  item: string;
+  required_value: string;
+  actual_value: string;
+  location?: string;
+  evidence_photo?: string;
+  immediate_action?: string;
+}
+export interface DerivedNCRDoc {
+  ncr_number: string;
+  source_document_type: string; // quality_inspection | material_inspection
+  source_document_id: string;
+  ncr_type: string;             // workmanship | material | test_result | other
+  items: DerivedNCRItemDoc[];
+  description: string;
+  responsible_party?: string;
+  due_date?: string;
+  car_required?: boolean;
+  status?: string;
+  related_standards?: string[];
+}
+
 export type CategoryId = "design" | "process" | "construction" | "quality" | "safety";
 export type DocStatus = "idle" | "submitting" | "polling" | "done" | "error";
 

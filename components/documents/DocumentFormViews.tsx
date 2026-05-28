@@ -9,6 +9,7 @@ import type {
   QualityInspectionDoc,
   MaterialInspectionDoc,
   CARDoc,
+  DerivedNCRDoc,
 } from "../../stores/doc/types";
 import type { ScheduleReportDoc } from "../../lib/api/schedule";
 
@@ -1096,6 +1097,117 @@ export function MaterialFormView({
           ["검수자", doc.inspector_sign || doc.inspector], ["현장대리인", doc.site_manager_sign || ""],
           ["감리/감독자", doc.supervisor_sign || ""], ["협력업체", doc.cooperator_sign || ""],
         ]} />
+      </div>
+    </div>
+  );
+}
+
+/* ── 자동 파생 NCR (부적합 처리 보고서) A4 뷰 ────────────────── */
+
+const NCR_TYPE_LABEL: Record<string, string> = {
+  workmanship: "시공 (Workmanship)",
+  material: "자재 (Material)",
+  test_result: "시험 결과 (Test Result)",
+  other: "기타 (Other)",
+};
+const SRC_TYPE_LABEL: Record<string, string> = {
+  quality_inspection: "품질 검사 보고서",
+  material_inspection: "자재 검수 확인서",
+};
+
+export function DerivedNcrFormView({
+  doc,
+  onReset,
+}: {
+  doc: DerivedNCRDoc;
+  onReset?: () => void;
+}) {
+  const items = doc.items || [];
+  return (
+    <div className="sir-wrapper">
+      <FormTopBar onReset={onReset} />
+      <div className="sir-form">
+        <div className="sir-doc-header">
+          <div className="sir-doc-title">부적합 처리 보고서 (NCR)</div>
+          <div className="sir-doc-meta">
+            <span>문서번호: {doc.ncr_number}</span>
+            <span className="sir-risk-badge sir-risk-high">부적합 {items.length}건</span>
+          </div>
+        </div>
+
+        <div className="sir-section">
+          <div className="sir-section-title">1. 발행 정보</div>
+          <table className="sir-info-table">
+            <tbody>
+              <tr>
+                <th>원본 문서</th>
+                <td>{SRC_TYPE_LABEL[doc.source_document_type] || doc.source_document_type} {doc.source_document_id}</td>
+                <th>부적합 유형</th>
+                <td>{NCR_TYPE_LABEL[doc.ncr_type] || doc.ncr_type}</td>
+              </tr>
+              <tr>
+                <th>조치 담당자</th>
+                <td>{doc.responsible_party || "현장 품질관리자"}</td>
+                <th>조치 기한</th>
+                <td>{doc.due_date || "-"}</td>
+              </tr>
+              <tr>
+                <th>CAR 필요</th>
+                <td>{doc.car_required ? "필요 (시정조치 보고서 작성 권고)" : "불필요"}</td>
+                <th>상태</th>
+                <td>{doc.status || "draft"}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="sir-photo-guidance">{doc.description}</div>
+        </div>
+
+        <div className="sir-section">
+          <div className="sir-section-title">
+            2. 부적합 항목
+            <span className="sir-summary-badge">총 <strong>{items.length}</strong>건</span>
+          </div>
+          <table className="sir-checklist-table">
+            <thead>
+              <tr>
+                <th style={{ width: "18%" }}>부적합 항목</th>
+                <th style={{ width: "20%" }}>요구 기준</th>
+                <th style={{ width: "22%" }}>실제 상태</th>
+                <th style={{ width: "16%" }}>발생 위치</th>
+                <th>즉시 조치</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={i} className="sir-row-fail">
+                  <td className="sir-target-cell">{it.item}</td>
+                  <td>{it.required_value}</td>
+                  <td>{it.actual_value}</td>
+                  <td>{it.location || "-"}</td>
+                  <td className="sir-findings-cell">{it.immediate_action || "시정조치 후 재검사 필요"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {doc.related_standards && doc.related_standards.length > 0 && (
+          <div className="sir-section">
+            <div className="sir-section-title">3. 위반 기준·근거 (KCS/KDS·법령)</div>
+            <div className="sir-regulation-box">
+              <ul className="sir-reg-list">
+                {doc.related_standards.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <div className="sir-photo-guidance">
+          ※ 본 NCR은 {doc.source_document_id}의 부적합 항목에서 자동 발행되었습니다. 원인 분석·재발방지가
+          필요하면 아래 [CAR 생성]으로 시정조치 보고서를 작성하세요.
+        </div>
       </div>
     </div>
   );

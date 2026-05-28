@@ -23,6 +23,10 @@ export type {
   NCRDocument,
   SafetyCheckItem,
   SafetyInspectionDocument,
+  QualityInspectionDoc,
+  MaterialInspectionDoc,
+  CARDoc,
+  DerivedNCRDoc,
 } from "./doc/types";
 
 export const useDocStore = create<DocStore>()((...a) => ({

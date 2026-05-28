@@ -13,7 +13,9 @@ import {
   QualityFormView,
   MaterialFormView,
   CarFormView,
+  DerivedNcrFormView,
 } from "../documents/DocumentFormViews";
+import type { DerivedNCRDoc } from "../../stores/doc/types";
 
 const PIPELINE_STEPS = [
   { key: "orchestrator_node[GPT-5-mini]", label: "GPT 오케스트레이터", icon: "🎯" },
@@ -294,8 +296,7 @@ export function DocAutoGen() {
             {status === "done" && (qualityResult || materialResult) && nonconformityDetected && derivedNcr && (
               <div className="dag-derived-ncr">
                 <p className="dag-result-label">자동 발행된 NCR</p>
-                <strong>{String((derivedNcr as Record<string, unknown>).ncr_number ?? "NCR")}</strong>
-                <p className="dag-ncr-desc">{String((derivedNcr as Record<string, unknown>).description ?? "")}</p>
+                <DerivedNcrFormView doc={derivedNcr as unknown as DerivedNCRDoc} />
                 {carStatus === "done" && carDoc ? (
                   <div className="dag-car-result">
                     <CarFormView doc={carDoc} onReset={undefined} />

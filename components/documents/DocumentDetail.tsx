@@ -29,8 +29,20 @@ import {
   type DocumentRead,
 } from "../../lib/api/documents";
 import { docLabelForType } from "../../lib/docCategories";
-import type { NCRDocument, SafetyInspectionDocument } from "../../stores/docStore";
-import { NcrFormView, SirFormView } from "./DocumentFormViews";
+import type {
+  NCRDocument,
+  SafetyInspectionDocument,
+  QualityInspectionDoc,
+  MaterialInspectionDoc,
+  CARDoc,
+} from "../../stores/docStore";
+import {
+  NcrFormView,
+  SirFormView,
+  QualityFormView,
+  MaterialFormView,
+  CarFormView,
+} from "./DocumentFormViews";
 
 type Mode = "view" | "edit";
 
@@ -121,6 +133,33 @@ function sirFromJson(j: Record<string, unknown>): SafetyInspectionDocument {
     risk_level: asString(j.risk_level) || "Medium",
     notes: j.notes != null ? asString(j.notes) : undefined,
   };
+}
+
+// doc_type 우선 라우팅 — 저장된 구조화 JSON(document_json)을 해당 A4 폼으로 렌더.
+// 구조화 doc(품질/자재/CAR)은 백엔드 model_dump 와 TS 인터페이스가 1:1 → 캐스팅.
+function renderA4Form(docType: string, dj: Record<string, unknown>, projectName: string) {
+  switch (docType) {
+    case "quality_inspect":
+      return <QualityFormView doc={dj as unknown as QualityInspectionDoc} stepsLog={[]} />;
+    case "material_check":
+      return <MaterialFormView doc={dj as unknown as MaterialInspectionDoc} stepsLog={[]} />;
+    case "car":
+      return <CarFormView doc={dj as unknown as CARDoc} stepsLog={[]} />;
+    case "defect_report":
+      return (
+        <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
+      );
+    case "safety_inspect":
+      return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
+    default:
+      // 레거시/미상 — payload 형태로 추정 (doc_type 누락 문서 호환)
+      if (isNcrPayload(dj))
+        return (
+          <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
+        );
+      if (isSirPayload(dj)) return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
+      return <pre className="docdetail-raw-json">{JSON.stringify(dj, null, 2)}</pre>;
+  }
 }
 
 function pickEditable(doc: DocumentRead): EditableFields {
@@ -377,22 +416,11 @@ export function DocumentDetail({ id, mode }: Props) {
       <section className="docdetail-preview">
         <h3 className="docdetail-preview-heading">A4 미리보기</h3>
         <div className="docdetail-a4-host">
-          {dj && typeof dj === "object" && !Array.isArray(dj) ? (
-            isNcrPayload(dj) ? (
-              <NcrFormView
-                ncr={ncrFromJson(dj)}
-                stepsLog={[]}
-                projectName={projectName}
-                showPipeline={false}
-              />
-            ) : isSirPayload(dj) ? (
-              <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />
-            ) : (
-              <pre className="docdetail-raw-json">{JSON.stringify(dj, null, 2)}</pre>
-            )
-          ) : (
-            <pre className="docdetail-raw-text">{doc.preview_text || "(저장된 본문이 없습니다.)"}</pre>
-          )}
+          {dj && typeof dj === "object" && !Array.isArray(dj)
+            ? renderA4Form(doc.doc_type, dj, projectName)
+            : (
+              <pre className="docdetail-raw-text">{doc.preview_text || "(저장된 본문이 없습니다.)"}</pre>
+            )}
         </div>
       </section>
     </div>
