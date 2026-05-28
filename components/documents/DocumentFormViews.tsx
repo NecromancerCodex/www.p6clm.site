@@ -1028,7 +1028,12 @@ export function QualityFormView({
               <thead><tr><th>부적합 내용</th><th>조치 사항</th><th>완료 여부</th><th>재검사 결과</th></tr></thead>
               <tbody>
                 {doc.actions.map((a, i) => (
-                  <tr key={i}><td>{a.nonconformity}</td><td>{a.action}</td><td>{a.completed}</td><td>{a.reinspection_result}</td></tr>
+                  <tr key={i}>
+                    <td><NumberedText text={a.nonconformity || ""} /></td>
+                    <td><NumberedText text={a.action || ""} /></td>
+                    <td>{a.completed}</td>
+                    <td>{a.reinspection_result}</td>
+                  </tr>
                 ))}
               </tbody>
             </table>

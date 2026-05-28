@@ -3490,6 +3490,120 @@ select {
 }
 
 /* ══════════════════════════════════════════════════
+   인쇄 / PDF 저장 — A4 문서 전용
+   /document/[id] · /document/[id]/edit + DocAutoGen·Progress 미리보기 공통
+   ══════════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm 12mm;
+  }
+
+  /* 워크스페이스 chrome (사이드바·헤더·푸터) 전부 숨김 */
+  .ws-sidebar,
+  .ws-sidebar-footer,
+  .ws-sidebar-close,
+  .ws-section-title,
+  .ws-section-desc,
+  header, nav,
+  .docdetail-toolbar,
+  .docdetail-save-error,
+  .docdetail-preview-heading,
+  /* 폼 내부 액션바 (인쇄/복사/리셋 버튼들) */
+  .ncr-top-bar,
+  .sir-top-bar,
+  .dag-header,
+  .dag-cat-row,
+  .dag-left,
+  .dag-steps-log,
+  .ncr-actions,
+  /* CAR 종결 select (인쇄엔 텍스트만 보이게 — 아래 별도 처리) */
+  .car-closure-edit,
+  /* 인라인 편집 input/select 자체는 인쇄 안 함 — 텍스트로 폴백되도록 EditCell 처리에 의존 */
+  .progress-car-btn,
+  .progress-car-error {
+    display: none !important;
+  }
+
+  /* 본문 컨테이너 — 전체 폭 사용 */
+  html, body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .docdetail-shell,
+  .docdetail-preview,
+  .docdetail-a4-host,
+  .progress-preview-col,
+  .progress-a4-host,
+  .dag-section, .dag-body, .dag-layout, .dag-right {
+    max-width: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+
+  /* A4 폼 본체 — sir/ncr 공통 wrapper */
+  .sir-wrapper, .ncr-wrapper {
+    box-shadow: none !important;
+    border: 0 !important;
+    page-break-inside: auto;
+  }
+  .sir-form, .ncr-form {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    padding: 8mm !important;
+    max-width: none !important;
+  }
+
+  /* 표 — 셀이 위아래로 잘리지 않게 폭 균등 + 깨짐 방지 */
+  .sir-info-table, .sir-action-table, .sir-checklist-table,
+  .ncr-header-grid {
+    width: 100% !important;
+    table-layout: auto !important;
+    page-break-inside: avoid;
+  }
+  .sir-info-table td, .sir-action-table td, .sir-checklist-table td,
+  .sir-info-table th, .sir-action-table th, .sir-checklist-table th {
+    word-break: keep-all !important;
+    overflow-wrap: anywhere !important;
+    white-space: normal !important;
+    vertical-align: top !important;
+  }
+
+  /* 섹션 페이지 브레이크 — 표는 가능하면 한 페이지에 */
+  .sir-section, .ncr-section {
+    page-break-inside: avoid;
+  }
+  .sir-doc-header, .sir-section-title, .ncr-section-title, .ncr-title-row {
+    page-break-after: avoid;
+  }
+
+  /* 배지·뱃지 — 인쇄에서 배경색 보이게 (브라우저 기본은 컬러 인쇄 OK 가 디폴트) */
+  .sir-risk-badge, .sir-pf-cell, .sir-summary-badge {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 인라인 편집 input/textarea — 인쇄 시 일반 텍스트처럼 렌더 */
+  .dd-edit-input, .dd-edit-textarea {
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    outline: none !important;
+    resize: none !important;
+    font-family: inherit !important;
+  }
+
+  /* 링크 — URL 인쇄 안 함 */
+  a[href]::after { content: none !important; }
+}
+
+/* ══════════════════════════════════════════════════
    CBOT · Triggered Job Card (진행 → 완료 상태 카드)
    ══════════════════════════════════════════════════ */
 
