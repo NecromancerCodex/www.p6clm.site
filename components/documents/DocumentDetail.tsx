@@ -28,6 +28,9 @@ import {
   type DocumentPatchBody,
   type DocumentRead,
 } from "../../lib/api/documents";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 import { docLabelForType } from "../../lib/docCategories";
 import type {
   NCRDocument,
@@ -35,6 +38,7 @@ import type {
   QualityInspectionDoc,
   MaterialInspectionDoc,
   CARDoc,
+  DerivedNCRDoc,
 } from "../../stores/docStore";
 import {
   NcrFormView,
@@ -42,6 +46,7 @@ import {
   QualityFormView,
   MaterialFormView,
   CarFormView,
+  DerivedNcrFormView,
 } from "./DocumentFormViews";
 
 type Mode = "view" | "edit";
@@ -146,6 +151,9 @@ function renderA4Form(docType: string, dj: Record<string, unknown>, projectName:
     case "car":
       return <CarFormView doc={dj as unknown as CARDoc} stepsLog={[]} />;
     case "defect_report":
+      // 파생 NCR(품질/자재 부적합 발) 은 DerivedNCR 모양 → 전용 뷰. 직접 발행 NCR 은 NcrFormView.
+      if ("items" in dj && "source_document_type" in dj)
+        return <DerivedNcrFormView doc={dj as unknown as DerivedNCRDoc} />;
       return (
         <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
       );
@@ -419,7 +427,11 @@ export function DocumentDetail({ id, mode }: Props) {
           {dj && typeof dj === "object" && !Array.isArray(dj)
             ? renderA4Form(doc.doc_type, dj, projectName)
             : (
-              <pre className="docdetail-raw-text">{doc.preview_text || "(저장된 본문이 없습니다.)"}</pre>
+              <div className="docdetail-md sch-md">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {doc.preview_text || "_(저장된 본문이 없습니다.)_"}
+                </ReactMarkdown>
+              </div>
             )}
         </div>
       </section>

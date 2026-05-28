@@ -68,7 +68,7 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
     documents: [
       { id: "quality_inspect", label: "품질 검사 보고서" },
       { id: "material_check", label: "자재 검수 확인서" },
-      { id: "defect_report", label: "부적합 처리 보고서 (NCR) — 직접 발행", isNcr: true },
+      { id: "defect_report", label: "부적합 처리 보고서 (NCR)", isNcr: true },
       { id: "car", label: "시정조치 보고서 (CAR)", derived: true },
     ],
   },
