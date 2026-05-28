@@ -581,10 +581,85 @@ export function ScheduleFormView({
           </div>
         </div>
 
-        {/* 3. 지연·임계 공정 */}
+        {/* 3. 공정 리스크 신호 (단기 착수·지연 영향·정합성) */}
+        {(doc.upcoming_critical.length > 0 ||
+          doc.delay_impacts.length > 0 ||
+          doc.integrity_warnings.length > 0) && (
+          <div className="sir-section">
+            <div className="sir-section-title">3. 공정 리스크 신호 (AI 추천 — 검토용)</div>
+
+            {doc.integrity_warnings.length > 0 && (
+              <div className="sch-warn-box">
+                <div className="sch-warn-title">⚠ 데이터 정합성 경고</div>
+                <ul className="sch-warn-list">
+                  {doc.integrity_warnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {doc.upcoming_critical.length > 0 && (
+              <>
+                <div className="sch-subhead">단기 착수 예정 — 선행 조치 대상 (14일 내)</div>
+                <table className="sir-checklist-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "30%" }}>공정명</th>
+                      <th style={{ width: "32%" }}>WBS 경로</th>
+                      <th style={{ width: "18%" }}>착수 예정</th>
+                      <th>구분</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doc.upcoming_critical.map((u, i) => (
+                      <tr key={i} className={u.is_critical ? "sir-row-fail" : ""}>
+                        <td className="sir-target-cell">{u.name}</td>
+                        <td>{u.wbs_path || "-"}</td>
+                        <td>
+                          {u.planned_start}
+                          {" "}
+                          <span style={{ color: u.days_until < 0 ? "#b91c1c" : "#64748b" }}>
+                            ({u.days_until < 0 ? `${-u.days_until}일 경과` : `D-${u.days_until}`})
+                          </span>
+                        </td>
+                        <td className={`sir-pf-cell ${u.is_critical ? "sir-pf-fail" : "sir-pf-na"}`}>
+                          {u.is_critical ? "⚠ 임계" : "일반"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            {doc.delay_impacts.length > 0 && (
+              <>
+                <div className="sch-subhead">지연 영향 전파 (후속 공정·마일스톤)</div>
+                <ul className="sch-impact-list">
+                  {doc.delay_impacts.map((di, i) => (
+                    <li key={i}>
+                      <strong>{di.name}</strong>
+                      {di.is_critical ? <span className="sch-tag-cp"> 임계</span> : null}
+                      {" "}
+                      {di.delay_days}일 지연 → 후속 {di.downstream_count}건 영향
+                      {di.affected_milestones.length > 0 && (
+                        <span className="sch-impact-ms">
+                          {" "}· 마일스톤 영향: {di.affected_milestones.join(", ")}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* 4. 지연·임계 공정 */}
         <div className="sir-section">
           <div className="sir-section-title">
-            3. 지연·임계 공정 (지적 사항)
+            4. 지연·임계 공정 (지적 사항)
             <span className="sir-summary-badge">
               지연 <strong>{doc.delayed_count}</strong>건 &nbsp;/&nbsp; 임계{" "}
               <strong>{doc.critical_count}</strong>건
@@ -634,9 +709,9 @@ export function ScheduleFormView({
           )}
         </div>
 
-        {/* 4. 관련 기준·근거 / 종합 의견 */}
+        {/* 5. 관련 기준·근거 / 종합 의견 */}
         <div className="sir-section">
-          <div className="sir-section-title">4. 관련 기준·근거 / 종합 의견</div>
+          <div className="sir-section-title">5. 관련 기준·근거 / 종합 의견</div>
           {doc.grounding ? (
             <div className="sir-regulation-box">
               <span className="sir-reg-label">관련 기준·근거 (KCS/KDS·법령)</span>

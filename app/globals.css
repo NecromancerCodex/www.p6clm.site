@@ -4051,6 +4051,17 @@ select {
 .sch-md th { background: var(--surface-soft); }
 .sch-md code { background: var(--surface-soft); padding: 1px 5px; border-radius: 4px; font-size: 0.82rem; }
 
+/* 공정 리스크 신호 섹션 */
+.sch-warn-box { background: #fef3c7; border: 1px solid #f59e0b; border-radius: var(--radius-s); padding: 10px 14px; margin-bottom: 12px; }
+.sch-warn-title { font-weight: 700; font-size: 0.86rem; color: #92400e; margin-bottom: 6px; }
+.sch-warn-list { margin: 0; padding-left: 18px; }
+.sch-warn-list li { font-size: 0.83rem; color: #78350f; margin: 3px 0; }
+.sch-subhead { font-weight: 600; font-size: 0.88rem; color: var(--muted-strong); margin: 14px 0 6px; }
+.sch-impact-list { margin: 0; padding-left: 18px; }
+.sch-impact-list li { font-size: 0.86rem; margin: 5px 0; line-height: 1.5; }
+.sch-impact-ms { color: #b91c1c; font-weight: 500; }
+.sch-tag-cp { display: inline-block; background: #b91c1c; color: #fff; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 2px; }
+
 .sch-h3 { font-size: 0.98rem; font-weight: 700; color: var(--muted-strong); margin: 22px 0 10px; }
 .sch-empty { color: var(--muted); font-size: 0.86rem; }
 .sch-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }

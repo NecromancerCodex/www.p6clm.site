@@ -69,6 +69,22 @@ export interface ScheduleReportDoc {
   delayed_count: number;
   delayed: ScheduleDocDelayedRow[];
   milestones: { name: string; date: string }[];
+  upcoming_critical: {
+    code: string;
+    name: string;
+    wbs_path: string;
+    planned_start: string;
+    days_until: number;
+    is_critical: boolean;
+  }[];
+  delay_impacts: {
+    name: string;
+    delay_days: number;
+    is_critical: boolean;
+    downstream_count: number;
+    affected_milestones: string[];
+  }[];
+  integrity_warnings: string[];
   narrative: string;
   grounding: string;
 }
