@@ -960,7 +960,7 @@ export function QualityFormView({
 
         <div className="sir-section">
           <div className="sir-section-title">2. 검사 목적</div>
-          <div className="sir-photo-guidance">{doc.inspection_purpose}</div>
+          <div className="sir-photo-guidance"><NumberedText text={doc.inspection_purpose || ""} /></div>
         </div>
 
         <div className="sir-section">
@@ -1012,9 +1012,9 @@ export function QualityFormView({
               <table key={i} className="sir-action-table" style={{ marginBottom: 8 }}>
                 <tbody>
                   <tr><th>발생 위치</th><td colSpan={3}>{nc.location}</td></tr>
-                  <tr><th>부적합 내용</th><td colSpan={3}>{nc.description}</td></tr>
-                  <tr><th>원인</th><td>{nc.cause || "-"}</td><th>관련 사진</th><td>{nc.photo_ref || "-"}</td></tr>
-                  <tr><th>조치 필요</th><td colSpan={3}>{nc.required_action}</td></tr>
+                  <tr><th>부적합 내용</th><td colSpan={3}><NumberedText text={nc.description || ""} /></td></tr>
+                  <tr><th>원인</th><td><NumberedText text={nc.cause || "-"} /></td><th>관련 사진</th><td>{nc.photo_ref || "-"}</td></tr>
+                  <tr><th>조치 필요</th><td colSpan={3}><NumberedText text={nc.required_action || ""} /></td></tr>
                 </tbody>
               </table>
             ))}
@@ -1037,7 +1037,7 @@ export function QualityFormView({
 
         <div className="sir-section">
           <div className="sir-section-title">7. 종합 의견</div>
-          <div className="sir-photo-guidance">{doc.overall_opinion}</div>
+          <div className="sir-photo-guidance"><NumberedText text={doc.overall_opinion || ""} /></div>
         </div>
 
         {doc.attachments?.length > 0 && (
@@ -1147,9 +1147,9 @@ export function MaterialFormView({
               <table key={i} className="sir-action-table" style={{ marginBottom: 8 }}>
                 <tbody>
                   <tr><th>발생 항목</th><td>{nc.nc_item}</td><th>발생 수량</th><td>{nc.quantity || "-"}</td></tr>
-                  <tr><th>요구 기준</th><td>{nc.required_criterion}</td><th>실제 상태</th><td>{nc.actual_state}</td></tr>
-                  <tr><th>부적합 내용</th><td colSpan={3}>{nc.description}</td></tr>
-                  <tr><th>임시 조치</th><td>{nc.temporary_action}</td><th>NCR 발행</th><td>{nc.ncr_issued}{nc.ncr_number ? ` (${nc.ncr_number})` : ""}</td></tr>
+                  <tr><th>요구 기준</th><td><NumberedText text={nc.required_criterion || ""} /></td><th>실제 상태</th><td><NumberedText text={nc.actual_state || ""} /></td></tr>
+                  <tr><th>부적합 내용</th><td colSpan={3}><NumberedText text={nc.description || ""} /></td></tr>
+                  <tr><th>임시 조치</th><td><NumberedText text={nc.temporary_action || ""} /></td><th>NCR 발행</th><td>{nc.ncr_issued}{nc.ncr_number ? ` (${nc.ncr_number})` : ""}</td></tr>
                 </tbody>
               </table>
             ))}
@@ -1158,7 +1158,7 @@ export function MaterialFormView({
 
         <div className="sir-section">
           <div className="sir-section-title">7. 검수 의견</div>
-          <div className="sir-photo-guidance">{doc.inspection_opinion}</div>
+          <div className="sir-photo-guidance"><NumberedText text={doc.inspection_opinion || ""} /></div>
         </div>
 
         <SigRow roles={[
@@ -1333,7 +1333,7 @@ export function CarFormView({
             <tbody>
               <tr><th>부적합 항목</th><td>{nc.nc_item || "-"}</td><th>등급</th><td>{nc.nc_grade || "-"}</td></tr>
               <tr><th>요구 기준</th><td>{nc.required_criterion || "-"}</td><th>실제 상태</th><td>{nc.actual_state || "-"}</td></tr>
-              <tr><th>부적합 내용</th><td colSpan={3}>{nc.nc_description}</td></tr>
+              <tr><th>부적합 내용</th><td colSpan={3}><NumberedText text={String(nc.nc_description ?? "")} /></td></tr>
             </tbody>
           </table>
         </div>
@@ -1342,8 +1342,8 @@ export function CarFormView({
           <div className="sir-section-title">3. 원인 분석</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>직접 원인</th><td colSpan={3}>{String(c.direct_cause ?? "")}</td></tr>
-              <tr><th>근본 원인</th><td colSpan={3}>{String(c.root_cause ?? "")}</td></tr>
+              <tr><th>직접 원인</th><td colSpan={3}><NumberedText text={String(c.direct_cause ?? "")} /></td></tr>
+              <tr><th>근본 원인</th><td colSpan={3}><NumberedText text={String(c.root_cause ?? "")} /></td></tr>
               <tr><th>분석 방법</th><td colSpan={3}>{methods}</td></tr>
             </tbody>
           </table>
@@ -1353,8 +1353,8 @@ export function CarFormView({
           <div className="sir-section-title">4. 시정조치 계획</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>조치 내용</th><td colSpan={3}>{cor.content}</td></tr>
-              <tr><th>조치 방법</th><td>{cor.method}</td><th>담당자</th><td>{cor.responsible || lk.action_responsible}</td></tr>
+              <tr><th>조치 내용</th><td colSpan={3}><NumberedText text={String(cor.content ?? "")} /></td></tr>
+              <tr><th>조치 방법</th><td><NumberedText text={String(cor.method ?? "")} /></td><th>담당자</th><td>{cor.responsible || lk.action_responsible}</td></tr>
               <tr><th>예정일</th><td>{cor.planned_date || "-"}</td><th>완료 예정</th><td>{cor.completion_due || "-"}</td></tr>
             </tbody>
           </table>
@@ -1364,7 +1364,7 @@ export function CarFormView({
           <div className="sir-section-title">5. 재발방지 대책</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>대책</th><td colSpan={3}>{pre.content}</td></tr>
+              <tr><th>대책</th><td colSpan={3}><NumberedText text={String(pre.content ?? "")} /></td></tr>
               <tr><th>개선 대상</th><td>{pre.improvement_target || "-"}</td><th>교육</th><td>{pre.training_needed} {pre.training_target ? `(${pre.training_target})` : ""}</td></tr>
             </tbody>
           </table>
@@ -1375,7 +1375,7 @@ export function CarFormView({
           <table className="sir-action-table">
             <tbody>
               <tr><th>조치 기간</th><td>{ar.start_date || "예정"} ~ {ar.complete_date || "예정"}</td><th>결과</th><td>{ar.result || "미완료"}</td></tr>
-              <tr><th>실제 조치</th><td colSpan={3}>{ar.actual_content || "(조치 진행 시 기재)"}</td></tr>
+              <tr><th>실제 조치</th><td colSpan={3}><NumberedText text={String(ar.actual_content ?? "(조치 진행 시 기재)")} /></td></tr>
             </tbody>
           </table>
         </div>
@@ -1385,8 +1385,8 @@ export function CarFormView({
           <table className="sir-action-table">
             <tbody>
               <tr><th>재검사 일자</th><td>{ri.date || "예정"}</td><th>재검사 결과</th><td>{ri.result || "재검사 예정"}</td></tr>
-              <tr><th>재검사 기준</th><td colSpan={3}>{ri.criterion || "-"}</td></tr>
-              <tr><th>검증 의견</th><td colSpan={3}>{ri.opinion || "-"}</td></tr>
+              <tr><th>재검사 기준</th><td colSpan={3}><NumberedText text={String(ri.criterion ?? "-")} /></td></tr>
+              <tr><th>검증 의견</th><td colSpan={3}><NumberedText text={String(ri.opinion ?? "-")} /></td></tr>
             </tbody>
           </table>
         </div>
@@ -1403,7 +1403,7 @@ export function CarFormView({
           </div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>종결 의견</th><td colSpan={3}>{doc.closure_opinion}</td></tr>
+              <tr><th>종결 의견</th><td colSpan={3}><NumberedText text={String(doc.closure_opinion ?? "")} /></td></tr>
             </tbody>
           </table>
         </div>
