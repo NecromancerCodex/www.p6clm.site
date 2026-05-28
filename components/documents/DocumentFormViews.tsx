@@ -42,14 +42,19 @@ export function NcrFormView({
   onReset,
   projectName = "현장 미지정",
   showPipeline = true,
+  editable = false,
+  onChange,
 }: {
   ncr: NCRDocument;
   stepsLog?: string[];
   onReset?: () => void;
   projectName?: string;
   showPipeline?: boolean;
+  editable?: boolean;
+  onChange?: (next: Record<string, unknown>) => void;
 }) {
   const DISPOSITION_ALL = ["재작업", "폐기", "사용승인", "반품", "기타"] as const;
+  const setField = makeSetField(ncr, onChange);
 
   async function copyAsText() {
     const text = `Non-Conformance Report (NCR)\nPROJECT: ${projectName}\n\n문서번호: ${ncr.document_number}   발생자: ${ncr.reporter}   발생일자: ${ncr.report_date}\n제목: ${ncr.title}\n작성자: ${ncr.author}   조치부서: ${ncr.action_department}\n발생위치: ${ncr.location}   업체: ${ncr.company}\nNC 유형: ${ncr.nc_type}   첨부: ${ncr.attachment}\n조치담당자: ${ncr.action_manager}\n\n[요구사항/기준]\n${ncr.specification}\n\n[부적합 내용]\n${ncr.description}\n\n[즉각 조치사항]\n${ncr.immediate_action}\n\n[처분] ${ncr.disposition.join(", ")}\n조치 책임자: ${ncr.action_responsible}   조치기한: ${ncr.action_deadline}\n\n[검증]\n${ncr.verification}\n\n종료일: ${ncr.completion_date}   비고: ${ncr.notes}`.trim();
@@ -93,70 +98,82 @@ export function NcrFormView({
         <div className="ncr-header-grid">
           <div className="ncr-cell">
             <span className="ncr-label">문서번호</span>
-            <span className="ncr-value">{ncr.document_number}</span>
+            <span className="ncr-value"><EditCell value={ncr.document_number} editable={!!editable} onChange={(v) => setField("document_number", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">발생자</span>
-            <span className="ncr-value">{ncr.reporter}</span>
+            <span className="ncr-value"><EditCell value={ncr.reporter} editable={!!editable} onChange={(v) => setField("reporter", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">발생일자</span>
-            <span className="ncr-value">{ncr.report_date}</span>
+            <span className="ncr-value"><EditCell value={ncr.report_date} editable={!!editable} onChange={(v) => setField("report_date", v)} /></span>
           </div>
           <div className="ncr-cell ncr-cell-full">
             <span className="ncr-label">제목</span>
-            <span className="ncr-value">{ncr.title}</span>
+            <span className="ncr-value"><EditCell value={ncr.title} editable={!!editable} onChange={(v) => setField("title", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">작성자</span>
-            <span className="ncr-value">{ncr.author}</span>
+            <span className="ncr-value"><EditCell value={ncr.author} editable={!!editable} onChange={(v) => setField("author", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">조치부서</span>
-            <span className="ncr-value">{ncr.action_department}</span>
+            <span className="ncr-value"><EditCell value={ncr.action_department} editable={!!editable} onChange={(v) => setField("action_department", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">발생위치</span>
-            <span className="ncr-value">{ncr.location}</span>
+            <span className="ncr-value"><EditCell value={ncr.location} editable={!!editable} onChange={(v) => setField("location", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">업체</span>
-            <span className="ncr-value">{ncr.company}</span>
+            <span className="ncr-value"><EditCell value={ncr.company} editable={!!editable} onChange={(v) => setField("company", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">NC 유형</span>
-            <span className="ncr-value">{ncr.nc_type}</span>
+            <span className="ncr-value"><EditCell value={ncr.nc_type} editable={!!editable} onChange={(v) => setField("nc_type", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">첨부</span>
-            <span className="ncr-value">{ncr.attachment}</span>
+            <span className="ncr-value"><EditCell value={ncr.attachment} editable={!!editable} onChange={(v) => setField("attachment", v)} /></span>
           </div>
           <div className="ncr-cell ncr-cell-full">
             <span className="ncr-label">조치담당자</span>
-            <span className="ncr-value">{ncr.action_manager}</span>
+            <span className="ncr-value"><EditCell value={ncr.action_manager} editable={!!editable} onChange={(v) => setField("action_manager", v)} /></span>
           </div>
         </div>
         <div className="ncr-section">
           <div className="ncr-section-title">요구사항 / 기준 (Specification)</div>
-          <div className="ncr-section-body">{ncr.specification}</div>
+          <div className="ncr-section-body">
+            <EditCell value={ncr.specification} editable={!!editable} onChange={(v) => setField("specification", v)} multiline />
+          </div>
         </div>
         <div className="ncr-section">
           <div className="ncr-section-title">부적합 내용 (Description)</div>
           <div className="ncr-section-body ncr-section-tall">
-            <NumberedText text={ncr.description} />
+            <EditCell value={ncr.description} editable={!!editable} onChange={(v) => setField("description", v)} multiline />
           </div>
         </div>
         <div className="ncr-section">
           <div className="ncr-section-title">즉각 조치사항 (Immediate Action)</div>
           <div className="ncr-section-body ncr-section-tall">
-            <NumberedText text={ncr.immediate_action} />
+            <EditCell value={ncr.immediate_action} editable={!!editable} onChange={(v) => setField("immediate_action", v)} multiline />
           </div>
         </div>
         <div className="ncr-section">
           <div className="ncr-section-title">처분 (Disposition)</div>
           <div className="ncr-disposition-row">
             {DISPOSITION_ALL.map((opt) => (
-              <label key={opt} className="ncr-checkbox-label">
+              <label
+                key={opt}
+                className="ncr-checkbox-label"
+                style={editable ? { cursor: "pointer" } : undefined}
+                onClick={editable ? () => {
+                  const next = ncr.disposition.includes(opt)
+                    ? ncr.disposition.filter((d) => d !== opt)
+                    : [...ncr.disposition, opt];
+                  setField("disposition", next);
+                } : undefined}
+              >
                 <span
                   className={`ncr-checkbox${ncr.disposition.includes(opt) ? " is-checked" : ""}`}
                 >
@@ -170,27 +187,27 @@ export function NcrFormView({
         <div className="ncr-two-col">
           <div className="ncr-cell">
             <span className="ncr-label">조치 책임자</span>
-            <span className="ncr-value">{ncr.action_responsible}</span>
+            <span className="ncr-value"><EditCell value={ncr.action_responsible} editable={!!editable} onChange={(v) => setField("action_responsible", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">조치기한</span>
-            <span className="ncr-value">{ncr.action_deadline}</span>
+            <span className="ncr-value"><EditCell value={ncr.action_deadline} editable={!!editable} onChange={(v) => setField("action_deadline", v)} /></span>
           </div>
         </div>
         <div className="ncr-section">
           <div className="ncr-section-title">검증 (Verification)</div>
           <div className="ncr-section-body">
-            <NumberedText text={ncr.verification} />
+            <EditCell value={ncr.verification} editable={!!editable} onChange={(v) => setField("verification", v)} multiline />
           </div>
         </div>
         <div className="ncr-two-col">
           <div className="ncr-cell">
             <span className="ncr-label">종료일</span>
-            <span className="ncr-value">{ncr.completion_date || "-"}</span>
+            <span className="ncr-value"><EditCell value={ncr.completion_date || ""} editable={!!editable} onChange={(v) => setField("completion_date", v)} /></span>
           </div>
           <div className="ncr-cell">
             <span className="ncr-label">비고</span>
-            <span className="ncr-value">{ncr.notes || ""}</span>
+            <span className="ncr-value"><EditCell value={ncr.notes || ""} editable={!!editable} onChange={(v) => setField("notes", v)} /></span>
           </div>
         </div>
       </div>
@@ -205,12 +222,18 @@ export function SirFormView({
   stepsLog = [],
   onReset,
   showPipeline = true,
+  editable = false,
+  onChange,
 }: {
   sir: SafetyInspectionDocument;
   stepsLog?: string[];
   onReset?: () => void;
   showPipeline?: boolean;
+  editable?: boolean;
+  onChange?: (next: Record<string, unknown>) => void;
 }) {
+  const setField = makeSetField(sir, onChange);
+  const setItem = makeSetItem(sir, onChange);
   const failItems = sir.checklist.filter((c) => c.status === "F");
   const passItems = sir.checklist.filter((c) => c.status === "P");
   const riskClass =
@@ -288,7 +311,14 @@ export function SirFormView({
           <div className="sir-doc-title">정기 안전 점검 보고서</div>
           <div className="sir-doc-meta">
             <span>문서번호: {sir.document_number}</span>
-            <span className={`sir-risk-badge ${riskClass}`}>{sir.risk_level}</span>
+            <span className={`sir-risk-badge ${riskClass}`}>
+              <EditSelect
+                value={sir.risk_level}
+                editable={!!editable}
+                options={["Low", "Medium", "High", "Critical"]}
+                onChange={(v) => setField("risk_level", v)}
+              />
+            </span>
           </div>
         </div>
 
@@ -298,17 +328,17 @@ export function SirFormView({
             <tbody>
               <tr>
                 <th>공사명</th>
-                <td colSpan={3}>{sir.construction_name}</td>
+                <td colSpan={3}><EditCell value={sir.construction_name} editable={!!editable} onChange={(v) => setField("construction_name", v)} /></td>
               </tr>
               <tr>
                 <th>점검 일시</th>
-                <td>{sir.inspection_date}</td>
+                <td><EditCell value={sir.inspection_date} editable={!!editable} onChange={(v) => setField("inspection_date", v)} /></td>
                 <th>점검자</th>
-                <td>{sir.inspector}</td>
+                <td><EditCell value={sir.inspector} editable={!!editable} onChange={(v) => setField("inspector", v)} /></td>
               </tr>
               <tr>
                 <th>점검 구역</th>
-                <td colSpan={3}>{sir.inspection_zone}</td>
+                <td colSpan={3}><EditCell value={sir.inspection_zone} editable={!!editable} onChange={(v) => setField("inspection_zone", v)} /></td>
               </tr>
             </tbody>
           </table>
@@ -344,16 +374,21 @@ export function SirFormView({
                     item.status === "F" ? "sir-row-fail" : item.status === "P" ? "sir-row-pass" : ""
                   }
                 >
-                  <td className="sir-target-cell">{item.target}</td>
-                  <td>{item.item_name}</td>
+                  <td className="sir-target-cell"><EditCell value={item.target} editable={!!editable} onChange={(v) => setItem("checklist", i, { target: v })} /></td>
+                  <td><EditCell value={item.item_name} editable={!!editable} onChange={(v) => setItem("checklist", i, { item_name: v })} /></td>
                   <td
                     className={`sir-pf-cell ${
                       item.status === "F" ? "sir-pf-fail" : item.status === "P" ? "sir-pf-pass" : "sir-pf-na"
                     }`}
                   >
-                    {item.status}
+                    <EditSelect
+                      value={item.status}
+                      editable={!!editable}
+                      options={["P", "F", "N/A"]}
+                      onChange={(v) => setItem("checklist", i, { status: v })}
+                    />
                   </td>
-                  <td className="sir-findings-cell">{item.findings}</td>
+                  <td className="sir-findings-cell"><EditCell value={item.findings} editable={!!editable} onChange={(v) => setItem("checklist", i, { findings: v })} multiline /></td>
                 </tr>
               ))}
             </tbody>
@@ -362,7 +397,7 @@ export function SirFormView({
 
         <div className="sir-section">
           <div className="sir-section-title">3. 현장 사진 (Before &amp; After)</div>
-          <div className="sir-photo-guidance">{sir.photo_guidance}</div>
+          <div className="sir-photo-guidance"><EditCell value={sir.photo_guidance} editable={!!editable} onChange={(v) => setField("photo_guidance", v)} multiline /></div>
           <div className="sir-photo-grid">
             <div className="sir-photo-box">
               <div className="sir-photo-label">📷 현황 사진 (Before)</div>
@@ -377,12 +412,22 @@ export function SirFormView({
 
         <div className="sir-section">
           <div className="sir-section-title">4. 조치 계획 및 확인</div>
-          {sir.violated_regulations.length > 0 && (
+          {(sir.violated_regulations.length > 0 || editable) && (
             <div className="sir-regulation-box">
               <span className="sir-reg-label">위반 법령</span>
               <ul className="sir-reg-list">
                 {sir.violated_regulations.map((r, i) => (
-                  <li key={i}>{r}</li>
+                  <li key={i}>
+                    <EditCell
+                      value={r}
+                      editable={!!editable}
+                      onChange={(v) => {
+                        const next = [...sir.violated_regulations];
+                        next[i] = v;
+                        setField("violated_regulations", next);
+                      }}
+                    />
+                  </li>
                 ))}
               </ul>
             </div>
@@ -391,19 +436,28 @@ export function SirFormView({
             <tbody>
               <tr>
                 <th>조치 기한</th>
-                <td>{sir.action_deadline}</td>
+                <td><EditCell value={sir.action_deadline} editable={!!editable} onChange={(v) => setField("action_deadline", v)} /></td>
                 <th>조치 책임자</th>
-                <td>{sir.action_responsible}</td>
+                <td><EditCell value={sir.action_responsible} editable={!!editable} onChange={(v) => setField("action_responsible", v)} /></td>
               </tr>
               <tr>
                 <th>재점검 의견</th>
                 <td colSpan={3} className="sir-opinion-cell">
-                  {sir.reinspection_opinion.split(/<br\s*\/?>/i).map((part, i, arr) => (
-                    <Fragment key={i}>
-                      {part}
-                      {i < arr.length - 1 && <br />}
-                    </Fragment>
-                  ))}
+                  {editable ? (
+                    <EditCell
+                      value={sir.reinspection_opinion}
+                      editable
+                      onChange={(v) => setField("reinspection_opinion", v)}
+                      multiline
+                    />
+                  ) : (
+                    sir.reinspection_opinion.split(/<br\s*\/?>/i).map((part, i, arr) => (
+                      <Fragment key={i}>
+                        {part}
+                        {i < arr.length - 1 && <br />}
+                      </Fragment>
+                    ))
+                  )}
                 </td>
               </tr>
             </tbody>
@@ -921,11 +975,17 @@ export function QualityFormView({
   doc,
   stepsLog = [],
   onReset,
+  editable = false,
+  onChange,
 }: {
   doc: QualityInspectionDoc;
   stepsLog?: string[];
   onReset?: () => void;
+  editable?: boolean;
+  onChange?: (next: Record<string, unknown>) => void;
 }) {
+  const setField = makeSetField(doc, onChange);
+  const setItem = makeSetItem(doc, onChange);
   const fail = doc.checklist.filter((c) => c.judgement === "부적합").length;
   const pass = doc.checklist.filter((c) => c.judgement === "적합").length;
   const review = doc.checklist.filter((c) => c.judgement === "확인필요").length;
@@ -941,7 +1001,14 @@ export function QualityFormView({
           <div className="sir-doc-title">{doc.report_title || "품질 검사 보고서"}</div>
           <div className="sir-doc-meta">
             <span>문서번호: {doc.document_number}</span>
-            <span className={`sir-risk-badge ${badge}`}>{doc.judgement}</span>
+            <span className={`sir-risk-badge ${badge}`}>
+              <EditSelect
+                value={doc.judgement}
+                editable={!!editable}
+                options={["적합", "부적합", "확인필요"]}
+                onChange={(v) => setField("judgement", v)}
+              />
+            </span>
           </div>
         </div>
 
@@ -949,18 +1016,18 @@ export function QualityFormView({
           <div className="sir-section-title">1. 공사 개요</div>
           <table className="sir-info-table">
             <tbody>
-              <tr><th>현장명</th><td>{doc.site_name}</td><th>공사 위치</th><td>{doc.construction_location || "-"}</td></tr>
-              <tr><th>시공사</th><td>{doc.contractor || "-"}</td><th>감리단</th><td>{doc.supervisor_org || "-"}</td></tr>
-              <tr><th>검사 일자</th><td>{doc.inspection_date}</td><th>검사자</th><td>{doc.inspector}</td></tr>
-              <tr><th>검사 공종</th><td>{doc.work_type}</td><th>입회자</th><td>{doc.witness || "해당 없음"}</td></tr>
-              <tr><th>검사 위치</th><td colSpan={3}>{doc.inspection_location}</td></tr>
+              <tr><th>현장명</th><td><EditCell value={doc.site_name} editable={!!editable} onChange={(v) => setField("site_name", v)} /></td><th>공사 위치</th><td><EditCell value={doc.construction_location || ""} editable={!!editable} onChange={(v) => setField("construction_location", v)} /></td></tr>
+              <tr><th>시공사</th><td><EditCell value={doc.contractor || ""} editable={!!editable} onChange={(v) => setField("contractor", v)} /></td><th>감리단</th><td><EditCell value={doc.supervisor_org || ""} editable={!!editable} onChange={(v) => setField("supervisor_org", v)} /></td></tr>
+              <tr><th>검사 일자</th><td><EditCell value={doc.inspection_date} editable={!!editable} onChange={(v) => setField("inspection_date", v)} /></td><th>검사자</th><td><EditCell value={doc.inspector} editable={!!editable} onChange={(v) => setField("inspector", v)} /></td></tr>
+              <tr><th>검사 공종</th><td><EditCell value={doc.work_type} editable={!!editable} onChange={(v) => setField("work_type", v)} /></td><th>입회자</th><td><EditCell value={doc.witness || ""} editable={!!editable} onChange={(v) => setField("witness", v)} /></td></tr>
+              <tr><th>검사 위치</th><td colSpan={3}><EditCell value={doc.inspection_location} editable={!!editable} onChange={(v) => setField("inspection_location", v)} /></td></tr>
             </tbody>
           </table>
         </div>
 
         <div className="sir-section">
           <div className="sir-section-title">2. 검사 목적</div>
-          <div className="sir-photo-guidance"><NumberedText text={doc.inspection_purpose || ""} /></div>
+          <div className="sir-photo-guidance"><EditCell value={doc.inspection_purpose || ""} editable={!!editable} onChange={(v) => setField("inspection_purpose", v)} multiline /></div>
         </div>
 
         <div className="sir-section">
@@ -996,9 +1063,18 @@ export function QualityFormView({
                     : "sir-row-pass"
                   }
                 >
-                  <td>{c.item}</td><td>{c.criterion}</td><td>{c.result}</td>
-                  <td className={`sir-pf-cell ${judgeClass(c.judgement)}`}>{c.judgement}</td>
-                  <td>{c.note || ""}</td>
+                  <td><EditCell value={c.item} editable={!!editable} onChange={(v) => setItem("checklist", i, { item: v })} /></td>
+                  <td><EditCell value={c.criterion} editable={!!editable} onChange={(v) => setItem("checklist", i, { criterion: v })} /></td>
+                  <td><EditCell value={c.result} editable={!!editable} onChange={(v) => setItem("checklist", i, { result: v })} /></td>
+                  <td className={`sir-pf-cell ${judgeClass(c.judgement)}`}>
+                    <EditSelect
+                      value={c.judgement}
+                      editable={!!editable}
+                      options={["적합", "부적합", "확인필요", "해당없음"]}
+                      onChange={(v) => setItem("checklist", i, { judgement: v })}
+                    />
+                  </td>
+                  <td><EditCell value={c.note || ""} editable={!!editable} onChange={(v) => setItem("checklist", i, { note: v })} /></td>
                 </tr>
               ))}
             </tbody>
@@ -1011,10 +1087,10 @@ export function QualityFormView({
             {doc.nonconformities.map((nc, i) => (
               <table key={i} className="sir-action-table" style={{ marginBottom: 8 }}>
                 <tbody>
-                  <tr><th>발생 위치</th><td colSpan={3}>{nc.location}</td></tr>
-                  <tr><th>부적합 내용</th><td colSpan={3}><NumberedText text={nc.description || ""} /></td></tr>
-                  <tr><th>원인</th><td><NumberedText text={nc.cause || "-"} /></td><th>관련 사진</th><td>{nc.photo_ref || "-"}</td></tr>
-                  <tr><th>조치 필요</th><td colSpan={3}><NumberedText text={nc.required_action || ""} /></td></tr>
+                  <tr><th>발생 위치</th><td colSpan={3}><EditCell value={nc.location || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { location: v })} /></td></tr>
+                  <tr><th>부적합 내용</th><td colSpan={3}><EditCell value={nc.description || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { description: v })} multiline /></td></tr>
+                  <tr><th>원인</th><td><EditCell value={nc.cause || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { cause: v })} multiline /></td><th>관련 사진</th><td><EditCell value={nc.photo_ref || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { photo_ref: v })} /></td></tr>
+                  <tr><th>조치 필요</th><td colSpan={3}><EditCell value={nc.required_action || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { required_action: v })} multiline /></td></tr>
                 </tbody>
               </table>
             ))}
@@ -1029,10 +1105,17 @@ export function QualityFormView({
               <tbody>
                 {doc.actions.map((a, i) => (
                   <tr key={i}>
-                    <td><NumberedText text={a.nonconformity || ""} /></td>
-                    <td><NumberedText text={a.action || ""} /></td>
-                    <td>{a.completed}</td>
-                    <td>{a.reinspection_result}</td>
+                    <td><EditCell value={a.nonconformity || ""} editable={!!editable} onChange={(v) => setItem("actions", i, { nonconformity: v })} /></td>
+                    <td><EditCell value={a.action || ""} editable={!!editable} onChange={(v) => setItem("actions", i, { action: v })} multiline /></td>
+                    <td>
+                      <EditSelect
+                        value={a.completed}
+                        editable={!!editable}
+                        options={["완료", "진행 중", "예정"]}
+                        onChange={(v) => setItem("actions", i, { completed: v })}
+                      />
+                    </td>
+                    <td><EditCell value={a.reinspection_result} editable={!!editable} onChange={(v) => setItem("actions", i, { reinspection_result: v })} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -1042,7 +1125,7 @@ export function QualityFormView({
 
         <div className="sir-section">
           <div className="sir-section-title">7. 종합 의견</div>
-          <div className="sir-photo-guidance"><NumberedText text={doc.overall_opinion || ""} /></div>
+          <div className="sir-photo-guidance"><EditCell value={doc.overall_opinion || ""} editable={!!editable} onChange={(v) => setField("overall_opinion", v)} multiline /></div>
         </div>
 
         {doc.attachments?.length > 0 && (
@@ -1064,11 +1147,17 @@ export function MaterialFormView({
   doc,
   stepsLog = [],
   onReset,
+  editable = false,
+  onChange,
 }: {
   doc: MaterialInspectionDoc;
   stepsLog?: string[];
   onReset?: () => void;
+  editable?: boolean;
+  onChange?: (next: Record<string, unknown>) => void;
 }) {
+  const setField = makeSetField(doc, onChange);
+  const setItem = makeSetItem(doc, onChange);
   const ov = doc.overview || {};
   const badge = doc.judgement === "부적합" ? "sir-risk-high" : doc.judgement === "조건부 적합" ? "sir-risk-medium" : "sir-risk-low";
   const OV: Array<[string, string]> = [
@@ -1076,6 +1165,12 @@ export function MaterialFormView({
     ["공급업체", ov.supplier], ["수량", `${ov.quantity ?? ""} ${ov.unit ?? ""}`], ["납품일자", ov.delivery_date],
     ["납품서 번호", ov.delivery_note_no], ["자재승인서 번호", ov.approval_doc_no],
     ["시험성적서 번호", ov.test_report_no], ["KS/인증", ov.ks_certified], ["보관 위치", ov.storage_location],
+  ];
+  const OV_KEYS: string[] = [
+    "material_name", "specification", "manufacturer",
+    "supplier", "quantity", "delivery_date",
+    "delivery_note_no", "approval_doc_no",
+    "test_report_no", "ks_certified", "storage_location",
   ];
   return (
     <div className="sir-wrapper">
@@ -1085,7 +1180,14 @@ export function MaterialFormView({
           <div className="sir-doc-title">자재 검수 확인서</div>
           <div className="sir-doc-meta">
             <span>문서번호: {doc.document_number}</span>
-            <span className={`sir-risk-badge ${badge}`}>{doc.judgement}</span>
+            <span className={`sir-risk-badge ${badge}`}>
+              <EditSelect
+                value={doc.judgement}
+                editable={!!editable}
+                options={["적합", "조건부 적합", "부적합"]}
+                onChange={(v) => setField("judgement", v)}
+              />
+            </span>
           </div>
         </div>
 
@@ -1093,10 +1195,10 @@ export function MaterialFormView({
           <div className="sir-section-title">기본 정보</div>
           <table className="sir-info-table">
             <tbody>
-              <tr><th>현장명</th><td>{doc.site_name}</td><th>검수 일자</th><td>{doc.inspection_date}</td></tr>
-              <tr><th>검수자</th><td>{doc.inspector}</td><th>관련 공종</th><td>{doc.work_type}</td></tr>
-              <tr><th>협력업체</th><td>{doc.cooperator || "-"}</td><th>공급업체</th><td>{doc.supplier || "-"}</td></tr>
-              <tr><th>납품차량</th><td>{doc.delivery_vehicle_no || "-"}</td><th>입회자</th><td>{doc.witness || "해당 없음"}</td></tr>
+              <tr><th>현장명</th><td><EditCell value={doc.site_name} editable={!!editable} onChange={(v) => setField("site_name", v)} /></td><th>검수 일자</th><td><EditCell value={doc.inspection_date} editable={!!editable} onChange={(v) => setField("inspection_date", v)} /></td></tr>
+              <tr><th>검수자</th><td><EditCell value={doc.inspector} editable={!!editable} onChange={(v) => setField("inspector", v)} /></td><th>관련 공종</th><td><EditCell value={doc.work_type} editable={!!editable} onChange={(v) => setField("work_type", v)} /></td></tr>
+              <tr><th>협력업체</th><td><EditCell value={doc.cooperator || ""} editable={!!editable} onChange={(v) => setField("cooperator", v)} /></td><th>공급업체</th><td><EditCell value={doc.supplier || ""} editable={!!editable} onChange={(v) => setField("supplier", v)} /></td></tr>
+              <tr><th>납품차량</th><td><EditCell value={doc.delivery_vehicle_no || ""} editable={!!editable} onChange={(v) => setField("delivery_vehicle_no", v)} /></td><th>입회자</th><td><EditCell value={doc.witness || ""} editable={!!editable} onChange={(v) => setField("witness", v)} /></td></tr>
             </tbody>
           </table>
         </div>
@@ -1105,14 +1207,16 @@ export function MaterialFormView({
           <div className="sir-section-title">1. 자재 개요</div>
           <table className="sir-info-table">
             <tbody>
-              {OV.reduce<Array<Array<[string, string]>>>((rows, cur, i) => {
-                if (i % 2 === 0) rows.push([cur]);
-                else rows[rows.length - 1].push(cur);
+              {OV.reduce<Array<Array<[number, [string, string]]>>>((rows, cur, i) => {
+                if (i % 2 === 0) rows.push([[i, cur]]);
+                else rows[rows.length - 1].push([i, cur]);
                 return rows;
-              }, []).map((pair, i) => (
-                <tr key={i}>
-                  <th>{pair[0][0]}</th><td>{pair[0][1] || "-"}</td>
-                  <th>{pair[1]?.[0] ?? ""}</th><td>{pair[1]?.[1] ?? ""}</td>
+              }, []).map((pair, ri) => (
+                <tr key={ri}>
+                  <th>{pair[0][1][0]}</th>
+                  <td><EditCell value={pair[0][1][1] || ""} editable={!!editable} onChange={(v) => setField(`overview.${OV_KEYS[pair[0][0]]}`, v)} /></td>
+                  <th>{pair[1]?.[1][0] ?? ""}</th>
+                  <td>{pair[1] ? <EditCell value={pair[1][1][1] || ""} editable={!!editable} onChange={(v) => setField(`overview.${OV_KEYS[pair[1]![0]]}`, v)} /> : ""}</td>
                 </tr>
               ))}
             </tbody>
@@ -1126,9 +1230,18 @@ export function MaterialFormView({
             <tbody>
               {doc.checklist.map((c, i) => (
                 <tr key={i} className={c.judgement === "부적합" ? "sir-row-fail" : "sir-row-pass"}>
-                  <td>{c.item}</td><td>{c.criterion}</td><td>{c.result}</td>
-                  <td className={`sir-pf-cell ${judgeClass(c.judgement)}`}>{c.judgement}</td>
-                  <td>{c.note || ""}</td>
+                  <td><EditCell value={c.item} editable={!!editable} onChange={(v) => setItem("checklist", i, { item: v })} /></td>
+                  <td><EditCell value={c.criterion} editable={!!editable} onChange={(v) => setItem("checklist", i, { criterion: v })} /></td>
+                  <td><EditCell value={c.result} editable={!!editable} onChange={(v) => setItem("checklist", i, { result: v })} /></td>
+                  <td className={`sir-pf-cell ${judgeClass(c.judgement)}`}>
+                    <EditSelect
+                      value={c.judgement}
+                      editable={!!editable}
+                      options={["적합", "부적합", "해당없음"]}
+                      onChange={(v) => setItem("checklist", i, { judgement: v })}
+                    />
+                  </td>
+                  <td><EditCell value={c.note || ""} editable={!!editable} onChange={(v) => setItem("checklist", i, { note: v })} /></td>
                 </tr>
               ))}
             </tbody>
@@ -1139,8 +1252,27 @@ export function MaterialFormView({
           <div className="sir-section-title">4. 종합 판정</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>종합 판정</th><td>{doc.judgement}</td><th>처리 결과</th><td>{doc.disposition}</td></tr>
-              <tr><th>NCR 번호</th><td colSpan={3}>{doc.ncr_number || "(해당 시 발행)"}</td></tr>
+              <tr>
+                <th>종합 판정</th>
+                <td>
+                  <EditSelect
+                    value={doc.judgement}
+                    editable={!!editable}
+                    options={["적합", "조건부 적합", "부적합"]}
+                    onChange={(v) => setField("judgement", v)}
+                  />
+                </td>
+                <th>처리 결과</th>
+                <td>
+                  <EditSelect
+                    value={doc.disposition}
+                    editable={!!editable}
+                    options={["반입 승인", "조건부 반입", "사용 보류", "격리 보관", "반품", "NCR 발행"]}
+                    onChange={(v) => setField("disposition", v)}
+                  />
+                </td>
+              </tr>
+              <tr><th>NCR 번호</th><td colSpan={3}><EditCell value={doc.ncr_number || ""} editable={!!editable} onChange={(v) => setField("ncr_number", v)} placeholder="(해당 시 발행)" /></td></tr>
             </tbody>
           </table>
         </div>
@@ -1151,10 +1283,29 @@ export function MaterialFormView({
             {doc.nonconformities.map((nc, i) => (
               <table key={i} className="sir-action-table" style={{ marginBottom: 8 }}>
                 <tbody>
-                  <tr><th>발생 항목</th><td>{nc.nc_item}</td><th>발생 수량</th><td>{nc.quantity || "-"}</td></tr>
-                  <tr><th>요구 기준</th><td><NumberedText text={nc.required_criterion || ""} /></td><th>실제 상태</th><td><NumberedText text={nc.actual_state || ""} /></td></tr>
-                  <tr><th>부적합 내용</th><td colSpan={3}><NumberedText text={nc.description || ""} /></td></tr>
-                  <tr><th>임시 조치</th><td><NumberedText text={nc.temporary_action || ""} /></td><th>NCR 발행</th><td>{nc.ncr_issued}{nc.ncr_number ? ` (${nc.ncr_number})` : ""}</td></tr>
+                  <tr><th>발생 항목</th><td><EditCell value={nc.nc_item || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { nc_item: v })} /></td><th>발생 수량</th><td><EditCell value={nc.quantity || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { quantity: v })} /></td></tr>
+                  <tr><th>요구 기준</th><td><EditCell value={nc.required_criterion || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { required_criterion: v })} /></td><th>실제 상태</th><td><EditCell value={nc.actual_state || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { actual_state: v })} /></td></tr>
+                  <tr><th>부적합 내용</th><td colSpan={3}><EditCell value={nc.description || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { description: v })} multiline /></td></tr>
+                  <tr>
+                    <th>임시 조치</th>
+                    <td><EditCell value={nc.temporary_action || ""} editable={!!editable} onChange={(v) => setItem("nonconformities", i, { temporary_action: v })} multiline /></td>
+                    <th>NCR 발행</th>
+                    <td>
+                      <EditSelect
+                        value={nc.ncr_issued}
+                        editable={!!editable}
+                        options={["예", "아니오"]}
+                        onChange={(v) => setItem("nonconformities", i, { ncr_issued: v })}
+                      />
+                      {!editable && nc.ncr_number ? ` (${nc.ncr_number})` : null}
+                      {editable ? (
+                        <>
+                          {" "}
+                          <EditCell value={nc.ncr_number || ""} editable onChange={(v) => setItem("nonconformities", i, { ncr_number: v })} placeholder="NCR 번호" />
+                        </>
+                      ) : null}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             ))}
@@ -1163,7 +1314,7 @@ export function MaterialFormView({
 
         <div className="sir-section">
           <div className="sir-section-title">7. 검수 의견</div>
-          <div className="sir-photo-guidance"><NumberedText text={doc.inspection_opinion || ""} /></div>
+          <div className="sir-photo-guidance"><EditCell value={doc.inspection_opinion || ""} editable={!!editable} onChange={(v) => setField("inspection_opinion", v)} multiline /></div>
         </div>
 
         <SigRow roles={[
@@ -1671,15 +1822,49 @@ export function pickDocumentForm({
   onChange?: (next: Record<string, unknown>) => void;
 }): ReactNode | null {
   if (!json || typeof json !== "object" || Array.isArray(json)) return null;
+  const onChangeCast = onChange as (next: Record<string, unknown>) => void;
   const ncr = () => (
-    <NcrFormView ncr={coerceNcr(json)} stepsLog={stepsLog} projectName={projectName} showPipeline={false} onReset={onReset} />
+    <NcrFormView
+      ncr={coerceNcr(json)}
+      stepsLog={stepsLog}
+      projectName={projectName}
+      showPipeline={false}
+      onReset={onReset}
+      editable={editable}
+      onChange={onChangeCast}
+    />
   );
-  const sir = () => <SirFormView sir={coerceSir(json)} stepsLog={stepsLog} showPipeline={false} onReset={onReset} />;
+  const sir = () => (
+    <SirFormView
+      sir={coerceSir(json)}
+      stepsLog={stepsLog}
+      showPipeline={false}
+      onReset={onReset}
+      editable={editable}
+      onChange={onChangeCast}
+    />
+  );
   switch (docType) {
     case "quality_inspect":
-      return <QualityFormView doc={json as unknown as QualityInspectionDoc} stepsLog={stepsLog} onReset={onReset} />;
+      return (
+        <QualityFormView
+          doc={json as unknown as QualityInspectionDoc}
+          stepsLog={stepsLog}
+          onReset={onReset}
+          editable={editable}
+          onChange={onChangeCast}
+        />
+      );
     case "material_check":
-      return <MaterialFormView doc={json as unknown as MaterialInspectionDoc} stepsLog={stepsLog} onReset={onReset} />;
+      return (
+        <MaterialFormView
+          doc={json as unknown as MaterialInspectionDoc}
+          stepsLog={stepsLog}
+          onReset={onReset}
+          editable={editable}
+          onChange={onChangeCast}
+        />
+      );
     case "car":
       return (
         <CarFormView
@@ -1687,7 +1872,7 @@ export function pickDocumentForm({
           stepsLog={stepsLog}
           onReset={onReset}
           editable={editable}
-          onChange={onChange as (next: Record<string, unknown>) => void}
+          onChange={onChangeCast}
         />
       );
     case "proc_daily":
