@@ -282,6 +282,34 @@ export function DocAutoGen() {
             {status === "done" && ncrResult && (
               <NcrFormView ncr={ncrResult} stepsLog={stepsLog} onReset={reset} />
             )}
+
+            {/* 직접 발행 NCR → [CAR 생성] → CAR A4 뷰 (파생 NCR 과 동시 발생 안 함) */}
+            {status === "done" && ncrResult && (
+              <div className="dag-derived-ncr">
+                <p className="dag-result-label">이 NCR에 대한 시정조치</p>
+                {carStatus === "done" && carDoc ? (
+                  <div className="dag-car-result">
+                    <CarFormView doc={carDoc} onReset={undefined} />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={`dag-gen-btn${carStatus === "submitting" || carStatus === "polling" ? " is-loading" : ""}`}
+                    onClick={() => void generateCar(ncrResult as unknown as Record<string, unknown>)}
+                    disabled={carStatus === "submitting" || carStatus === "polling"}
+                  >
+                    {carStatus === "submitting" || carStatus === "polling" ? (
+                      <>
+                        <Spinner size="sm" />
+                        CAR 생성 중...
+                      </>
+                    ) : (
+                      <>✦ CAR 생성 (시정조치 보고서)</>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
             {status === "done" && sirResult && (
               <SirFormView sir={sirResult} stepsLog={stepsLog} onReset={reset} />
             )}
