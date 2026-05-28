@@ -1621,6 +1621,12 @@ export function pickDocumentForm({
           onChange={onChange as (next: Record<string, unknown>) => void}
         />
       );
+    case "proc_daily":
+    case "proc_weekly":
+    case "proc_monthly":
+    case "proc_supervision":
+      // 공정관리 보고서 — /schedule 생성뷰와 동일한 ScheduleFormView 로 렌더.
+      return <ScheduleFormView doc={json as unknown as ScheduleReportDoc} stepsLog={stepsLog} onReset={onReset} />;
     case "defect_report":
       return _isDerivedNcrShape(json)
         ? <DerivedNcrFormView doc={json as unknown as DerivedNCRDoc} onReset={onReset} />
