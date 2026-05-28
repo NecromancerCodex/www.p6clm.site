@@ -3,8 +3,9 @@
 /**
  * DocumentDetail — 페더레이트 문서 단건 뷰/편집 UI.
  *
- * mode="view" : 읽기 전용 (양식 A4 미리보기 + 메타)
- * mode="edit" : title/project_name/description 등 부분 수정 폼 → PATCH /api/v1/documents/{id}
+ * mode="view" : 읽기 전용 A4
+ * mode="edit" : A4 자체가 인라인 편집 폼 (pickDocumentForm 에 editable=true)
+ *               → 위에 별도 폼 없음. 셀 직접 수정 → [저장] = raw_document patch.
  *
  * 삭제는 progress 페이지에서 처리 — 이 컴포넌트는 view/edit만 책임.
  */
@@ -20,6 +21,9 @@ import {
   X,
 } from "lucide-react";
 
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
 import {
   deleteDocument,
   getDocument,
@@ -28,9 +32,6 @@ import {
   type DocumentPatchBody,
   type DocumentRead,
 } from "../../lib/api/documents";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-
 import { docLabelForType } from "../../lib/docCategories";
 import { pickDocumentForm } from "./DocumentFormViews";
 
@@ -41,68 +42,14 @@ interface Props {
   mode: Mode;
 }
 
-interface EditableFields {
-  title: string;
-  project_name: string;
-  description: string;
-  immediate_action: string;
-}
-
-function asString(v: unknown): string {
-  if (v == null) return "";
-  return String(v);
-}
-
-function pickEditable(doc: DocumentRead): EditableFields {
-  const dj = (doc.document_json ?? {}) as Record<string, unknown>;
-  return {
-    title: asString(doc.title ?? dj.title),
-    project_name: asString(doc.project_name),
-    description: asString(dj.description ?? doc.preview_text),
-    immediate_action: asString(dj.immediate_action),
-  };
-}
-
-function buildPatch(initial: EditableFields, current: EditableFields, doc: DocumentRead): DocumentPatchBody {
-  const patch: DocumentPatchBody = {};
-  if (current.title !== initial.title) patch.title = current.title;
-  if (current.project_name !== initial.project_name) patch.project_name = current.project_name;
-
-  // raw JSON 양식이 있는 경우 — description/immediate_action 변경 시 raw_document 통째로 교체
-  const dj = doc.document_json;
-  if (dj && typeof dj === "object" && !Array.isArray(dj)) {
-    const nextRaw: Record<string, unknown> = { ...dj };
-    let rawChanged = false;
-    if (current.description !== initial.description) {
-      nextRaw.description = current.description;
-      rawChanged = true;
-    }
-    if (current.immediate_action !== initial.immediate_action) {
-      nextRaw.immediate_action = current.immediate_action;
-      rawChanged = true;
-    }
-    if (current.title !== initial.title) {
-      nextRaw.title = current.title;
-      rawChanged = true;
-    }
-    if (rawChanged) patch.raw_document = nextRaw;
-  } else {
-    // 일반 텍스트 문서 — clm_analysis_records의 final_response 갱신
-    if (current.description !== initial.description) {
-      patch.description = current.description;
-    }
-  }
-  return patch;
-}
-
 export function DocumentDetail({ id, mode }: Props) {
   const router = useRouter();
   const [doc, setDoc] = useState<DocumentRead | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [initial, setInitial] = useState<EditableFields | null>(null);
-  const [fields, setFields] = useState<EditableFields | null>(null);
+  // 편집 모드에서 직접 변경되는 document_json 사본 (A4 인라인 편집 대상)
+  const [editedJson, setEditedJson] = useState<Record<string, unknown> | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -112,9 +59,13 @@ export function DocumentDetail({ id, mode }: Props) {
     try {
       const d = await getDocument(id);
       setDoc(d);
-      const eds = pickEditable(d);
-      setInitial(eds);
-      setFields(eds);
+      // 편집 시작 시점의 스냅샷
+      const dj = d.document_json;
+      setEditedJson(
+        dj && typeof dj === "object" && !Array.isArray(dj)
+          ? (JSON.parse(JSON.stringify(dj)) as Record<string, unknown>)
+          : null,
+      );
     } catch (e) {
       const detail =
         e instanceof DocumentApiError ? e.detail : e instanceof Error ? e.message : "불러오기 실패";
@@ -130,20 +81,26 @@ export function DocumentDetail({ id, mode }: Props) {
   }, [load]);
 
   const handleSave = useCallback(async () => {
-    if (!doc || !fields || !initial) return;
-    const patch = buildPatch(initial, fields, doc);
-    if (Object.keys(patch).length === 0) {
-      setSaveError("변경 사항이 없습니다.");
-      return;
-    }
+    if (!doc || !editedJson) return;
     setSaving(true);
     setSaveError(null);
     try {
+      // raw_document 통째 교체 + (있다면) 메타 필드 동기화
+      const patch: DocumentPatchBody = { raw_document: editedJson };
+      const newTitle = typeof editedJson.title === "string" ? editedJson.title : undefined;
+      if (newTitle != null && newTitle !== doc.title) patch.title = newTitle;
+      const newProject =
+        typeof editedJson.project_name === "string" ? editedJson.project_name : undefined;
+      if (newProject != null && newProject !== doc.project_name) patch.project_name = newProject;
+
       const updated = await patchDocument(doc.id, patch);
       setDoc(updated);
-      const eds = pickEditable(updated);
-      setInitial(eds);
-      setFields(eds);
+      const dj = updated.document_json;
+      setEditedJson(
+        dj && typeof dj === "object" && !Array.isArray(dj)
+          ? (JSON.parse(JSON.stringify(dj)) as Record<string, unknown>)
+          : null,
+      );
       router.replace(`/document/${encodeURIComponent(doc.id)}`);
     } catch (e) {
       setSaveError(
@@ -152,7 +109,7 @@ export function DocumentDetail({ id, mode }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [doc, fields, initial, router]);
+  }, [doc, editedJson, router]);
 
   const handleDelete = useCallback(async () => {
     if (!doc) return;
@@ -191,8 +148,12 @@ export function DocumentDetail({ id, mode }: Props) {
     );
   }
 
-  const dj = doc.document_json;
   const projectName = doc.project_name?.trim() || "현장 미지정";
+  const isEdit = mode === "edit";
+  // 편집 모드: editedJson 사용 (인라인 변경 반영). view 모드: 원본 document_json.
+  const showJson: Record<string, unknown> | null | undefined = isEdit
+    ? editedJson
+    : (doc.document_json as Record<string, unknown> | null | undefined);
 
   return (
     <div className="docdetail-shell">
@@ -213,11 +174,12 @@ export function DocumentDetail({ id, mode }: Props) {
           <span className="docdetail-meta">
             ID {doc.id} · 프로젝트 {projectName}
             {doc.updated_at ? ` · 수정 ${new Date(doc.updated_at).toLocaleString("ko-KR")}` : ""}
+            {isEdit && " · ✏️ 편집 모드 — A4 셀 직접 클릭해서 수정"}
           </span>
         </div>
 
         <div className="docdetail-actions">
-          {mode === "view" ? (
+          {!isEdit ? (
             <>
               <button
                 type="button"
@@ -242,7 +204,8 @@ export function DocumentDetail({ id, mode }: Props) {
                 type="button"
                 className="docdetail-btn docdetail-btn--primary"
                 onClick={() => void handleSave()}
-                disabled={saving}
+                disabled={saving || !editedJson}
+                title={!editedJson ? "구조화 JSON이 없는 옛 문서는 인라인 편집 미지원" : ""}
               >
                 <Save size={14} strokeWidth={1.8} />
                 {saving ? "저장 중…" : "저장"}
@@ -261,56 +224,28 @@ export function DocumentDetail({ id, mode }: Props) {
         </div>
       </header>
 
-      {mode === "edit" && fields && (
-        <section className="docdetail-edit-grid">
-          <label className="docdetail-field">
-            <span>제목</span>
-            <input
-              type="text"
-              value={fields.title}
-              onChange={(e) => setFields({ ...fields, title: e.target.value })}
-            />
-          </label>
-          <label className="docdetail-field">
-            <span>프로젝트</span>
-            <input
-              type="text"
-              value={fields.project_name}
-              onChange={(e) => setFields({ ...fields, project_name: e.target.value })}
-            />
-          </label>
-          <label className="docdetail-field docdetail-field--full">
-            <span>설명 / 본문</span>
-            <textarea
-              rows={6}
-              value={fields.description}
-              onChange={(e) => setFields({ ...fields, description: e.target.value })}
-            />
-          </label>
-          <label className="docdetail-field docdetail-field--full">
-            <span>즉시 조치</span>
-            <textarea
-              rows={4}
-              value={fields.immediate_action}
-              onChange={(e) => setFields({ ...fields, immediate_action: e.target.value })}
-            />
-          </label>
-          {saveError && (
-            <div className="docdetail-save-error">
-              <AlertCircle size={14} strokeWidth={1.8} />
-              {saveError}
-            </div>
-          )}
-        </section>
+      {saveError && (
+        <div className="docdetail-save-error">
+          <AlertCircle size={14} strokeWidth={1.8} />
+          {saveError}
+        </div>
+      )}
+      {isEdit && !editedJson && (
+        <div className="docdetail-save-error">
+          <AlertCircle size={14} strokeWidth={1.8} />
+          이 문서는 구조화 JSON 본문이 없어 인라인 편집을 지원하지 않습니다. 옛 문서는 progress 페이지의
+          삭제 후 재생성을 고려하세요.
+        </div>
       )}
 
       <section className="docdetail-preview">
-        <h3 className="docdetail-preview-heading">A4 미리보기</h3>
         <div className="docdetail-a4-host">
           {pickDocumentForm({
             docType: doc.doc_type,
-            json: dj as Record<string, unknown> | null | undefined,
+            json: showJson,
             projectName,
+            editable: isEdit && !!editedJson,
+            onChange: (next) => setEditedJson(next),
           }) ?? (
             <div className="docdetail-md sch-md">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>

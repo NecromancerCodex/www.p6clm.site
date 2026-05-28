@@ -3237,6 +3237,30 @@ select {
   box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.18);
 }
 
+/* 인라인 편집 input — A4 셀 안에서 자연스러운 입력 (CarFormView etc.) */
+.dd-edit-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: inherit;
+  font-family: inherit;
+  background: #fefce8;          /* 연한 노란색으로 편집 가능 영역 표시 */
+  color: #0f172a;
+  line-height: 1.5;
+}
+.dd-edit-input:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -1px;
+  background: #fff;
+}
+.dd-edit-textarea {
+  resize: vertical;
+  min-height: 28px;
+  white-space: pre-wrap;
+}
+
 .docdetail-save-error {
   grid-column: 1 / -1;
   display: inline-flex;

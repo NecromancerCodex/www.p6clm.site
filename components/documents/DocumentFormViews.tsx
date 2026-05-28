@@ -1285,14 +1285,57 @@ export function DerivedNcrFormView({
 
 const CLOSURE_OPTIONS = ["종결", "조건부 종결", "미종결", "추가 조치 필요"];
 
+/** 인라인 편집 셀 — editable=false 면 정적 텍스트, true 면 input/textarea. */
+function EditCell({
+  value,
+  editable,
+  onChange,
+  multiline = false,
+  placeholder,
+}: {
+  value: string;
+  editable: boolean;
+  onChange: (v: string) => void;
+  multiline?: boolean;
+  placeholder?: string;
+}) {
+  if (!editable) {
+    return <NumberedText text={value || ""} />;
+  }
+  if (multiline) {
+    return (
+      <textarea
+        className="dd-edit-input dd-edit-textarea"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={Math.max(2, Math.min(12, (value || "").split("\n").length + 1))}
+      />
+    );
+  }
+  return (
+    <input
+      type="text"
+      className="dd-edit-input"
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+    />
+  );
+}
+
 export function CarFormView({
   doc,
   stepsLog = [],
   onReset,
+  editable = false,
+  onChange,
 }: {
   doc: CARDoc;
   stepsLog?: string[];
   onReset?: () => void;
+  editable?: boolean;
+  onChange?: (next: Record<string, unknown>) => void;
 }) {
   const [closure, setClosure] = useState(doc.closure_status || "미종결");
   const lk = doc.linked || {};
@@ -1304,6 +1347,30 @@ export function CarFormView({
   const ri = doc.reinspection || {};
   const methods = Array.isArray(c.analysis_methods) ? (c.analysis_methods as string[]).join(", ") : "5 Why";
   const badge = closure === "종결" ? "sir-risk-low" : closure === "추가 조치 필요" ? "sir-risk-high" : "sir-risk-medium";
+
+  // 인라인 편집 — path 기반 onChange 헬퍼.
+  // 예: setField("corrective.content", "...") → doc.corrective.content 갱신.
+  const setField = (path: string, val: string) => {
+    if (!onChange) return;
+    const parts = path.split(".");
+    // doc 을 얕은 복사하면서 path 따라 들어감
+    const next: Record<string, unknown> = { ...(doc as unknown as Record<string, unknown>) };
+    let cur: Record<string, unknown> = next;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const k = parts[i];
+      const child = cur[k];
+      cur[k] = child && typeof child === "object" && !Array.isArray(child) ? { ...(child as object) } : {};
+      cur = cur[k] as Record<string, unknown>;
+    }
+    cur[parts[parts.length - 1]] = val;
+    onChange(next);
+  };
+  const setClosureField = (v: string) => {
+    setClosure(v);
+    if (onChange) {
+      onChange({ ...(doc as unknown as Record<string, unknown>), closure_status: v });
+    }
+  };
   return (
     <div className="sir-wrapper">
       <FormTopBar stepsLog={stepsLog} onReset={onReset} />
@@ -1331,9 +1398,22 @@ export function CarFormView({
           <div className="sir-section-title">2. 부적합 내용 요약</div>
           <table className="sir-info-table">
             <tbody>
-              <tr><th>부적합 항목</th><td>{nc.nc_item || "-"}</td><th>등급</th><td>{nc.nc_grade || "-"}</td></tr>
-              <tr><th>요구 기준</th><td>{nc.required_criterion || "-"}</td><th>실제 상태</th><td>{nc.actual_state || "-"}</td></tr>
-              <tr><th>부적합 내용</th><td colSpan={3}><NumberedText text={String(nc.nc_description ?? "")} /></td></tr>
+              <tr>
+                <th>부적합 항목</th>
+                <td><EditCell value={String(nc.nc_item ?? "")} editable={editable} onChange={(v) => setField("nc_summary.nc_item", v)} /></td>
+                <th>등급</th>
+                <td><EditCell value={String(nc.nc_grade ?? "")} editable={editable} onChange={(v) => setField("nc_summary.nc_grade", v)} /></td>
+              </tr>
+              <tr>
+                <th>요구 기준</th>
+                <td><EditCell value={String(nc.required_criterion ?? "")} editable={editable} onChange={(v) => setField("nc_summary.required_criterion", v)} multiline /></td>
+                <th>실제 상태</th>
+                <td><EditCell value={String(nc.actual_state ?? "")} editable={editable} onChange={(v) => setField("nc_summary.actual_state", v)} multiline /></td>
+              </tr>
+              <tr>
+                <th>부적합 내용</th>
+                <td colSpan={3}><EditCell value={String(nc.nc_description ?? "")} editable={editable} onChange={(v) => setField("nc_summary.nc_description", v)} multiline /></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -1342,8 +1422,8 @@ export function CarFormView({
           <div className="sir-section-title">3. 원인 분석</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>직접 원인</th><td colSpan={3}><NumberedText text={String(c.direct_cause ?? "")} /></td></tr>
-              <tr><th>근본 원인</th><td colSpan={3}><NumberedText text={String(c.root_cause ?? "")} /></td></tr>
+              <tr><th>직접 원인</th><td colSpan={3}><EditCell value={String(c.direct_cause ?? "")} editable={editable} onChange={(v) => setField("cause.direct_cause", v)} multiline /></td></tr>
+              <tr><th>근본 원인</th><td colSpan={3}><EditCell value={String(c.root_cause ?? "")} editable={editable} onChange={(v) => setField("cause.root_cause", v)} multiline /></td></tr>
               <tr><th>분석 방법</th><td colSpan={3}>{methods}</td></tr>
             </tbody>
           </table>
@@ -1353,9 +1433,19 @@ export function CarFormView({
           <div className="sir-section-title">4. 시정조치 계획</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>조치 내용</th><td colSpan={3}><NumberedText text={String(cor.content ?? "")} /></td></tr>
-              <tr><th>조치 방법</th><td><NumberedText text={String(cor.method ?? "")} /></td><th>담당자</th><td>{cor.responsible || lk.action_responsible}</td></tr>
-              <tr><th>예정일</th><td>{cor.planned_date || "-"}</td><th>완료 예정</th><td>{cor.completion_due || "-"}</td></tr>
+              <tr><th>조치 내용</th><td colSpan={3}><EditCell value={String(cor.content ?? "")} editable={editable} onChange={(v) => setField("corrective.content", v)} multiline /></td></tr>
+              <tr>
+                <th>조치 방법</th>
+                <td><EditCell value={String(cor.method ?? "")} editable={editable} onChange={(v) => setField("corrective.method", v)} /></td>
+                <th>담당자</th>
+                <td><EditCell value={String(cor.responsible ?? lk.action_responsible ?? "")} editable={editable} onChange={(v) => setField("corrective.responsible", v)} /></td>
+              </tr>
+              <tr>
+                <th>예정일</th>
+                <td><EditCell value={String(cor.planned_date ?? "")} editable={editable} onChange={(v) => setField("corrective.planned_date", v)} /></td>
+                <th>완료 예정</th>
+                <td><EditCell value={String(cor.completion_due ?? "")} editable={editable} onChange={(v) => setField("corrective.completion_due", v)} /></td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -1364,8 +1454,13 @@ export function CarFormView({
           <div className="sir-section-title">5. 재발방지 대책</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>대책</th><td colSpan={3}><NumberedText text={String(pre.content ?? "")} /></td></tr>
-              <tr><th>개선 대상</th><td>{pre.improvement_target || "-"}</td><th>교육</th><td>{pre.training_needed} {pre.training_target ? `(${pre.training_target})` : ""}</td></tr>
+              <tr><th>대책</th><td colSpan={3}><EditCell value={String(pre.content ?? "")} editable={editable} onChange={(v) => setField("preventive.content", v)} multiline /></td></tr>
+              <tr>
+                <th>개선 대상</th>
+                <td><EditCell value={String(pre.improvement_target ?? "")} editable={editable} onChange={(v) => setField("preventive.improvement_target", v)} /></td>
+                <th>교육</th>
+                <td>{pre.training_needed} {pre.training_target ? `(${pre.training_target})` : ""}</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -1374,8 +1469,17 @@ export function CarFormView({
           <div className="sir-section-title">6. 조치 실행 결과</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>조치 기간</th><td>{ar.start_date || "예정"} ~ {ar.complete_date || "예정"}</td><th>결과</th><td>{ar.result || "미완료"}</td></tr>
-              <tr><th>실제 조치</th><td colSpan={3}><NumberedText text={String(ar.actual_content ?? "(조치 진행 시 기재)")} /></td></tr>
+              <tr>
+                <th>조치 기간</th>
+                <td>
+                  <EditCell value={String(ar.start_date ?? "")} editable={editable} onChange={(v) => setField("action_result.start_date", v)} placeholder="시작일" />
+                  {!editable && " ~ "}
+                  <EditCell value={String(ar.complete_date ?? "")} editable={editable} onChange={(v) => setField("action_result.complete_date", v)} placeholder="완료일" />
+                </td>
+                <th>결과</th>
+                <td><EditCell value={String(ar.result ?? "")} editable={editable} onChange={(v) => setField("action_result.result", v)} /></td>
+              </tr>
+              <tr><th>실제 조치</th><td colSpan={3}><EditCell value={String(ar.actual_content ?? "")} editable={editable} onChange={(v) => setField("action_result.actual_content", v)} multiline /></td></tr>
             </tbody>
           </table>
         </div>
@@ -1384,9 +1488,14 @@ export function CarFormView({
           <div className="sir-section-title">7. 재검사 및 효과성 검증</div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>재검사 일자</th><td>{ri.date || "예정"}</td><th>재검사 결과</th><td>{ri.result || "재검사 예정"}</td></tr>
-              <tr><th>재검사 기준</th><td colSpan={3}><NumberedText text={String(ri.criterion ?? "-")} /></td></tr>
-              <tr><th>검증 의견</th><td colSpan={3}><NumberedText text={String(ri.opinion ?? "-")} /></td></tr>
+              <tr>
+                <th>재검사 일자</th>
+                <td><EditCell value={String(ri.date ?? "")} editable={editable} onChange={(v) => setField("reinspection.date", v)} /></td>
+                <th>재검사 결과</th>
+                <td><EditCell value={String(ri.result ?? "")} editable={editable} onChange={(v) => setField("reinspection.result", v)} /></td>
+              </tr>
+              <tr><th>재검사 기준</th><td colSpan={3}><EditCell value={String(ri.criterion ?? "")} editable={editable} onChange={(v) => setField("reinspection.criterion", v)} multiline /></td></tr>
+              <tr><th>검증 의견</th><td colSpan={3}><EditCell value={String(ri.opinion ?? "")} editable={editable} onChange={(v) => setField("reinspection.opinion", v)} multiline /></td></tr>
             </tbody>
           </table>
         </div>
@@ -1395,7 +1504,7 @@ export function CarFormView({
           <div className="sir-section-title">8. 종결 판정</div>
           <div className="car-closure-edit">
             <label>종결 여부:&nbsp;
-              <select value={closure} onChange={(e) => setClosure(e.target.value)} className="car-closure-select">
+              <select value={closure} onChange={(e) => setClosureField(e.target.value)} className="car-closure-select">
                 {CLOSURE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </label>
@@ -1403,7 +1512,7 @@ export function CarFormView({
           </div>
           <table className="sir-action-table">
             <tbody>
-              <tr><th>종결 의견</th><td colSpan={3}><NumberedText text={String(doc.closure_opinion ?? "")} /></td></tr>
+              <tr><th>종결 의견</th><td colSpan={3}><EditCell value={String(doc.closure_opinion ?? "")} editable={editable} onChange={(v) => setField("closure_opinion", v)} multiline /></td></tr>
             </tbody>
           </table>
         </div>
@@ -1479,12 +1588,18 @@ export function pickDocumentForm({
   projectName = "현장 미지정",
   stepsLog = [],
   onReset,
+  editable = false,
+  onChange,
 }: {
   docType: string;
   json?: Record<string, unknown> | null;
   projectName?: string;
   stepsLog?: string[];
   onReset?: () => void;
+  /** 인라인 편집 모드 — A4 셀이 input/textarea 가 됨. 현재 CAR 에서 1차 구현. */
+  editable?: boolean;
+  /** 편집 시 호출 — 변경된 document_json 전체를 호출측에 전달. */
+  onChange?: (next: Record<string, unknown>) => void;
 }): ReactNode | null {
   if (!json || typeof json !== "object" || Array.isArray(json)) return null;
   const ncr = () => (
@@ -1497,7 +1612,15 @@ export function pickDocumentForm({
     case "material_check":
       return <MaterialFormView doc={json as unknown as MaterialInspectionDoc} stepsLog={stepsLog} onReset={onReset} />;
     case "car":
-      return <CarFormView doc={json as unknown as CARDoc} stepsLog={stepsLog} onReset={onReset} />;
+      return (
+        <CarFormView
+          doc={json as unknown as CARDoc}
+          stepsLog={stepsLog}
+          onReset={onReset}
+          editable={editable}
+          onChange={onChange as (next: Record<string, unknown>) => void}
+        />
+      );
     case "defect_report":
       return _isDerivedNcrShape(json)
         ? <DerivedNcrFormView doc={json as unknown as DerivedNCRDoc} onReset={onReset} />
