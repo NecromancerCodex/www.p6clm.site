@@ -62,7 +62,7 @@ export interface QualityCheckRow {
   item: string;
   criterion: string;
   result: string;
-  judgement: "적합" | "부적합" | "해당없음";
+  judgement: "적합" | "부적합" | "확인필요" | "해당없음";
   note?: string;
 }
 export interface QualityInspectionDoc {
@@ -197,7 +197,7 @@ export interface GenerateSlice {
   // 품질 파이프라인 (Phase 5)
   qualityResult: QualityInspectionDoc | null;        // 품질검사 구조화 (A4 뷰)
   materialResult: MaterialInspectionDoc | null;      // 자재검수 구조화 (A4 뷰)
-  judgement: string | null;                          // 적합 | 부적합 | 조건부 적합 | 검토필요
+  judgement: string | null;                          // 품질: 적합/부적합/확인필요 · 자재: 적합/조건부 적합/부적합
   nonconformityDetected: boolean;                    // 부적합 → NCR 파생됨
   derivedNcr: Record<string, unknown> | null;        // 자동 파생 NCR
   carStatus: "idle" | "submitting" | "polling" | "done" | "error";

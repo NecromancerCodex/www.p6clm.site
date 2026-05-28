@@ -909,7 +909,10 @@ function SigRow({ roles }: { roles: Array<[string, string]> }) {
 }
 
 function judgeClass(j: string) {
-  return j === "부적합" ? "sir-pf-fail" : j === "적합" ? "sir-pf-pass" : "sir-pf-na";
+  if (j === "부적합") return "sir-pf-fail";
+  if (j === "적합") return "sir-pf-pass";
+  if (j === "확인필요") return "sir-pf-na";  // 노란 톤 원하면 별도 클래스 추가 가능
+  return "sir-pf-na";  // 해당없음 등
 }
 
 /* ── 품질 검사 보고서 A4 뷰 ──────────────────────────────────── */
@@ -925,7 +928,11 @@ export function QualityFormView({
 }) {
   const fail = doc.checklist.filter((c) => c.judgement === "부적합").length;
   const pass = doc.checklist.filter((c) => c.judgement === "적합").length;
-  const badge = doc.judgement === "부적합" ? "sir-risk-high" : "sir-risk-low";
+  const review = doc.checklist.filter((c) => c.judgement === "확인필요").length;
+  const badge =
+    doc.judgement === "부적합" ? "sir-risk-high"
+    : doc.judgement === "확인필요" ? "sir-risk-medium"
+    : "sir-risk-low";
   return (
     <div className="sir-wrapper">
       <FormTopBar stepsLog={stepsLog} onReset={onReset} />
@@ -970,7 +977,10 @@ export function QualityFormView({
         <div className="sir-section">
           <div className="sir-section-title">
             4. 검사 내용
-            <span className="sir-summary-badge">적합 <strong>{pass}</strong>건 / 부적합 <strong>{fail}</strong>건</span>
+            <span className="sir-summary-badge">
+              적합 <strong>{pass}</strong> / 부적합 <strong>{fail}</strong>
+              {review > 0 && <> / 확인필요 <strong>{review}</strong></>}건
+            </span>
           </div>
           <table className="sir-checklist-table">
             <thead>
@@ -978,7 +988,14 @@ export function QualityFormView({
             </thead>
             <tbody>
               {doc.checklist.map((c, i) => (
-                <tr key={i} className={c.judgement === "부적합" ? "sir-row-fail" : "sir-row-pass"}>
+                <tr
+                  key={i}
+                  className={
+                    c.judgement === "부적합" ? "sir-row-fail"
+                    : c.judgement === "확인필요" ? ""
+                    : "sir-row-pass"
+                  }
+                >
                   <td>{c.item}</td><td>{c.criterion}</td><td>{c.result}</td>
                   <td className={`sir-pf-cell ${judgeClass(c.judgement)}`}>{c.judgement}</td>
                   <td>{c.note || ""}</td>
