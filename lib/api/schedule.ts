@@ -52,6 +52,7 @@ export interface ScheduleReportDoc {
   document_number: string;
   construction_name: string;
   data_date: string;
+  reference_date: string;
   report_date: string;
   status_level: "지연" | "정상";
   project_start: string;
@@ -85,6 +86,15 @@ export interface ScheduleReportDoc {
     affected_milestones: string[];
   }[];
   integrity_warnings: string[];
+  active_today: {
+    code: string;
+    name: string;
+    wbs_path: string;
+    planned_start: string;
+    planned_finish: string;
+    percent_complete: number;
+    is_critical: boolean;
+  }[];
   narrative: string;
   grounding: string;
 }

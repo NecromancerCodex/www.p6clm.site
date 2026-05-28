@@ -526,14 +526,16 @@ export function ScheduleFormView({
                 <td colSpan={3}>{doc.construction_name}</td>
               </tr>
               <tr>
-                <th>기준일 (Data Date)</th>
+                <th>작성일 (금일)</th>
+                <td>{doc.reference_date}</td>
+                <th>공정표 기준일</th>
                 <td>{doc.data_date}</td>
-                <th>보고 유형</th>
-                <td>{doc.title}</td>
               </tr>
               <tr>
+                <th>보고 유형</th>
+                <td>{doc.title}</td>
                 <th>전체 공기</th>
-                <td colSpan={3}>
+                <td>
                   {doc.project_start} ~ {doc.project_finish} (총 {doc.total_duration_days}일)
                 </td>
               </tr>
@@ -580,6 +582,48 @@ export function ScheduleFormView({
             <ProgressBar label="계획" pct={doc.planned_percent} variant="planned" />
           </div>
         </div>
+
+        {/* 금일 진행 공정 (공사일보 — 일정 날짜 기준, 실적%과 무관) */}
+        {doc.doc_type === "proc_daily" && (
+          <div className="sir-section">
+            <div className="sir-section-title">
+              금일({doc.reference_date}) 진행 공정 — 일정 기준
+              <span className="sir-summary-badge">
+                <strong>{doc.active_today.length}</strong>건
+              </span>
+            </div>
+            {doc.active_today.length > 0 ? (
+              <table className="sir-checklist-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "32%" }}>공정명</th>
+                    <th style={{ width: "30%" }}>WBS 경로</th>
+                    <th style={{ width: "22%" }}>공정 기간</th>
+                    <th>구분</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {doc.active_today.map((t, i) => (
+                    <tr key={i} className={t.is_critical ? "sir-row-fail" : ""}>
+                      <td className="sir-target-cell">{t.name}</td>
+                      <td>{t.wbs_path || "-"}</td>
+                      <td>
+                        {t.planned_start} ~ {t.planned_finish}
+                      </td>
+                      <td className={`sir-pf-cell ${t.is_critical ? "sir-pf-fail" : "sir-pf-na"}`}>
+                        {t.is_critical ? "⚠ 임계" : "일반"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="sir-photo-guidance">
+                금일({doc.reference_date}) 일정상 착수·진행 예정 공정 없음.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 3. 공정 리스크 신호 (단기 착수·지연 영향·정합성) */}
         {(doc.upcoming_critical.length > 0 ||
