@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, FileText, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X } from "lucide-react";
+import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,8 +10,7 @@ import { IconButton } from "../atoms/IconButton";
 import { useUiStore } from "../../stores/uiStore";
 
 const NAV_ITEMS = [
-  { path: "/home",     label: "AI 대화",   icon: Bot      },
-  { path: "/document", label: "문서 작성", icon: FileText },
+  { path: "/home", label: "AI 대화·문서작성", icon: Bot },
 ];
 
 // 공정관리 — 확장형 그룹 (pmisx 구조 재현)

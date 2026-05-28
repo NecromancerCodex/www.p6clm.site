@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -1398,4 +1398,100 @@ export function CarFormView({
       </div>
     </div>
   );
+}
+
+/* ── 통합 문서 렌더 라우터 ─────────────────────────────────────────
+ * 단일 진실원천(SSOT): doc_type + document_json → A4 폼뷰.
+ * DocAutoGen / DocumentDetail / ProgressDashboard 가 모두 이 함수를 공유한다.
+ * (이전엔 3곳이 각자 라우팅 → 누락·불일치 버그 발생)
+ */
+
+const _s = (v: unknown): string => (v == null ? "" : String(v));
+
+/** 임의 JSON → NCRDocument (직접 발행 NCR 모양 정규화). */
+export function coerceNcr(j: Record<string, unknown>): NCRDocument {
+  const disp = j.disposition;
+  let disposition: string[] = [];
+  if (Array.isArray(disp)) disposition = disp.map(String);
+  else if (typeof disp === "string" && disp.trim()) disposition = [disp];
+  return {
+    document_number: _s(j.document_number), reporter: _s(j.reporter), report_date: _s(j.report_date),
+    title: _s(j.title), author: _s(j.author), action_department: _s(j.action_department),
+    location: _s(j.location), company: _s(j.company), nc_type: _s(j.nc_type),
+    attachment: _s(j.attachment), action_manager: _s(j.action_manager), specification: _s(j.specification),
+    description: _s(j.description), immediate_action: _s(j.immediate_action), disposition,
+    action_responsible: _s(j.action_responsible), action_deadline: _s(j.action_deadline),
+    verification: _s(j.verification), completion_date: _s(j.completion_date), notes: _s(j.notes),
+  };
+}
+
+/** 임의 JSON → SafetyInspectionDocument (안전점검 모양 정규화). */
+export function coerceSir(j: Record<string, unknown>): SafetyInspectionDocument {
+  const raw = Array.isArray(j.checklist) ? j.checklist : [];
+  const checklist = raw.map((row) => {
+    const o = row as Record<string, unknown>;
+    const st = String(o.status ?? "N/A").toUpperCase();
+    const status: "P" | "F" | "N/A" = st === "F" || st === "FAIL" ? "F" : st === "P" || st === "PASS" ? "P" : "N/A";
+    return { target: _s(o.target), item_name: _s(o.item_name), status, findings: _s(o.findings) };
+  });
+  const regs = j.violated_regulations;
+  return {
+    document_number: _s(j.document_number), construction_name: _s(j.construction_name),
+    inspection_date: _s(j.inspection_date), inspector: _s(j.inspector), inspection_zone: _s(j.inspection_zone),
+    yolo_detections_summary: _s(j.yolo_detections_summary) || "자동 탐지 결과 없음",
+    checklist, photo_guidance: _s(j.photo_guidance),
+    violated_regulations: Array.isArray(regs) ? regs.map(String) : [],
+    action_deadline: _s(j.action_deadline), action_responsible: _s(j.action_responsible),
+    reinspection_opinion: _s(j.reinspection_opinion), risk_level: _s(j.risk_level) || "Medium",
+    notes: j.notes != null ? _s(j.notes) : undefined,
+  };
+}
+
+const _isNcrShape = (j: Record<string, unknown>): boolean =>
+  typeof j.document_number === "string" && ("specification" in j || "description" in j || "immediate_action" in j);
+const _isSirShape = (j: Record<string, unknown>): boolean => Array.isArray(j.checklist);
+const _isDerivedNcrShape = (j: Record<string, unknown>): boolean => "items" in j && "source_document_type" in j;
+
+/**
+ * 통합 라우터 — doc_type + json → A4 폼뷰.
+ * 구조화 JSON 이 없거나 매칭되는 폼이 없으면 null 반환(호출측이 마크다운 fallback 처리).
+ */
+export function pickDocumentForm({
+  docType,
+  json,
+  projectName = "현장 미지정",
+  stepsLog = [],
+  onReset,
+}: {
+  docType: string;
+  json?: Record<string, unknown> | null;
+  projectName?: string;
+  stepsLog?: string[];
+  onReset?: () => void;
+}): ReactNode | null {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return null;
+  const ncr = () => (
+    <NcrFormView ncr={coerceNcr(json)} stepsLog={stepsLog} projectName={projectName} showPipeline={false} onReset={onReset} />
+  );
+  const sir = () => <SirFormView sir={coerceSir(json)} stepsLog={stepsLog} showPipeline={false} onReset={onReset} />;
+  switch (docType) {
+    case "quality_inspect":
+      return <QualityFormView doc={json as unknown as QualityInspectionDoc} stepsLog={stepsLog} onReset={onReset} />;
+    case "material_check":
+      return <MaterialFormView doc={json as unknown as MaterialInspectionDoc} stepsLog={stepsLog} onReset={onReset} />;
+    case "car":
+      return <CarFormView doc={json as unknown as CARDoc} stepsLog={stepsLog} onReset={onReset} />;
+    case "defect_report":
+      return _isDerivedNcrShape(json)
+        ? <DerivedNcrFormView doc={json as unknown as DerivedNCRDoc} onReset={onReset} />
+        : ncr();
+    case "safety_inspect":
+      return sir();
+    default:
+      // 레거시/미상 doc_type — payload 형태로 추정
+      if (_isDerivedNcrShape(json)) return <DerivedNcrFormView doc={json as unknown as DerivedNCRDoc} onReset={onReset} />;
+      if (_isNcrShape(json)) return ncr();
+      if (_isSirShape(json)) return sir();
+      return null;
+  }
 }

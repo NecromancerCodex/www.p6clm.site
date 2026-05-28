@@ -32,22 +32,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { docLabelForType } from "../../lib/docCategories";
-import type {
-  NCRDocument,
-  SafetyInspectionDocument,
-  QualityInspectionDoc,
-  MaterialInspectionDoc,
-  CARDoc,
-  DerivedNCRDoc,
-} from "../../stores/docStore";
-import {
-  NcrFormView,
-  SirFormView,
-  QualityFormView,
-  MaterialFormView,
-  CarFormView,
-  DerivedNcrFormView,
-} from "./DocumentFormViews";
+import { pickDocumentForm } from "./DocumentFormViews";
 
 type Mode = "view" | "edit";
 
@@ -66,108 +51,6 @@ interface EditableFields {
 function asString(v: unknown): string {
   if (v == null) return "";
   return String(v);
-}
-
-function isNcrPayload(j: Record<string, unknown>): boolean {
-  if (typeof j.document_number !== "string") return false;
-  return "specification" in j || "description" in j || "immediate_action" in j;
-}
-
-function isSirPayload(j: Record<string, unknown>): boolean {
-  return Array.isArray(j.checklist);
-}
-
-function ncrFromJson(j: Record<string, unknown>): NCRDocument {
-  const disp = j.disposition;
-  let disposition: string[] = [];
-  if (Array.isArray(disp)) disposition = disp.map(String);
-  else if (typeof disp === "string" && disp.trim()) disposition = [disp];
-  return {
-    document_number: asString(j.document_number),
-    reporter: asString(j.reporter),
-    report_date: asString(j.report_date),
-    title: asString(j.title),
-    author: asString(j.author),
-    action_department: asString(j.action_department),
-    location: asString(j.location),
-    company: asString(j.company),
-    nc_type: asString(j.nc_type),
-    attachment: asString(j.attachment),
-    action_manager: asString(j.action_manager),
-    specification: asString(j.specification),
-    description: asString(j.description),
-    immediate_action: asString(j.immediate_action),
-    disposition,
-    action_responsible: asString(j.action_responsible),
-    action_deadline: asString(j.action_deadline),
-    verification: asString(j.verification),
-    completion_date: asString(j.completion_date),
-    notes: asString(j.notes),
-  };
-}
-
-function sirFromJson(j: Record<string, unknown>): SafetyInspectionDocument {
-  const raw = Array.isArray(j.checklist) ? j.checklist : [];
-  const checklist = raw.map((row) => {
-    const o = row as Record<string, unknown>;
-    const st = String(o.status ?? "N/A").toUpperCase();
-    const status: "P" | "F" | "N/A" =
-      st === "F" || st === "FAIL" ? "F" : st === "P" || st === "PASS" ? "P" : "N/A";
-    return {
-      target: String(o.target ?? ""),
-      item_name: String(o.item_name ?? ""),
-      status,
-      findings: String(o.findings ?? ""),
-    };
-  });
-  const regs = j.violated_regulations;
-  const violated_regulations = Array.isArray(regs) ? regs.map(String) : [];
-  return {
-    document_number: asString(j.document_number),
-    construction_name: asString(j.construction_name),
-    inspection_date: asString(j.inspection_date),
-    inspector: asString(j.inspector),
-    inspection_zone: asString(j.inspection_zone),
-    yolo_detections_summary: asString(j.yolo_detections_summary) || "자동 탐지 결과 없음",
-    checklist,
-    photo_guidance: asString(j.photo_guidance),
-    violated_regulations,
-    action_deadline: asString(j.action_deadline),
-    action_responsible: asString(j.action_responsible),
-    reinspection_opinion: asString(j.reinspection_opinion),
-    risk_level: asString(j.risk_level) || "Medium",
-    notes: j.notes != null ? asString(j.notes) : undefined,
-  };
-}
-
-// doc_type 우선 라우팅 — 저장된 구조화 JSON(document_json)을 해당 A4 폼으로 렌더.
-// 구조화 doc(품질/자재/CAR)은 백엔드 model_dump 와 TS 인터페이스가 1:1 → 캐스팅.
-function renderA4Form(docType: string, dj: Record<string, unknown>, projectName: string) {
-  switch (docType) {
-    case "quality_inspect":
-      return <QualityFormView doc={dj as unknown as QualityInspectionDoc} stepsLog={[]} />;
-    case "material_check":
-      return <MaterialFormView doc={dj as unknown as MaterialInspectionDoc} stepsLog={[]} />;
-    case "car":
-      return <CarFormView doc={dj as unknown as CARDoc} stepsLog={[]} />;
-    case "defect_report":
-      // 파생 NCR(품질/자재 부적합 발) 은 DerivedNCR 모양 → 전용 뷰. 직접 발행 NCR 은 NcrFormView.
-      if ("items" in dj && "source_document_type" in dj)
-        return <DerivedNcrFormView doc={dj as unknown as DerivedNCRDoc} />;
-      return (
-        <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
-      );
-    case "safety_inspect":
-      return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
-    default:
-      // 레거시/미상 — payload 형태로 추정 (doc_type 누락 문서 호환)
-      if (isNcrPayload(dj))
-        return (
-          <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
-        );
-      if (isSirPayload(dj)) return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
-      return <pre className="docdetail-raw-json">{JSON.stringify(dj, null, 2)}</pre>;
-  }
 }
 
 function pickEditable(doc: DocumentRead): EditableFields {
@@ -424,15 +307,17 @@ export function DocumentDetail({ id, mode }: Props) {
       <section className="docdetail-preview">
         <h3 className="docdetail-preview-heading">A4 미리보기</h3>
         <div className="docdetail-a4-host">
-          {dj && typeof dj === "object" && !Array.isArray(dj)
-            ? renderA4Form(doc.doc_type, dj, projectName)
-            : (
-              <div className="docdetail-md sch-md">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {doc.preview_text || "_(저장된 본문이 없습니다.)_"}
-                </ReactMarkdown>
-              </div>
-            )}
+          {pickDocumentForm({
+            docType: doc.doc_type,
+            json: dj as Record<string, unknown> | null | undefined,
+            projectName,
+          }) ?? (
+            <div className="docdetail-md sch-md">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {doc.preview_text || "_(저장된 본문이 없습니다.)_"}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
       </section>
     </div>

@@ -7,27 +7,12 @@ import { RefreshCw, FileText, AlertCircle, Pencil, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import type {
-  CategoryId,
-  NCRDocument,
-  SafetyInspectionDocument,
-  QualityInspectionDoc,
-  MaterialInspectionDoc,
-  CARDoc,
-  DerivedNCRDoc,
-} from "../../stores/docStore";
+import type { CategoryId } from "../../stores/docStore";
 import { DOC_CATEGORIES, docLabelForType, resolveItemCategory } from "../../lib/docCategories";
-import { deleteDocument, listDocuments } from "../../lib/api/documents";
+import { createDocument, deleteDocument, getJob, listDocuments } from "../../lib/api/documents";
 import { CategoryTab } from "../molecules/CategoryTab";
 import { ProgressInsights } from "../molecules/ProgressInsights";
-import {
-  NcrFormView,
-  SirFormView,
-  QualityFormView,
-  MaterialFormView,
-  CarFormView,
-  DerivedNcrFormView,
-} from "../documents/DocumentFormViews";
+import { pickDocumentForm } from "../documents/DocumentFormViews";
 
 export interface DocumentHistoryItem {
   id: string;
@@ -64,86 +49,6 @@ function formatDate(iso: string) {
   }
 }
 
-function isNcrPayload(j: Record<string, unknown>): boolean {
-  if (typeof j.document_number !== "string") return false;
-  return "specification" in j || "description" in j || "immediate_action" in j;
-}
-
-function isSirPayload(j: Record<string, unknown>): boolean {
-  return Array.isArray(j.checklist);
-}
-
-function ncrFromJson(j: Record<string, unknown>): NCRDocument {
-  const disp = j.disposition;
-  let disposition: string[] = [];
-  if (Array.isArray(disp)) disposition = disp.map(String);
-  else if (typeof disp === "string" && disp.trim()) disposition = [disp];
-
-  const s = (v: unknown) => (v == null ? "" : String(v));
-
-  return {
-    document_number: s(j.document_number),
-    reporter: s(j.reporter),
-    report_date: s(j.report_date),
-    title: s(j.title),
-    author: s(j.author),
-    action_department: s(j.action_department),
-    location: s(j.location),
-    company: s(j.company),
-    nc_type: s(j.nc_type),
-    attachment: s(j.attachment),
-    action_manager: s(j.action_manager),
-    specification: s(j.specification),
-    description: s(j.description),
-    immediate_action: s(j.immediate_action),
-    disposition,
-    action_responsible: s(j.action_responsible),
-    action_deadline: s(j.action_deadline),
-    verification: s(j.verification),
-    completion_date: s(j.completion_date),
-    notes: s(j.notes),
-  };
-}
-
-function sirFromJson(j: Record<string, unknown>): SafetyInspectionDocument {
-  const raw = Array.isArray(j.checklist) ? j.checklist : [];
-  const checklist = raw.map((row) => {
-    const o = row as Record<string, unknown>;
-    const st = String(o.status ?? "N/A").toUpperCase();
-    let status: "P" | "F" | "N/A" = "N/A";
-    if (st === "F" || st === "FAIL") status = "F";
-    else if (st === "P" || st === "PASS") status = "P";
-    return {
-      target: String(o.target ?? ""),
-      item_name: String(o.item_name ?? ""),
-      status,
-      findings: String(o.findings ?? ""),
-    };
-  });
-
-  const regs = j.violated_regulations;
-  const violated_regulations = Array.isArray(regs) ? regs.map(String) : [];
-
-  const s = (v: unknown) => (v == null ? "" : String(v));
-
-  return {
-    document_number: s(j.document_number),
-    construction_name: s(j.construction_name),
-    inspection_date: s(j.inspection_date),
-    inspector: s(j.inspector),
-    inspection_zone: s(j.inspection_zone),
-    yolo_detections_summary: s(j.yolo_detections_summary) || "자동 탐지 결과 없음 — 이미지 육안 분석 기반",
-    checklist,
-    photo_guidance: s(j.photo_guidance),
-    violated_regulations,
-    action_deadline: s(j.action_deadline),
-    action_responsible: s(j.action_responsible),
-    reinspection_opinion: s(j.reinspection_opinion),
-    risk_level: s(j.risk_level) || "Medium",
-    notes: j.notes != null ? s(j.notes) : undefined,
-  };
-}
-
 function ProgressDocumentPreview({
   row,
   projectName,
@@ -151,37 +56,15 @@ function ProgressDocumentPreview({
   row: DocumentHistoryItem;
   projectName: string;
 }) {
-  const dj = row.document_json;
+  // 통합 라우터(pickDocumentForm) — DocAutoGen/DocumentDetail 과 *동일한* A4 폼뷰.
+  const form = pickDocumentForm({
+    docType: row.doc_type,
+    json: row.document_json,
+    projectName,
+  });
+  if (form) return <>{form}</>;
 
-  // 문서 작성 화면(DocAutoGen)과 *동일한* A4 폼뷰로 doc_type 라우팅.
-  if (dj && typeof dj === "object" && !Array.isArray(dj)) {
-    switch (row.doc_type) {
-      case "quality_inspect":
-        return <QualityFormView doc={dj as unknown as QualityInspectionDoc} stepsLog={[]} />;
-      case "material_check":
-        return <MaterialFormView doc={dj as unknown as MaterialInspectionDoc} stepsLog={[]} />;
-      case "car":
-        return <CarFormView doc={dj as unknown as CARDoc} stepsLog={[]} />;
-      case "defect_report":
-        // 파생 NCR(품질/자재 부적합 발) 은 DerivedNCR 모양 → 전용 뷰. 직접 발행은 NcrFormView.
-        if ("items" in dj && "source_document_type" in dj)
-          return <DerivedNcrFormView doc={dj as unknown as DerivedNCRDoc} />;
-        return (
-          <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
-        );
-      case "safety_inspect":
-        return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
-      default:
-        // 레거시/미상 — payload 형태로 추정 (doc_type 누락 호환)
-        if (isNcrPayload(dj))
-          return (
-            <NcrFormView ncr={ncrFromJson(dj)} stepsLog={[]} projectName={projectName} showPipeline={false} />
-          );
-        if (isSirPayload(dj)) return <SirFormView sir={sirFromJson(dj)} stepsLog={[]} showPipeline={false} />;
-    }
-  }
-
-  // 구조화 JSON 없는 옛 문서(json=N) — raw <pre> 대신 마크다운 렌더.
+  // 구조화 JSON 없는 옛 문서(json=N) — 마크다운 렌더.
   const text = row.preview_text?.trim() || row.title || "_(저장된 본문이 없습니다.)_";
 
   return (
@@ -230,6 +113,9 @@ export function ProgressDashboard() {
   const [activeDocType, setActiveDocType] = useState<string | null>("defect_report");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterDayKey, setFilterDayKey] = useState<string | null>(null);
+  // NCR → CAR 생성 (저장폴더에서 후속 문서 생성)
+  const [carBusy, setCarBusy] = useState(false);
+  const [carError, setCarError] = useState<string | null>(null);
 
   // job 자동 적용 1회 flag — items 로딩 완료 후 한 번만 시도.
   const jobInitRef = useRef(false);
@@ -288,6 +174,47 @@ export function ProgressDashboard() {
       }
     },
     [items, selectedId],
+  );
+
+  // NCR → CAR 생성: 대상 NCR 의 document_json 을 linked_ncr 로 전달 → 폴링 → 목록 새로고침 후 새 CAR 선택.
+  const handleGenerateCar = useCallback(
+    async (row: DocumentHistoryItem) => {
+      setCarBusy(true);
+      setCarError(null);
+      try {
+        const created = await createDocument({
+          category: "quality",
+          doc_type: "car",
+          context: "",
+          project_name: row.project_name ?? "",
+          linked_ncr: row.document_json ?? null,
+        });
+        // 폴링 (최대 ~10분)
+        let done = false;
+        for (let i = 0; i < 240 && !done; i++) {
+          await new Promise((r) => setTimeout(r, 2500));
+          try {
+            const job = await getJob(created.job_id);
+            if (job.status === "done") done = true;
+            else if (job.status === "error") throw new Error(job.error ?? "CAR 생성 오류");
+          } catch (pollErr) {
+            if (pollErr instanceof Error && pollErr.message === "CAR 생성 오류") throw pollErr;
+            // 일시 오류는 재시도
+          }
+        }
+        if (!done) throw new Error("CAR 생성 시간이 초과되었습니다.");
+        await load();
+        // 새로 생성된 CAR 로 이동 (quality 카테고리 · car 유형)
+        setActiveCat("quality");
+        setActiveDocType("car");
+        setSelectedId(null);
+      } catch (e) {
+        setCarError(e instanceof Error ? e.message : "CAR 생성 실패");
+      } finally {
+        setCarBusy(false);
+      }
+    },
+    [load],
   );
 
   useEffect(() => {
@@ -529,7 +456,27 @@ export function ProgressDashboard() {
         </div>
 
         <div className="progress-preview-col">
-          <div className="progress-preview-header">A4 미리보기</div>
+          <div className="progress-preview-header">
+            <span>A4 미리보기</span>
+            {selected?.doc_type === "defect_report" && (
+              <button
+                type="button"
+                className="progress-car-btn"
+                onClick={() => void handleGenerateCar(selected)}
+                disabled={carBusy}
+                title="이 NCR에 대한 시정조치 보고서(CAR) 생성"
+              >
+                {carBusy ? (
+                  <>
+                    <RefreshCw size={13} className="progress-spin" strokeWidth={2} /> CAR 생성 중…
+                  </>
+                ) : (
+                  <>✦ CAR 생성</>
+                )}
+              </button>
+            )}
+          </div>
+          {carError && <div className="progress-car-error">CAR 생성 실패: {carError}</div>}
           <div className="progress-preview-scroll">
             {!selected ? (
               <div className="progress-preview-placeholder">

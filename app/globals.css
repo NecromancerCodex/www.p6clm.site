@@ -3308,12 +3308,41 @@ select {
 }
 
 .progress-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 10px 14px;
   font-size: 0.75rem;
   font-weight: 600;
   color: #475569;
   background: #f1f5f9;
   border-bottom: 1px solid #e2e8f0;
+}
+
+.progress-car-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #fff;
+  background: #0d9488;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.progress-car-btn:hover:not(:disabled) { background: #0f766e; }
+.progress-car-btn:disabled { opacity: 0.6; cursor: progress; }
+
+.progress-car-error {
+  padding: 8px 14px;
+  font-size: 0.74rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
 }
 
 .progress-preview-scroll {
