@@ -1043,6 +1043,14 @@ export function QualityFormView({
     doc.judgement === "부적합" ? "sir-risk-high"
     : doc.judgement === "확인필요" ? "sir-risk-medium"
     : "sir-risk-low";
+
+  // 동적 섹션 번호 — 1~4 고정, 이후는 렌더되는 섹션만 연속 부여(조건부 숨김 시 번호 구멍 방지).
+  let _sec = 4;
+  const secNonc = (doc.nonconformities?.length ?? 0) > 0 ? ++_sec : null;
+  const secAct = (doc.actions?.length ?? 0) > 0 ? ++_sec : null;
+  const secOpinion = ++_sec;                                  // 종합 의견 — 항상
+  const secAttach = (doc.attachments?.length ?? 0) > 0 ? ++_sec : null;
+
   return (
     <div className="sir-wrapper">
       <FormTopBar stepsLog={stepsLog} onReset={onReset} />
@@ -1138,7 +1146,7 @@ export function QualityFormView({
 
         {doc.nonconformities?.length > 0 && (
           <div className="sir-section">
-            <div className="sir-section-title">5. 부적합 사항</div>
+            <div className="sir-section-title">{secNonc}. 부적합 사항</div>
             {doc.nonconformities.map((nc, i) => (
               <table key={i} className="sir-action-table" style={{ marginBottom: 8 }}>
                 <tbody>
@@ -1154,7 +1162,7 @@ export function QualityFormView({
 
         {doc.actions?.length > 0 && (
           <div className="sir-section">
-            <div className="sir-section-title">6. 조치 사항</div>
+            <div className="sir-section-title">{secAct}. 조치 사항</div>
             <table className="sir-checklist-table">
               <thead><tr><th>부적합 내용</th><th>조치 사항</th><th>완료 여부</th><th>재검사 결과</th></tr></thead>
               <tbody>
@@ -1179,13 +1187,13 @@ export function QualityFormView({
         )}
 
         <div className="sir-section">
-          <div className="sir-section-title">7. 종합 의견</div>
+          <div className="sir-section-title">{secOpinion}. 종합 의견</div>
           <div className="sir-photo-guidance"><EditCell value={doc.overall_opinion || ""} editable={!!editable} onChange={(v) => setField("overall_opinion", v)} multiline /></div>
         </div>
 
         {doc.attachments?.length > 0 && (
           <div className="sir-section">
-            <div className="sir-section-title">8. 첨부 자료</div>
+            <div className="sir-section-title">{secAttach}. 첨부 자료</div>
             <div className="sir-regulation-box"><ul className="sir-reg-list">{doc.attachments.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
           </div>
         )}
@@ -1223,6 +1231,11 @@ export function MaterialFormView({
   const setItem = makeSetItem(doc, onChange);
   const ov = doc.overview || {};
   const badge = doc.judgement === "부적합" ? "sir-risk-high" : doc.judgement === "조건부 적합" ? "sir-risk-medium" : "sir-risk-low";
+
+  // 동적 섹션 번호 — 1~4 고정, 부적합 사항(조건부) 유무에 따라 검수 의견 번호 당겨짐.
+  let _msec = 4;
+  const mSecNonc = (doc.nonconformities?.length ?? 0) > 0 ? ++_msec : null;
+  const mSecOpinion = ++_msec;
   const OV: Array<[string, string]> = [
     ["자재명", ov.material_name], ["규격/모델", ov.specification], ["제조사", ov.manufacturer],
     ["공급업체", ov.supplier], ["수량", `${ov.quantity ?? ""} ${ov.unit ?? ""}`], ["납품일자", ov.delivery_date],
@@ -1255,7 +1268,7 @@ export function MaterialFormView({
         </div>
 
         <div className="sir-section">
-          <div className="sir-section-title">기본 정보</div>
+          <div className="sir-section-title">1. 기본 정보</div>
           <table className="sir-info-table">
             <tbody>
               <tr><th>현장명</th><td><EditCell value={doc.site_name} editable={!!editable} onChange={(v) => setField("site_name", v)} /></td><th>검수 일자</th><td><EditCell value={doc.inspection_date} editable={!!editable} onChange={(v) => setField("inspection_date", v)} /></td></tr>
@@ -1267,7 +1280,7 @@ export function MaterialFormView({
         </div>
 
         <div className="sir-section">
-          <div className="sir-section-title">1. 자재 개요</div>
+          <div className="sir-section-title">2. 자재 개요</div>
           <table className="sir-info-table">
             <tbody>
               {OV.reduce<Array<Array<[number, [string, string]]>>>((rows, cur, i) => {
@@ -1342,7 +1355,7 @@ export function MaterialFormView({
 
         {doc.nonconformities?.length > 0 && (
           <div className="sir-section">
-            <div className="sir-section-title">5. 부적합 사항</div>
+            <div className="sir-section-title">{mSecNonc}. 부적합 사항</div>
             {doc.nonconformities.map((nc, i) => (
               <table key={i} className="sir-action-table" style={{ marginBottom: 8 }}>
                 <tbody>
@@ -1376,7 +1389,7 @@ export function MaterialFormView({
         )}
 
         <div className="sir-section">
-          <div className="sir-section-title">7. 검수 의견</div>
+          <div className="sir-section-title">{mSecOpinion}. 검수 의견</div>
           <div className="sir-photo-guidance"><EditCell value={doc.inspection_opinion || ""} editable={!!editable} onChange={(v) => setField("inspection_opinion", v)} multiline /></div>
         </div>
 
