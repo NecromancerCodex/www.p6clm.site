@@ -58,6 +58,9 @@ export const createJobsSlice: StateCreator<ChatStore, [], [], JobsSlice> = (set,
     const { jobStatuses } = get();
     if (jobStatuses[job.job_id]) return; // 멱등
 
+    // job 이 시작된 세션 캡처 — 완료 메시지가 다른 세션으로 새는 것 방지.
+    const originSessionId = get().currentSessionId;
+
     set({
       jobStatuses: {
         ...jobStatuses,
@@ -76,6 +79,9 @@ export const createJobsSlice: StateCreator<ChatStore, [], [], JobsSlice> = (set,
     };
 
     const pushSystemMessage = (content: string, idPrefix: string) => {
+      // 폴링 중 사용자가 다른 세션으로 이동했으면 현재 세션 오염 방지 — 스킵.
+      // (완료 상태는 persist 된 triggered_job 카드가 재폴링으로 복원하므로 정보 손실 없음)
+      if (get().currentSessionId !== originSessionId) return;
       set((s) => ({
         messages: [...s.messages, appendAssistant(content, idPrefix, job.job_id)],
       }));

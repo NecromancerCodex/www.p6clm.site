@@ -58,6 +58,9 @@ export const createMessageSlice: StateCreator<ChatStore, [], [], MessageSlice> =
         form.append("message", outboundMessage);
         form.append("history_json", JSON.stringify(historyPayload));
         form.append("image", pendingImage);
+        // 세션 영속화 — 텍스트 경로와 동일. null 이면 미전송(백엔드가 새 세션 생성).
+        const _sid = get().currentSessionId;
+        if (_sid != null) form.append("session_id", String(_sid));
         res = await fetch("/api/cbot/chat/image", {
           method: "POST",
           body: form,
