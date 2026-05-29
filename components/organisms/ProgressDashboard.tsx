@@ -121,6 +121,8 @@ export function ProgressDashboard() {
   const jobInitRef = useRef(false);
   // catChanged effect 에서 docType/selectedId reset 을 *한 사이클* 차단하는 flag.
   const jobApplyingRef = useRef(false);
+  // 최초 진입 시 기본 탭 자동 결정 1회 flag (명시 ?cat=/?job= 없을 때 최근 문서 기준).
+  const defaultCatRef = useRef(false);
 
   const router = useRouter();
 
@@ -276,6 +278,18 @@ export function ProgressDashboard() {
     setActiveDocType(matched.doc_type);
     setSelectedId(matched.id);
   }, [items, initialQuery.jobId]);
+
+  // 기본 탭 자동 결정 — 명시 ?cat=/?job= 없이 진입(사이드바 등)하면 *가장 최근 생성 문서*의
+  // 카테고리로 점프. "품질관리 고정 디폴트" 불편 해소 (방금 만든 문서 탭으로 바로).
+  useEffect(() => {
+    if (defaultCatRef.current || items.length === 0) return;
+    defaultCatRef.current = true;
+    if (initialQuery.cat || initialQuery.jobId) return; // 명시 진입이면 그 로직 우선
+    const latest = items.reduce((a, b) =>
+      b.created_at.localeCompare(a.created_at) > 0 ? b : a,
+    );
+    setActiveCat(resolveItemCategory(latest.doc_type, latest.doc_category) as CategoryId);
+  }, [items, initialQuery.cat, initialQuery.jobId]);
 
   const historyRows = useMemo(() => {
     if (!activeDocType) return [];

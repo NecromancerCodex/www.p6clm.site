@@ -2282,13 +2282,14 @@ select {
   .sir-doc-title { font-size: 13px !important; }
   .sir-section-title { font-size: 11px !important; padding: 3px 7px !important; }
 
-  /* 모든 표: 고정 레이아웃 + 단어 줄바꿈 */
+  /* 모든 표: 고정 레이아웃 + 한글 어절 줄바꿈(글자단위 분해 방지) */
   .sir-info-table,
   .sir-checklist-table,
   .sir-action-table {
     font-size: 10px !important;
     table-layout: fixed;
-    word-break: break-word;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
   }
   .sir-info-table th,
   .sir-info-table td,
@@ -2313,6 +2314,14 @@ select {
   .sir-checklist-table th:nth-child(4),
   .sir-checklist-table td:nth-child(4) { width: 40% !important; }
   .sir-target-cell { white-space: normal !important; }
+
+  /* 위험성 평가표(7컬럼)는 4컬럼용 nth-child 강제 너비 제외 — 가로 스크롤로 처리 */
+  .ra-table th,
+  .ra-table td {
+    width: auto !important;
+    white-space: normal !important;
+  }
+  .ra-table { min-width: 760px; }
 
   /* 사진 그리드·서명 행 세로 스택 */
   .sir-photo-grid { grid-template-columns: 1fr !important; }
@@ -3315,6 +3324,19 @@ select {
 .photo-cell-btn--danger { background: #ef4444; }
 .photo-cell-btn--danger:hover { background: #dc2626; }
 
+/* ── 표 셀 한글 줄바꿈 — '비고' 글자단위 세로 분해 버그 방지 (전 문서 공통) ──
+ * 한글은 기본 word-break 가 음절 단위로 깨져, 좁은 컬럼에선 한 글자씩 세로로 쌓임.
+ * keep-all = 한글을 단어(어절) 경계에서만 줄바꿈. 매우 긴 무공백 토큰은 anywhere 로 보조. */
+.sir-checklist-table th,
+.sir-checklist-table td,
+.sir-info-table th,
+.sir-info-table td,
+.sir-action-table th,
+.sir-action-table td {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
 /* 위험성 평가표 (Risk Assess) — 행 밀도 높아 폰트·패딩 축소 */
 .ra-table { font-size: 0.8rem; }
 .ra-table th, .ra-table td { padding: 5px 6px; vertical-align: top; }
@@ -3331,6 +3353,22 @@ select {
 }
 .ra-measure-list { margin: 0; padding-left: 16px; }
 .ra-measure-list li { margin-bottom: 2px; }
+
+/* 위험성 평가표 7컬럼 — 좁은 화면에선 컬럼 찌그러뜨리지 말고 가로 스크롤(스프레드시트형) */
+.ra-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ra-table { table-layout: fixed; min-width: 880px; }
+.ra-table .sir-target-cell { white-space: normal; }
+
+/* 엑셀(CSV) 내려받기 버튼 — 기존 dag-copy-btn 톤 재사용 + 초록 강조 */
+.ra-export-btn {
+  background: #16a34a !important;
+  color: #fff !important;
+  border-color: #16a34a !important;
+}
+.ra-export-btn:hover { background: #15803d !important; }
 
 .docdetail-save-error {
   grid-column: 1 / -1;

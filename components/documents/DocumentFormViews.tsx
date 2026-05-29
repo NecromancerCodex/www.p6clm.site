@@ -2014,6 +2014,53 @@ export function RiskAssessFormView({
     await navigator.clipboard.writeText(text);
   }
 
+  // 엑셀/CSV 내려받기 — 스프레드시트 형태. BOM(﻿)으로 Excel 한글 깨짐 방지.
+  function downloadCsv() {
+    const esc = (v: unknown) => {
+      const s = String(v ?? "").replace(/\r?\n/g, " / ");
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const header = [
+      "단위작업", "작업Flow", "위험요인",
+      "사전_빈도", "사전_강도", "사전_등급",
+      "안전관리대책",
+      "잔여_빈도", "잔여_강도", "잔여_등급",
+      "비고", "출처", "공정코드",
+    ];
+    const bodyRows = items.map((it) => [
+      it.unit_work, it.work_flow, it.hazard,
+      it.pre_risk?.frequency, it.pre_risk?.severity, it.pre_risk?.grade,
+      (it.control_measures || []).join(" / "),
+      it.post_risk?.frequency, it.post_risk?.severity, it.post_risk?.grade,
+      it.note || "", it.source === "schedule_activity" ? "공정" : "공통",
+      it.activity_code || "",
+    ]);
+    // 메타 헤더 블록 + 빈 줄 + 표
+    const metaLines = [
+      ["위험성 평가표", doc.document_number],
+      ["현장명", doc.site_name], ["협력사", doc.partner_company],
+      ["공종", doc.work_type], ["작성자", doc.author], ["작성일", doc.issue_date],
+      ["평가기간", `${doc.period_from} ~ ${doc.period_to}`],
+      ["근거법령", (doc.legal_grounding || []).join(" / ")],
+    ];
+    const lines = [
+      ...metaLines.map((r) => r.map(esc).join(",")),
+      "",
+      header.map(esc).join(","),
+      ...bodyRows.map((r) => r.map(esc).join(",")),
+    ];
+    const csv = "﻿" + lines.join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `위험성평가표_${doc.document_number || "RA"}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="sir-wrapper">
       <div className="sir-top-bar">
@@ -2027,6 +2074,7 @@ export function RiskAssessFormView({
           <div className="dag-steps-log" />
         )}
         <div className="ncr-actions">
+          <button type="button" className="dag-copy-btn ra-export-btn" onClick={downloadCsv}>📊 엑셀(CSV)</button>
           <button type="button" className="dag-copy-btn" onClick={copyAsText}>텍스트 복사</button>
           <button type="button" className="dag-copy-btn" onClick={() => window.print()}>🖨️ 인쇄</button>
           {onReset ? (
@@ -2083,6 +2131,7 @@ export function RiskAssessFormView({
               공정 <strong>{schedCount}</strong> / 공통 <strong>{genCount}</strong>건
             </span>
           </div>
+          <div className="ra-scroll">
           <table className="sir-checklist-table ra-table">
             <thead>
               <tr>
@@ -2127,6 +2176,7 @@ export function RiskAssessFormView({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         {(doc.legal_grounding?.length > 0 || editable) && (
