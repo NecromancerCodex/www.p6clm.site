@@ -1727,7 +1727,7 @@ select {
   border-radius: var(--radius-m);
   background: transparent;
   color: var(--muted-strong);
-  font-size: 0.84rem;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.14s, color 0.14s, border-color 0.14s;
@@ -1750,11 +1750,11 @@ select {
 .ws-chat-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
+  gap: 8px;
+  padding: 6px 10px 6px 14px;
   border-radius: var(--radius-s, 6px);
   color: var(--muted-strong);
-  font-size: 0.8rem;
+  font-size: 0.84rem;
   cursor: pointer;
   transition: background 0.12s;
 }
