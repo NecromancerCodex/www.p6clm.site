@@ -4,10 +4,14 @@
  * Backend: /api/v1/documents (api/v1/documents.py)
  * Frontend API base: /api/clm (next.config.ts rewrite → CLM 서비스)
  *
- * 페더레이트 ID 규칙:
- *   - "ncr:<int>"     → ncr_documents
- *   - "safety:<int>"  → safety_documents
- *   - "clm:<int>"     → clm_analysis_records
+ * 페더레이트 ID 규칙 (023, 2026-05-29):
+ *   - "ncr:<int>"      → ncr_documents
+ *   - "safety:<int>"   → safety_documents
+ *   - "quality:<int>"  → quality_documents
+ *   - "material:<int>" → material_documents
+ *   - "car:<int>"      → car_documents
+ *   - "sched:<int>"    → schedule_documents
+ *   - "risk:<int>"     → risk_assess_documents
  */
 
 const API_BASE = "/api/clm";
@@ -17,7 +21,11 @@ const API_BASE = "/api/clm";
 export type DocumentSource =
   | "ncr_documents"
   | "safety_documents"
-  | "clm_analysis_records";
+  | "quality_documents"
+  | "material_documents"
+  | "car_documents"
+  | "schedule_documents"
+  | "risk_assess_documents";
 
 export interface DocumentRead {
   id: string;

@@ -149,6 +149,42 @@ export interface CARDoc {
   photo_after?: string;
 }
 
+// ── 위험성 평가표 (risk_assess) A4 뷰용 — 공정표 2-source 합성 ──────────
+export interface RiskScore {
+  frequency: number; // 빈도 1~5
+  severity: number;  // 강도 1~5
+  grade: number;     // 등급 1~5 (빈도×강도 구간)
+}
+export interface RiskAssessItem {
+  unit_work: string;
+  work_flow: string;
+  hazard: string;
+  pre_risk: RiskScore;
+  control_measures: string[];
+  post_risk: RiskScore;
+  note?: string;
+  source: "schedule_activity" | "general_template";
+  activity_code?: string | null;
+}
+export interface RiskAssessDoc {
+  document_number: string;
+  site_name: string;
+  partner_company: string;
+  author: string;
+  issue_date: string;
+  work_type: string;
+  period_from: string;
+  period_to: string;
+  items: RiskAssessItem[];
+  supervisor_opinion?: string;
+  hse_opinion?: string;
+  sig_partner?: string;
+  sig_supervisor?: string;
+  sig_hse?: string;
+  sig_site_director?: string;
+  legal_grounding: string[];
+}
+
 // ── 자동 파생 NCR (품질/자재 부적합 → source-linked NCR) A4 뷰용 ──────────
 export interface DerivedNCRItemDoc {
   item: string;

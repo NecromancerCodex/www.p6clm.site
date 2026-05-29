@@ -3315,6 +3315,23 @@ select {
 .photo-cell-btn--danger { background: #ef4444; }
 .photo-cell-btn--danger:hover { background: #dc2626; }
 
+/* 위험성 평가표 (Risk Assess) — 행 밀도 높아 폰트·패딩 축소 */
+.ra-table { font-size: 0.8rem; }
+.ra-table th, .ra-table td { padding: 5px 6px; vertical-align: top; }
+.ra-src-chip {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-radius: 3px;
+  vertical-align: middle;
+}
+.ra-measure-list { margin: 0; padding-left: 16px; }
+.ra-measure-list li { margin-bottom: 2px; }
+
 .docdetail-save-error {
   grid-column: 1 / -1;
   display: inline-flex;

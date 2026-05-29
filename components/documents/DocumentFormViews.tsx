@@ -10,6 +10,8 @@ import type {
   MaterialInspectionDoc,
   CARDoc,
   DerivedNCRDoc,
+  RiskAssessDoc,
+  RiskScore,
 } from "../../stores/doc/types";
 import type { ScheduleReportDoc } from "../../lib/api/schedule";
 
@@ -1960,6 +1962,229 @@ export function CarFormView({
   );
 }
 
+/* ── 위험성 평가표 (Risk Assess) A4 뷰 — 공정표 2-source 합성 ────── */
+
+const _GRADE_KR: Record<number, string> = { 1: "낮음", 2: "보통", 3: "중간", 4: "높음", 5: "매우높음" };
+const _gradeClass = (g: number) =>
+  g >= 4 ? "sir-pf-fail" : g === 3 ? "sir-pf-na" : "sir-pf-pass";
+
+function _scoreLabel(s: RiskScore | undefined): string {
+  if (!s) return "-";
+  return `${s.frequency}×${s.severity}=${s.grade} (${_GRADE_KR[s.grade] || s.grade})`;
+}
+
+export function RiskAssessFormView({
+  doc,
+  stepsLog = [],
+  onReset,
+  editable = false,
+  onChange,
+}: {
+  doc: RiskAssessDoc;
+  stepsLog?: string[];
+  onReset?: () => void;
+  editable?: boolean;
+  onChange?: (next: Record<string, unknown>) => void;
+}) {
+  const setField = makeSetField(doc, onChange);
+  const setItem = makeSetItem(doc, onChange);
+  const items = doc.items || [];
+  const schedCount = items.filter((it) => it.source === "schedule_activity").length;
+  const genCount = items.filter((it) => it.source === "general_template").length;
+  const highRisk = items.filter((it) => (it.pre_risk?.grade ?? 0) >= 4).length;
+
+  async function copyAsText() {
+    const rows = items
+      .map(
+        (it) =>
+          `  [${it.source === "schedule_activity" ? "공정" : "공통"}] ${it.unit_work} / ${it.work_flow}` +
+          ` — ${it.hazard} | 사전 ${_scoreLabel(it.pre_risk)} → 잔여 ${_scoreLabel(it.post_risk)}`,
+      )
+      .join("\n");
+    const text = [
+      `위험성 평가표  ${doc.document_number}`,
+      `현장: ${doc.site_name}  협력사: ${doc.partner_company}  공종: ${doc.work_type}`,
+      `작성자: ${doc.author}  작성일: ${doc.issue_date}  기간: ${doc.period_from} ~ ${doc.period_to}`,
+      ``,
+      `[위험성 평가] 공정 ${schedCount} / 공통 ${genCount}건`,
+      rows,
+      ``,
+      `근거 법령: ${(doc.legal_grounding || []).join(", ") || "-"}`,
+    ].join("\n");
+    await navigator.clipboard.writeText(text);
+  }
+
+  return (
+    <div className="sir-wrapper">
+      <div className="sir-top-bar">
+        {stepsLog.length > 0 ? (
+          <div className="dag-steps-log">
+            {stepsLog.map((s, i) => (
+              <span key={i} className="dag-step-badge">✓ {s}</span>
+            ))}
+          </div>
+        ) : (
+          <div className="dag-steps-log" />
+        )}
+        <div className="ncr-actions">
+          <button type="button" className="dag-copy-btn" onClick={copyAsText}>텍스트 복사</button>
+          <button type="button" className="dag-copy-btn" onClick={() => window.print()}>🖨️ 인쇄</button>
+          {onReset ? (
+            <button type="button" className="dag-reset-btn" onClick={onReset}>다시 선택</button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="sir-form">
+        <div className="sir-doc-header">
+          <div className="sir-doc-title">위험성 평가표</div>
+          <div className="sir-doc-meta">
+            <span>문서번호: {doc.document_number}</span>
+            <span className={`sir-risk-badge ${highRisk > 0 ? "sir-risk-high" : "sir-risk-low"}`}>
+              고위험 {highRisk}건
+            </span>
+          </div>
+        </div>
+
+        <div className="sir-section">
+          <div className="sir-section-title">기본 정보</div>
+          <table className="sir-info-table">
+            <tbody>
+              <tr>
+                <th>현장명</th>
+                <td><EditCell value={doc.site_name} editable={!!editable} onChange={(v) => setField("site_name", v)} /></td>
+                <th>협력사</th>
+                <td><EditCell value={doc.partner_company} editable={!!editable} onChange={(v) => setField("partner_company", v)} /></td>
+              </tr>
+              <tr>
+                <th>공종</th>
+                <td><EditCell value={doc.work_type} editable={!!editable} onChange={(v) => setField("work_type", v)} /></td>
+                <th>작성자</th>
+                <td><EditCell value={doc.author} editable={!!editable} onChange={(v) => setField("author", v)} /></td>
+              </tr>
+              <tr>
+                <th>작성일</th>
+                <td><EditCell value={doc.issue_date} editable={!!editable} onChange={(v) => setField("issue_date", v)} /></td>
+                <th>평가 기간</th>
+                <td>
+                  <EditCell value={doc.period_from} editable={!!editable} onChange={(v) => setField("period_from", v)} placeholder="시작" />
+                  {!editable && " ~ "}
+                  <EditCell value={doc.period_to} editable={!!editable} onChange={(v) => setField("period_to", v)} placeholder="종료" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="sir-section">
+          <div className="sir-section-title">
+            위험성 평가
+            <span className="sir-summary-badge">
+              공정 <strong>{schedCount}</strong> / 공통 <strong>{genCount}</strong>건
+            </span>
+          </div>
+          <table className="sir-checklist-table ra-table">
+            <thead>
+              <tr>
+                <th style={{ width: "11%" }}>단위작업</th>
+                <th style={{ width: "11%" }}>작업 Flow</th>
+                <th style={{ width: "24%" }}>위험요인</th>
+                <th style={{ width: "11%" }}>사전(빈도×강도=등급)</th>
+                <th style={{ width: "20%" }}>안전관리대책</th>
+                <th style={{ width: "11%" }}>잔여(빈도×강도=등급)</th>
+                <th>비고</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={i} className={(it.pre_risk?.grade ?? 0) >= 4 ? "sir-row-fail" : ""}>
+                  <td className="sir-target-cell">
+                    {it.source === "schedule_activity" && (
+                      <span className="ra-src-chip" title={it.activity_code || ""}>공정</span>
+                    )}
+                    <EditCell value={it.unit_work} editable={!!editable} onChange={(v) => setItem("items", i, { unit_work: v })} />
+                  </td>
+                  <td><EditCell value={it.work_flow} editable={!!editable} onChange={(v) => setItem("items", i, { work_flow: v })} /></td>
+                  <td className="sir-findings-cell"><EditCell value={it.hazard} editable={!!editable} onChange={(v) => setItem("items", i, { hazard: v })} multiline /></td>
+                  <td className={`sir-pf-cell ${_gradeClass(it.pre_risk?.grade ?? 0)}`}>{_scoreLabel(it.pre_risk)}</td>
+                  <td className="sir-findings-cell">
+                    {editable ? (
+                      <EditCell
+                        value={(it.control_measures || []).join("\n")}
+                        editable
+                        onChange={(v) => setItem("items", i, { control_measures: v.split("\n").map((s) => s.trim()).filter(Boolean) })}
+                        multiline
+                      />
+                    ) : (
+                      <ul className="ra-measure-list">
+                        {(it.control_measures || []).map((m, mi) => <li key={mi}>{m}</li>)}
+                      </ul>
+                    )}
+                  </td>
+                  <td className={`sir-pf-cell ${_gradeClass(it.post_risk?.grade ?? 0)}`}>{_scoreLabel(it.post_risk)}</td>
+                  <td><EditCell value={it.note || ""} editable={!!editable} onChange={(v) => setItem("items", i, { note: v })} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {(doc.legal_grounding?.length > 0 || editable) && (
+          <div className="sir-section">
+            <div className="sir-section-title">근거 법령</div>
+            <div className="sir-regulation-box">
+              <ul className="sir-reg-list">
+                {(doc.legal_grounding || []).map((r, i) => (
+                  <li key={i}>
+                    <EditCell
+                      value={r}
+                      editable={!!editable}
+                      onChange={(v) => {
+                        const next = [...(doc.legal_grounding || [])];
+                        next[i] = v;
+                        setField("legal_grounding", next);
+                      }}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {(doc.supervisor_opinion || doc.hse_opinion || editable) && (
+          <div className="sir-section">
+            <div className="sir-section-title">평가 의견</div>
+            <table className="sir-action-table">
+              <tbody>
+                <tr>
+                  <th>관리감독자</th>
+                  <td><EditCell value={doc.supervisor_opinion || ""} editable={!!editable} onChange={(v) => setField("supervisor_opinion", v)} multiline /></td>
+                </tr>
+                <tr>
+                  <th>HSE관리자</th>
+                  <td><EditCell value={doc.hse_opinion || ""} editable={!!editable} onChange={(v) => setField("hse_opinion", v)} multiline /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <SigRow
+          editable={!!editable}
+          onSign={(k, v) => setField(k, v)}
+          roles={[
+            ["협력사", doc.sig_partner || "", "sig_partner"],
+            ["관리감독자", doc.sig_supervisor || "", "sig_supervisor"],
+            ["HSE관리자", doc.sig_hse || "", "sig_hse"],
+            ["현장소장", doc.sig_site_director || "", "sig_site_director"],
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* ── 통합 문서 렌더 라우터 ─────────────────────────────────────────
  * 단일 진실원천(SSOT): doc_type + document_json → A4 폼뷰.
  * DocAutoGen / DocumentDetail / ProgressDashboard 가 모두 이 함수를 공유한다.
@@ -2101,6 +2326,16 @@ export function pickDocumentForm({
         : ncr();
     case "safety_inspect":
       return sir();
+    case "risk_assess":
+      return (
+        <RiskAssessFormView
+          doc={json as unknown as RiskAssessDoc}
+          stepsLog={stepsLog}
+          onReset={onReset}
+          editable={editable}
+          onChange={onChangeCast}
+        />
+      );
     default:
       // 레거시/미상 doc_type — payload 형태로 추정
       if (_isDerivedNcrShape(json)) return <DerivedNcrFormView doc={json as unknown as DerivedNCRDoc} onReset={onReset} />;
