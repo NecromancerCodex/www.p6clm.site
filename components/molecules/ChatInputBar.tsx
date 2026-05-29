@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, ImageIcon, Mic, X } from "lucide-react";
+import { ArrowUp, ImageIcon, Mic, Square, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useCallback, useRef } from "react";
@@ -33,6 +33,7 @@ export function ChatInputBar() {
   const pendingImagePreview = useChatStore((s) => s.pendingImagePreview);
   const setInput          = useChatStore((s) => s.setInput);
   const sendMessage       = useChatStore((s) => s.sendMessage);
+  const cancelMessage     = useChatStore((s) => s.cancelMessage);
   const setPendingImage   = useChatStore((s) => s.setPendingImage);
   const clearPendingImage = useChatStore((s) => s.clearPendingImage);
 
@@ -142,15 +143,27 @@ export function ChatInputBar() {
 
         <div className="cbot-right-controls">
           <VoiceMicButton />
-          <button
-            className="cbot-send-btn"
-            type="button"
-            aria-label="전송"
-            onClick={() => sendMessage().then(() => textareaRef.current?.focus())}
-            disabled={!canSend}
-          >
-            <ArrowUp size={17} strokeWidth={2.5} />
-          </button>
+          {isLoading ? (
+            <button
+              className="cbot-send-btn cbot-stop-btn"
+              type="button"
+              aria-label="요청 취소"
+              title="요청 취소"
+              onClick={() => cancelMessage()}
+            >
+              <Square size={14} strokeWidth={2.5} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              className="cbot-send-btn"
+              type="button"
+              aria-label="전송"
+              onClick={() => sendMessage().then(() => textareaRef.current?.focus())}
+              disabled={!canSend}
+            >
+              <ArrowUp size={17} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
       </div>
 

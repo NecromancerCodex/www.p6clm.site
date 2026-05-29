@@ -1597,6 +1597,15 @@ select {
   cursor: default;
 }
 
+/* 정지(취소) 버튼 — 진행 중 전송 버튼 자리에 표시 */
+.cbot-stop-btn {
+  background: #dc2626;
+}
+.cbot-stop-btn:hover {
+  background: #b91c1c;
+  transform: scale(1.05);
+}
+
 .cbot-hint {
   text-align: center;
   font-size: 0.75rem;

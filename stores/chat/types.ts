@@ -30,6 +30,8 @@ export interface MessageSlice {
    * 경로에서 호출자가 *명시적으로* 보낼 텍스트를 넘기는 용도.
    */
   sendMessage: (overrideText?: string) => Promise<void>;
+  /** 진행 중인 요청 취소 — AbortController.abort() + isLoading 해제. */
+  cancelMessage: () => void;
 }
 
 export interface InputSlice {

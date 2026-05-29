@@ -2,11 +2,24 @@ import type { StateCreator } from "zustand";
 
 import type { ChatStore, Message, MessageSlice } from "./types";
 
+// 진행 중 요청의 AbortController — 모듈 스코프(직렬화 불필요, 반응성 불필요).
+// cancelMessage 가 abort, sendMessage 가 생성/정리.
+let activeController: AbortController | null = null;
+
 export const createMessageSlice: StateCreator<ChatStore, [], [], MessageSlice> = (set, get) => ({
   messages: [],
   isLoading: false,
 
   clearMessages: () => set({ messages: [] }),
+
+  cancelMessage: () => {
+    if (activeController) {
+      activeController.abort();
+      activeController = null;
+    }
+    // sendMessage 의 finally 도 isLoading 을 내리지만, 즉각 UX 위해 여기서도 해제.
+    set({ isLoading: false });
+  },
 
   sendMessage: async (overrideText?: string) => {
     const { input, messages, isLoading, pendingImage, pendingImagePreview } = get();
@@ -32,6 +45,10 @@ export const createMessageSlice: StateCreator<ChatStore, [], [], MessageSlice> =
       pendingImagePreview: null,
     });
 
+    // 요청별 AbortController — 취소 버튼이 이걸 abort.
+    const controller = new AbortController();
+    activeController = controller;
+
     try {
       let res: Response;
       const historyPayload = messages.map(({ role, content }) => ({ role, content }));
@@ -41,12 +58,17 @@ export const createMessageSlice: StateCreator<ChatStore, [], [], MessageSlice> =
         form.append("message", outboundMessage);
         form.append("history_json", JSON.stringify(historyPayload));
         form.append("image", pendingImage);
-        res = await fetch("/api/cbot/chat/image", { method: "POST", body: form });
+        res = await fetch("/api/cbot/chat/image", {
+          method: "POST",
+          body: form,
+          signal: controller.signal,
+        });
       } else {
         res = await fetch("/api/cbot/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text, history: historyPayload }),
+          signal: controller.signal,
         });
       }
 
@@ -61,13 +83,28 @@ export const createMessageSlice: StateCreator<ChatStore, [], [], MessageSlice> =
       };
       set((s) => ({ messages: [...s.messages, assistantMsg] }));
     } catch (err) {
-      const errMsg: Message = {
-        id: `e-${Date.now()}`,
-        role: "assistant",
-        content: `오류: ${err instanceof Error ? err.message : "알 수 없는 오류"}`,
-      };
-      set((s) => ({ messages: [...s.messages, errMsg] }));
+      // 사용자 취소(abort)는 오류가 아님 — 조용한 시스템 메시지로 구분.
+      if (controller.signal.aborted) {
+        set((s) => ({
+          messages: [
+            ...s.messages,
+            { id: `c-${Date.now()}`, role: "assistant", content: "⏹ 요청을 취소했습니다." },
+          ],
+        }));
+      } else {
+        set((s) => ({
+          messages: [
+            ...s.messages,
+            {
+              id: `e-${Date.now()}`,
+              role: "assistant",
+              content: `오류: ${err instanceof Error ? err.message : "알 수 없는 오류"}`,
+            },
+          ],
+        }));
+      }
     } finally {
+      if (activeController === controller) activeController = null;
       set({ isLoading: false });
     }
   },
