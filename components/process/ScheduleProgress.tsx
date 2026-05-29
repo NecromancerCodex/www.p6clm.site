@@ -51,12 +51,20 @@ export function ScheduleProgress() {
         </div>
       )}
 
-      {summary && (
+      {summary && (() => {
+        // 베이스라인 미설정 시 계획 진도·편차 N/A — 근거 없는 수치 방지
+        const hasBaseline = summary.planned_percent != null && summary.schedule_variance != null;
+        const plannedPct = summary.planned_percent ?? 0;
+        return (
         <>
           <div className="sch-metrics" style={{ marginTop: 14 }}>
             <Metric label="실제 진도" value={`${summary.overall_percent}%`} big />
-            <Metric label="계획 진도" value={`${summary.planned_percent}%`} />
-            <Metric label="편차" value={`${summary.schedule_variance > 0 ? "+" : ""}${summary.schedule_variance}%p`} warn={summary.is_behind} />
+            <Metric label="계획 진도" value={hasBaseline ? `${summary.planned_percent}%` : "N/A"} />
+            <Metric
+              label="편차"
+              value={hasBaseline ? `${summary.schedule_variance! > 0 ? "+" : ""}${summary.schedule_variance}%p` : "—"}
+              warn={hasBaseline && summary.is_behind}
+            />
             <Metric label="완료" value={`${summary.completed_count}`} />
             <Metric label="진행" value={`${summary.in_progress_count}`} />
             <Metric label="미착수" value={`${summary.not_started_count}`} />
@@ -64,14 +72,23 @@ export function ScheduleProgress() {
             <Metric label="지연" value={`${summary.delayed.length}`} warn={summary.delayed.length > 0} />
           </div>
 
+          {!hasBaseline && (
+            <div className="sch-hint" style={{ marginTop: 8 }}>
+              <AlertTriangle size={14} /> 베이스라인(목표 일정)이 설정되지 않아 계획 진도·편차를 산출할 수 없습니다.
+              P6에서 베이스라인을 지정해 재업로드하면 계획 대비 분석이 표시됩니다.
+            </div>
+          )}
+
           {/* 진도 막대 */}
           <div className="sch-progress-bar-wrap">
             <div className="sch-progress-track">
-              <div className="sch-progress-planned" style={{ width: `${Math.min(100, summary.planned_percent)}%` }} title={`계획 ${summary.planned_percent}%`} />
+              {hasBaseline && (
+                <div className="sch-progress-planned" style={{ width: `${Math.min(100, plannedPct)}%` }} title={`계획 ${plannedPct}%`} />
+              )}
               <div className={`sch-progress-actual${summary.is_behind ? " behind" : ""}`} style={{ width: `${Math.min(100, summary.overall_percent)}%` }} title={`실제 ${summary.overall_percent}%`} />
             </div>
             <div className="sch-progress-legend">
-              <span><i className="dot planned" /> 계획 {summary.planned_percent}%</span>
+              <span><i className="dot planned" /> 계획 {hasBaseline ? `${plannedPct}%` : "N/A"}</span>
               <span><i className="dot actual" /> 실제 {summary.overall_percent}%</span>
             </div>
           </div>
@@ -115,7 +132,8 @@ export function ScheduleProgress() {
             </ul>
           )}
         </>
-      )}
+        );
+      })()}
     </div>
   );
 }

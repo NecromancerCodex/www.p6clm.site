@@ -92,6 +92,8 @@ export function GanttView() {
     }
   }, [file, projectName, upload]);
 
+  // 베이스라인(목표 일정) 미설정 시 계획 진도·편차는 N/A — 근거 없는 수치 표시 방지
+  const hasBaseline = summary != null && summary.planned_percent != null && summary.schedule_variance != null;
   const variance = summary?.schedule_variance ?? 0;
   const shownErr = localErr || error;
 
@@ -162,14 +164,26 @@ export function GanttView() {
       )}
 
       {summary && (
-        <div className="sch-metrics" style={{ marginTop: 14 }}>
-          <Metric label="실제 진도" value={`${summary.overall_percent}%`} />
-          <Metric label="계획 진도" value={`${summary.planned_percent}%`} />
-          <Metric label="편차" value={`${variance > 0 ? "+" : ""}${variance}%p`} warn={variance < 0} />
-          <Metric label="활동" value={`${summary.activity_count}개`} />
-          <Metric label="임계공정" value={`${summary.critical_count}개`} />
-          <Metric label="지연" value={`${summary.delayed.length}개`} warn={summary.delayed.length > 0} />
-        </div>
+        <>
+          <div className="sch-metrics" style={{ marginTop: 14 }}>
+            <Metric label="실제 진도" value={`${summary.overall_percent}%`} />
+            <Metric label="계획 진도" value={hasBaseline ? `${summary.planned_percent}%` : "N/A"} />
+            <Metric
+              label="편차"
+              value={hasBaseline ? `${variance > 0 ? "+" : ""}${variance}%p` : "—"}
+              warn={hasBaseline && variance < 0}
+            />
+            <Metric label="활동" value={`${summary.activity_count}개`} />
+            <Metric label="임계공정" value={`${summary.critical_count}개`} />
+            <Metric label="지연" value={`${summary.delayed.length}개`} warn={summary.delayed.length > 0} />
+          </div>
+          {!hasBaseline && (
+            <div className="sch-hint" style={{ marginTop: 8 }}>
+              <AlertTriangle size={14} /> 베이스라인(목표 일정)이 설정되지 않아 계획 진도·편차를 산출할 수 없습니다.
+              P6에서 베이스라인을 지정해 재업로드하면 계획 대비 분석이 표시됩니다.
+            </div>
+          )}
+        </>
       )}
 
       {ganttReady && tasks.length > 0 && (

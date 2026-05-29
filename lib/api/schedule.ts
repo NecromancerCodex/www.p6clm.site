@@ -59,8 +59,9 @@ export interface ScheduleReportDoc {
   project_finish: string;
   total_duration_days: number;
   overall_percent: number;
-  planned_percent: number;
-  schedule_variance: number;
+  planned_percent: number | null;   // 베이스라인 미설정 시 null (N/A)
+  schedule_variance: number | null; // 베이스라인 미설정 시 null (N/A)
+  baseline_valid?: boolean;
   activity_count: number;
   milestone_count: number;
   completed_count: number;
@@ -167,8 +168,9 @@ export interface ScheduleSummary {
   project_finish: string | null;
   total_duration_days: number;
   overall_percent: number;
-  planned_percent: number;
-  schedule_variance: number;
+  planned_percent: number | null;   // 베이스라인 미설정 시 null (N/A)
+  schedule_variance: number | null; // 베이스라인 미설정 시 null (N/A)
+  baseline_valid?: boolean;         // false = target 날짜가 실제 계획 미반영
   is_behind: boolean;
   activity_count: number;
   milestone_count: number;

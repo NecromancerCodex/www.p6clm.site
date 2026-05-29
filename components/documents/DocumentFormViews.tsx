@@ -514,7 +514,12 @@ export function ScheduleFormView({
 }) {
   // 진도 편차에 따른 상태 배지 색 (안전점검 risk 배지 클래스 재사용).
   const statusClass = doc.status_level === "지연" ? "sir-risk-high" : "sir-risk-low";
-  const varianceStr = `${doc.schedule_variance > 0 ? "+" : ""}${doc.schedule_variance}%p`;
+  // 베이스라인 미설정 시 계획 진도·편차 N/A — 근거 없는 수치 방지
+  const hasBaseline = doc.planned_percent != null && doc.schedule_variance != null;
+  const plannedStr = hasBaseline ? `${doc.planned_percent}%` : "N/A (베이스라인 미설정)";
+  const varianceStr = hasBaseline
+    ? `${doc.schedule_variance! > 0 ? "+" : ""}${doc.schedule_variance}%p`
+    : "N/A (베이스라인 미설정)";
   const criticalDelayed = doc.delayed.filter((d) => d.is_critical).length;
 
   async function copyAsText() {
@@ -534,7 +539,7 @@ export function ScheduleFormView({
       `전체 공기: ${doc.project_start} ~ ${doc.project_finish} (총 ${doc.total_duration_days}일)`,
       ``,
       `[2. 공정 현황 요약]`,
-      `실적 진도: ${doc.overall_percent}%  /  계획 진도: ${doc.planned_percent}%  /  편차: ${varianceStr}`,
+      `실적 진도: ${doc.overall_percent}%  /  계획 진도: ${plannedStr}  /  편차: ${varianceStr}`,
       `완료 ${doc.completed_count} / 진행 ${doc.in_progress_count} / 미착수 ${doc.not_started_count}  ·  임계공정 ${doc.critical_count}개`,
       ``,
       `[3. 지연·임계 공정]`,
@@ -617,8 +622,8 @@ export function ScheduleFormView({
             2. 공정 현황 요약
             <span className="sir-summary-badge">
               실적 <strong>{doc.overall_percent}%</strong> &nbsp;/&nbsp; 계획{" "}
-              <strong>{doc.planned_percent}%</strong> &nbsp;·&nbsp; 편차{" "}
-              <strong>{varianceStr}</strong>
+              <strong>{hasBaseline ? `${doc.planned_percent}%` : "N/A"}</strong> &nbsp;·&nbsp; 편차{" "}
+              <strong>{hasBaseline ? varianceStr : "—"}</strong>
             </span>
           </div>
           <table className="sir-info-table">
@@ -627,7 +632,7 @@ export function ScheduleFormView({
                 <th>실적 진도율</th>
                 <td>{doc.overall_percent}%</td>
                 <th>계획 진도율</th>
-                <td>{doc.planned_percent}%</td>
+                <td>{hasBaseline ? `${doc.planned_percent}%` : "N/A (베이스라인 미설정)"}</td>
               </tr>
               <tr>
                 <th>진행 현황</th>
@@ -647,7 +652,7 @@ export function ScheduleFormView({
           </table>
           <div className="sch-prog-wrap">
             <ProgressBar label="실적" pct={doc.overall_percent} variant="actual" />
-            <ProgressBar label="계획" pct={doc.planned_percent} variant="planned" />
+            {hasBaseline && <ProgressBar label="계획" pct={doc.planned_percent!} variant="planned" />}
           </div>
         </div>
 
