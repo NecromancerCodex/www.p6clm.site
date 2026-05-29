@@ -1,13 +1,14 @@
 "use client";
 
-import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X } from "lucide-react";
+import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Backdrop } from "../atoms/Backdrop";
 import { IconButton } from "../atoms/IconButton";
 import { useUiStore } from "../../stores/uiStore";
+import { useChatStore } from "../../stores/chatStore";
 
 const NAV_ITEMS = [
   { path: "/home", label: "AI 대화·문서작성", icon: Bot },
@@ -46,11 +47,43 @@ const NAV_ITEMS_AFTER = [
 
 export function WorkspaceSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const closeSidebar = useUiStore((s) => s.closeSidebar);
 
+  // 채팅 세션 (3C)
+  const sessions = useChatStore((s) => s.sessions);
+  const currentSessionId = useChatStore((s) => s.currentSessionId);
+  const loadSessions = useChatStore((s) => s.loadSessions);
+  const loadSession = useChatStore((s) => s.loadSession);
+  const newChat = useChatStore((s) => s.newChat);
+  const deleteSession = useChatStore((s) => s.deleteSession);
+
   const inProcess = pathname.startsWith(PROCESS_GROUP.basePath);
   const [processOpen, setProcessOpen] = useState(inProcess);
+
+  /** 최근 대화 목록 로드 (mount 1회) */
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
+
+  const handleNewChat = () => {
+    newChat();
+    closeSidebar();
+    if (pathname !== "/home") router.push("/home");
+  };
+
+  const handleSessionClick = (id: number) => {
+    void loadSession(id);
+    closeSidebar();
+    if (pathname !== "/home") router.push("/home");
+  };
+
+  const handleDeleteSession = (e: React.MouseEvent, id: number, title: string | null) => {
+    e.stopPropagation();
+    if (!window.confirm(`"${title || "새 대화"}" 대화를 삭제할까요?`)) return;
+    void deleteSession(id);
+  };
 
   /** 공정관리 경로 진입 시 그룹 자동 펼침 */
   useEffect(() => {
@@ -110,6 +143,40 @@ export function WorkspaceSidebar() {
 
         <nav className="ws-nav">
           {NAV_ITEMS.map(renderFlat)}
+
+          {/* 채팅 세션 (3C) — 새 채팅 + 최근 대화 */}
+          <button type="button" className="ws-newchat-btn" onClick={handleNewChat}>
+            <Plus size={15} strokeWidth={2.4} />
+            <span>새 채팅</span>
+          </button>
+          {sessions.length > 0 && (
+            <div className="ws-chat-list">
+              {sessions.map((s) => {
+                const active = currentSessionId === s.id && pathname === "/home";
+                return (
+                  <div
+                    key={s.id}
+                    className={`ws-chat-item${active ? " active" : ""}`}
+                    onClick={() => handleSessionClick(s.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSessionClick(s.id); }}
+                  >
+                    <MessageSquare size={13} strokeWidth={1.8} className="ws-chat-icon" />
+                    <span className="ws-chat-title">{s.title || "새 대화"}</span>
+                    <button
+                      type="button"
+                      className="ws-chat-del"
+                      aria-label="대화 삭제"
+                      onClick={(e) => handleDeleteSession(e, s.id, s.title)}
+                    >
+                      <Trash2 size={12} strokeWidth={1.8} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* 공정관리 확장 그룹 */}
           <button

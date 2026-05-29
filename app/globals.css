@@ -1715,6 +1715,72 @@ select {
   font-weight: 600;
 }
 
+/* ── 채팅 세션 (3C) — 새 채팅 + 최근 대화 목록 ─────────────── */
+.ws-newchat-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0 2px;
+  padding: 8px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--muted-strong);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+.ws-newchat-btn:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.ws-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px;
+  max-height: 38vh;
+  overflow-y: auto;
+}
+
+.ws-chat-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: var(--radius-s, 6px);
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ws-chat-item:hover { background: var(--surface-muted); }
+.ws-chat-item.active { background: var(--primary-soft); color: var(--primary); }
+.ws-chat-icon { flex-shrink: 0; opacity: 0.6; }
+.ws-chat-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-chat-del {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s, background 0.12s;
+}
+.ws-chat-item:hover .ws-chat-del { opacity: 1; }
+.ws-chat-del:hover { color: #dc2626; background: rgba(220, 38, 38, 0.1); }
+
 .ws-sidebar-footer {
   padding: 12px 16px;
   border-top: 1px solid var(--line);

@@ -71,4 +71,29 @@ export interface JobsSlice {
   trackJob: (job: TriggeredJob) => void;
 }
 
-export type ChatStore = MessageSlice & InputSlice & MediaSlice & JobsSlice;
+/* ── 채팅 세션 영속화 (3C) ───────────────────────────────── */
+
+export interface ChatSessionSummaryT {
+  id: number;
+  title: string | null;
+  message_count: number;
+  updated_at: string;
+}
+
+export interface SessionSlice {
+  /** 현재 활성 세션 id. null = 새 채팅(미저장). 첫 응답에서 백엔드가 부여. */
+  currentSessionId: number | null;
+  /** 사이드바 최근 대화 목록. */
+  sessions: ChatSessionSummaryT[];
+  setSessionId: (id: number | null) => void;
+  /** 세션 목록 새로고침 (사이드바 mount/턴 완료 후). */
+  loadSessions: () => Promise<void>;
+  /** 세션 메시지 로드 → 현재 대화로 복원. */
+  loadSession: (id: number) => Promise<void>;
+  /** 새 채팅 시작 — 메시지·세션 id 초기화. */
+  newChat: () => void;
+  /** 세션 삭제 (현재 세션이면 새 채팅으로). */
+  deleteSession: (id: number) => Promise<void>;
+}
+
+export type ChatStore = MessageSlice & InputSlice & MediaSlice & JobsSlice & SessionSlice;

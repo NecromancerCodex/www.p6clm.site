@@ -67,7 +67,12 @@ export const createMessageSlice: StateCreator<ChatStore, [], [], MessageSlice> =
         res = await fetch("/api/cbot/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, history: historyPayload }),
+          // session_id 동봉 — 백엔드가 영속화 후 (신규면 새 id) 반환.
+          body: JSON.stringify({
+            message: text,
+            history: historyPayload,
+            session_id: get().currentSessionId,
+          }),
           signal: controller.signal,
         });
       }
@@ -82,6 +87,11 @@ export const createMessageSlice: StateCreator<ChatStore, [], [], MessageSlice> =
         triggeredJob: data.triggered_job ?? undefined,
       };
       set((s) => ({ messages: [...s.messages, assistantMsg] }));
+      // 세션 id 갱신(신규 생성 시) + 사이드바 목록 새로고침.
+      if (typeof data.session_id === "number") {
+        set({ currentSessionId: data.session_id });
+        void get().loadSessions();
+      }
     } catch (err) {
       // 사용자 취소(abort)는 오류가 아님 — 조용한 시스템 메시지로 구분.
       if (controller.signal.aborted) {
