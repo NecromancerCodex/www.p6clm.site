@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { fetchMe, googleLoginUrl } from "../../lib/auth";
@@ -12,7 +12,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   forbidden: "접근이 허용되지 않은 계정입니다. 관리자에게 문의하세요.",
 };
 
-export default function LoginPage() {
+// useSearchParams() 는 Suspense 경계 필수 (Next App Router prerender 요건).
+function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
   const errorCode = params.get("error");
@@ -73,5 +74,19 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="login-screen">
+          <div className="login-card"><div className="login-spinner" aria-label="로딩 중" /></div>
+        </div>
+      }
+    >
+      <LoginInner />
+    </Suspense>
   );
 }
