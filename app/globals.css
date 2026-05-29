@@ -4456,3 +4456,60 @@ select {
 .ws-subnav-item.active .ws-subnav-dot { opacity: 1; }
 
 .sch-snap-select { flex: 1 1 280px; min-width: 200px; cursor: pointer; }
+
+/* ── 로그인 화면 (027 Google 소셜 로그인) ───────────────────────── */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #f8fafc 0%, #eef2f7 100%);
+  padding: 20px;
+}
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 36px 28px;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+  text-align: center;
+}
+.login-logo { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-bottom: 18px; }
+.login-logo-mark { font-size: 30px; }
+.login-logo strong { font-size: 1.25rem; color: #0f172a; margin-top: 4px; }
+.login-sub { font-size: 0.8rem; color: #64748b; }
+.login-desc { font-size: 0.9rem; color: #475569; margin: 0 0 18px; }
+.login-google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 11px 16px;
+  border: 1px solid #dadce0; border-radius: 8px;
+  background: #fff; color: #1f2937;
+  font-size: 0.92rem; font-weight: 600; text-decoration: none;
+  transition: background 0.14s, box-shadow 0.14s;
+}
+.login-google-btn:hover { background: #f8fafc; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.login-error {
+  background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+  border-radius: 8px; padding: 9px 12px; font-size: 0.83rem; margin-bottom: 14px;
+}
+.login-footer { font-size: 0.74rem; color: #94a3b8; margin: 16px 0 0; }
+.login-spinner {
+  width: 28px; height: 28px; margin: 8px auto;
+  border: 3px solid #e2e8f0; border-top-color: #3b82f6;
+  border-radius: 50%; animation: login-spin 0.7s linear infinite;
+}
+@keyframes login-spin { to { transform: rotate(360deg); } }
+
+/* 사이드바 로그아웃 버튼 */
+.ws-logout-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 7px 10px; margin-bottom: 8px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-m);
+  background: transparent; color: var(--muted-strong);
+  font-size: 0.82rem; font-weight: 500; cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+}
+.ws-logout-btn:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+.ws-version { font-size: 0.72rem; color: var(--muted); }

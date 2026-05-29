@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2 } from "lucide-react";
+import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -9,6 +9,7 @@ import { Backdrop } from "../atoms/Backdrop";
 import { IconButton } from "../atoms/IconButton";
 import { useUiStore } from "../../stores/uiStore";
 import { useChatStore } from "../../stores/chatStore";
+import { logout } from "../../lib/auth";
 
 const NAV_ITEMS = [
   { path: "/home", label: "AI 대화·문서작성", icon: Bot },
@@ -222,7 +223,15 @@ export function WorkspaceSidebar() {
         </nav>
 
         <div className="ws-sidebar-footer">
-          <span>v0.4.0 — 공정관리 PoC</span>
+          <button
+            type="button"
+            className="ws-logout-btn"
+            onClick={async () => { await logout(); router.replace("/login"); }}
+          >
+            <LogOut size={15} strokeWidth={1.9} />
+            <span>로그아웃</span>
+          </button>
+          <span className="ws-version">v0.4.0 — 공정관리 PoC</span>
         </div>
       </aside>
     </>
