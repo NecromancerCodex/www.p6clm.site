@@ -113,6 +113,12 @@ async function request<T>(
   }
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  if (res.status === 401 && typeof window !== "undefined") {
+    // 세션 만료 → 빈 화면 대신 로그인 유도 (2026-06-01)
+    const next = encodeURIComponent(window.location.pathname);
+    window.location.href = `/login?next=${next}`;
+    throw new DocumentApiError(401, "세션이 만료되었습니다. 다시 로그인해 주세요.");
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     const detail =
