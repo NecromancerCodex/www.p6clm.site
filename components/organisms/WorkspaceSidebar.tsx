@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut } from "lucide-react";
+import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut, Phone } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -9,10 +9,15 @@ import { Backdrop } from "../atoms/Backdrop";
 import { IconButton } from "../atoms/IconButton";
 import { useUiStore } from "../../stores/uiStore";
 import { useChatStore } from "../../stores/chatStore";
-import { logout } from "../../lib/auth";
+import { logout, fetchMe } from "../../lib/auth";
 
 const NAV_ITEMS = [
   { path: "/home", label: "AI 대화·문서작성", icon: Bot },
+];
+
+// admin 전용 메뉴 (무전 전화 내역 — STT 검증·보고서 근거 추적)
+const ADMIN_NAV_ITEMS = [
+  { path: "/calls", label: "전화 내역", icon: Phone },
 ];
 
 // 공정관리 — 확장형 그룹 (pmisx 구조 재현)
@@ -63,10 +68,22 @@ export function WorkspaceSidebar() {
   const inProcess = pathname.startsWith(PROCESS_GROUP.basePath);
   const [processOpen, setProcessOpen] = useState(inProcess);
 
+  // admin 여부 (전화 내역 메뉴 노출 제어) — fetchMe 는 AuthGuard 가 이미 호출, 캐시 재사용
+  const [isAdmin, setIsAdmin] = useState(false);
+
   /** 최근 대화 목록 로드 (mount 1회) */
   useEffect(() => {
     void loadSessions();
   }, [loadSessions]);
+
+  /** admin 여부 확인 (mount 1회) */
+  useEffect(() => {
+    let alive = true;
+    void fetchMe().then((u) => {
+      if (alive) setIsAdmin(u?.role === "admin");
+    });
+    return () => { alive = false; };
+  }, []);
 
   const handleNewChat = () => {
     newChat();
@@ -220,6 +237,9 @@ export function WorkspaceSidebar() {
           )}
 
           {NAV_ITEMS_AFTER.map(renderFlat)}
+
+          {/* admin 전용 — 무전 전화 내역 */}
+          {isAdmin && ADMIN_NAV_ITEMS.map(renderFlat)}
         </nav>
 
         <div className="ws-sidebar-footer">
