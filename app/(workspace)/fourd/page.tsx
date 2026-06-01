@@ -15,6 +15,7 @@ import { FourDViewer } from "../../../components/fourd/FourDViewer";
 import { uploadSchedule } from "../../../lib/api/schedule";
 import {
   buildScheduleIndex,
+  decodeActId,
   matchAll,
   type MatchResult,
   type MatchSummary,
@@ -28,6 +29,8 @@ interface Ready {
   ranges: Map<string, MatchResult>;
   index: ScheduleIndex;
   summary: MatchSummary;
+  taskCount: number; // 공정표 총 활동 수
+  codeCount: number; // 그 중 4D 코드 디코드 성공 수
 }
 
 function Dropzone({
@@ -105,17 +108,32 @@ export default function FourDPage() {
     setError(null);
     setReady(null);
     try {
-      // 1) 공정표 업로드 → tasks
+      // 1) 공정표 → tasks
+      //    .xer 는 브라우저에서 직접 파싱(백엔드가 4D 코드/target 날짜를 안 돌려줌).
+      //    .xml(PMXML) 은 기존 백엔드 업로드 경로 유지.
       setProgress({ p: 0.05, msg: "공정표 파싱 중…" });
-      const snap = await uploadSchedule(scheduleFile);
-      const rawTasks = (snap.tasks ?? []) as unknown as Array<Record<string, unknown>>;
-      const tasks: ScheduleTask[] = rawTasks.map((t) => ({
-        code: String(t.activity_code ?? t.code ?? t.id ?? ""),
-        name: t.name as string | undefined,
-        start: (t.start ?? t.baseline_start_date ?? null) as string | null,
-        end: (t.end ?? t.baseline_finish_date ?? null) as string | null,
-        progress: t.progress as number | undefined,
-      }));
+      let tasks: ScheduleTask[];
+      if (/\.xer$/i.test(scheduleFile.name)) {
+        const { parseXerTasks } = await import("../../../lib/fourd/xer");
+        tasks = parseXerTasks(await scheduleFile.text());
+      } else {
+        const snap = await uploadSchedule(scheduleFile);
+        const rawTasks = (snap.tasks ?? []) as unknown as Array<Record<string, unknown>>;
+        tasks = rawTasks.map((t) => ({
+          code: String(t.activity_code ?? t.code ?? t.id ?? ""),
+          name: t.name as string | undefined,
+          start: (t.start ?? t.baseline_start_date ?? null) as string | null,
+          end: (t.end ?? t.baseline_finish_date ?? null) as string | null,
+          progress: t.progress as number | undefined,
+        }));
+      }
+      const codeCount = tasks.filter((t) => decodeActId(t.code)).length;
+      if (codeCount === 0) {
+        throw new Error(
+          `공정표 ${tasks.length}건 중 4D 코드(502HG…)를 0건 찾았습니다. ` +
+            `task_code 또는 UDF "Act ID_4D" 에 4D 코드가 있는 XER 인지 확인하세요.`,
+        );
+      }
       const index = buildScheduleIndex(tasks);
 
       // 2) IFC 파싱 (브라우저 web-ifc, 동적 import — SSR 회피)
@@ -127,7 +145,7 @@ export default function FourDPage() {
       setProgress({ p: 1, msg: "매칭 중…" });
       const { ranges, summary } = matchAll(parsed.elements, index);
 
-      setReady({ parsed, ranges, index, summary });
+      setReady({ parsed, ranges, index, summary, taskCount: tasks.length, codeCount });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -187,6 +205,7 @@ export default function FourDPage() {
       {ready && (
         <>
           <div style={{ fontSize: 13, color: "#475569" }}>
+            공정 {ready.taskCount.toLocaleString()}건(4D코드 {ready.codeCount.toLocaleString()}) ·{" "}
             요소 {ready.summary.total.toLocaleString()}개 중{" "}
             <strong style={{ color: "#10b981" }}>{ready.summary.matched.toLocaleString()}개 매칭</strong>{" "}
             ({Math.round((ready.summary.matched / Math.max(ready.summary.total, 1)) * 100)}%)
