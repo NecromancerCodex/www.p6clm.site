@@ -30,7 +30,7 @@ let _api: IfcAPI | null = null;
 async function getApi(): Promise<IfcAPI> {
   if (_api) return _api;
   const api = new IfcAPI();
-  api.SetWasmPath("/web-ifc/"); // public/web-ifc/web-ifc.wasm
+  api.SetWasmPath("/web-ifc/", true); // absolute=true → origin 루트(/web-ifc/web-ifc.wasm)에서 로드. false면 JS 청크 상대경로(_next/static/chunks/web-ifc/)로 붙어 404
   await api.Init();
   _api = api;
   return api;
