@@ -40,11 +40,15 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  // 슬라이더 격자: min/max/value 를 모두 일(日) 경계(DAY 배수)로 스냅.
-  // 안 그러면 controlled range input 이 value↔step 불일치로 onChange 무한 재발화(React #185).
+  // 슬라이더는 정수 day-index(0..numDays)로 구동한다. epoch ms 격자로 돌리면
+  // value↔step 불일치로 controlled input 이 onChange 무한 재발화(React #185)를 일으킨다.
   const tMin = useMemo(() => Math.floor(index.minDate / DAY) * DAY, [index.minDate]);
-  const tMax = useMemo(() => Math.ceil(index.maxDate / DAY) * DAY, [index.maxDate]);
-  const [dateMs, setDateMs] = useState<number>(tMax);
+  const numDays = useMemo(
+    () => Math.max(1, Math.ceil((index.maxDate - index.minDate) / DAY)),
+    [index.minDate, index.maxDate],
+  );
+  const [dayIdx, setDayIdx] = useState<number>(numDays); // 초기: 마지막 날(완료 시점)
+  const dateMs = tMin + dayIdx * DAY;
   const [kpi, setKpi] = useState({ done: 0, active: 0, planned: 0, ghost: 0 });
 
   // ── three.js 씬 1회 셋업 ──
@@ -132,13 +136,17 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
       }
     }
     attr.needsUpdate = true;
-    setKpi(counts);
+    setKpi((prev) =>
+      prev.done === counts.done &&
+      prev.active === counts.active &&
+      prev.planned === counts.planned &&
+      prev.ghost === counts.ghost
+        ? prev
+        : counts,
+    );
   }, [dateMs, parsed, ranges]);
 
-  const pct = useMemo(() => {
-    const span = tMax - tMin || 1;
-    return Math.round(((dateMs - tMin) / span) * 100);
-  }, [dateMs, tMin, tMax]);
+  const pct = Math.round((dayIdx / numDays) * 100);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 8 }}>
@@ -157,11 +165,11 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
         <strong style={{ minWidth: 96 }}>{fmt(dateMs)}</strong>
         <input
           type="range"
-          min={tMin}
-          max={tMax}
-          step={DAY}
-          value={dateMs}
-          onChange={(e) => setDateMs(Number(e.target.value))}
+          min={0}
+          max={numDays}
+          step={1}
+          value={dayIdx}
+          onChange={(e) => setDayIdx(Number(e.target.value))}
           style={{ flex: 1 }}
           aria-label="공정 시뮬레이션 날짜"
         />
@@ -169,7 +177,7 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9ca3af" }}>
         <span>{fmt(tMin)}</span>
-        <span>{fmt(tMax)}</span>
+        <span>{fmt(tMin + numDays * DAY)}</span>
       </div>
     </div>
   );

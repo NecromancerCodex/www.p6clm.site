@@ -31,6 +31,12 @@ interface Ready {
   summary: MatchSummary;
   taskCount: number; // 공정표 총 활동 수
   codeCount: number; // 그 중 4D 코드 디코드 성공 수
+  diag: {
+    storeyNonNull: number; // storeyName 이 있는 요소 수
+    sampleStoreys: string[]; // 샘플 층이름(raw)
+    indexStoreys: string[]; // 스케줄 인덱스가 가진 층키
+    topVia: string; // byVia 상위 요약
+  };
 }
 
 function Dropzone({
@@ -145,7 +151,34 @@ export default function FourDPage() {
       setProgress({ p: 1, msg: "매칭 중…" });
       const { ranges, summary } = matchAll(parsed.elements, index);
 
-      setReady({ parsed, ranges, index, summary, taskCount: tasks.length, codeCount });
+      // 진단 — 0매칭 시 어디서 끊겼는지 가시화
+      const storeyNonNull = parsed.elements.filter((e) => e.storeyName).length;
+      const sampleStoreys = Array.from(
+        new Set(parsed.elements.map((e) => e.storeyName).filter(Boolean) as string[]),
+      ).slice(0, 6);
+      const indexStoreys = Array.from(
+        new Set([
+          ...index.crByStorey.keys(),
+          ...index.ftStoreys.keys(),
+          ...index.moByStorey.keys(),
+          ...index.prStoreys.keys(),
+        ]),
+      ).sort();
+      const topVia = Object.entries(summary.byVia)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([k, v]) => `${k}:${v}`)
+        .join("  ");
+
+      setReady({
+        parsed,
+        ranges,
+        index,
+        summary,
+        taskCount: tasks.length,
+        codeCount,
+        diag: { storeyNonNull, sampleStoreys, indexStoreys, topVia },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -220,6 +253,15 @@ export default function FourDPage() {
               새로 분석
             </button>
           </div>
+          <details style={{ fontSize: 12, color: "#64748b" }}>
+            <summary style={{ cursor: "pointer" }}>진단 (매칭 디버그)</summary>
+            <div style={{ marginTop: 6, lineHeight: 1.7, fontFamily: "monospace" }}>
+              <div>storey 보유 요소: {ready.diag.storeyNonNull.toLocaleString()} / {ready.summary.total.toLocaleString()}</div>
+              <div>IFC 층이름 샘플: {ready.diag.sampleStoreys.join(" | ") || "(없음)"}</div>
+              <div>스케줄 층키: {ready.diag.indexStoreys.join(", ") || "(없음)"}</div>
+              <div>byVia: {ready.diag.topVia}</div>
+            </div>
+          </details>
           <div style={{ flex: 1, minHeight: 400 }}>
             <FourDViewer parsed={ready.parsed} ranges={ready.ranges} index={ready.index} />
           </div>
