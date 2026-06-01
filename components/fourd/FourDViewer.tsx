@@ -114,36 +114,42 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
     };
   }, [parsed]);
 
-  // ── 날짜 변경 → 색상 갱신 ──
+  // ── 날짜 변경 → 색상 갱신 (RAF 스로틀) ──
+  // 드래그 중 onChange 가 프레임당 수십 번 발생하면 10,890개 정점색 재계산이 동기로
+  // 쌓여 React 19 가 업데이트 폭주(#185)로 판단할 수 있다. 직전 프레임을 취소하고
+  // 마지막 값만 계산해 프레임당 1회로 합친다.
   useEffect(() => {
     const attr = colorAttrRef.current;
     if (!attr) return;
-    const arr = attr.array as Float32Array;
-    const counts = { done: 0, active: 0, planned: 0, ghost: 0 };
-    for (const el of parsed.elements) {
-      const mr = ranges.get(el.globalId);
-      const st = statusAt(dateMs, mr?.range ?? null);
-      const c = colorFor(st);
-      if (st === 2) counts.done++;
-      else if (st === 1) counts.active++;
-      else if (st === 0) counts.planned++;
-      else counts.ghost++;
-      const end = (el.vStart + el.vCount) * 3;
-      for (let i = el.vStart * 3; i < end; i += 3) {
-        arr[i] = c[0];
-        arr[i + 1] = c[1];
-        arr[i + 2] = c[2];
+    const raf = requestAnimationFrame(() => {
+      const arr = attr.array as Float32Array;
+      const counts = { done: 0, active: 0, planned: 0, ghost: 0 };
+      for (const el of parsed.elements) {
+        const mr = ranges.get(el.globalId);
+        const st = statusAt(dateMs, mr?.range ?? null);
+        const c = colorFor(st);
+        if (st === 2) counts.done++;
+        else if (st === 1) counts.active++;
+        else if (st === 0) counts.planned++;
+        else counts.ghost++;
+        const end = (el.vStart + el.vCount) * 3;
+        for (let i = el.vStart * 3; i < end; i += 3) {
+          arr[i] = c[0];
+          arr[i + 1] = c[1];
+          arr[i + 2] = c[2];
+        }
       }
-    }
-    attr.needsUpdate = true;
-    setKpi((prev) =>
-      prev.done === counts.done &&
-      prev.active === counts.active &&
-      prev.planned === counts.planned &&
-      prev.ghost === counts.ghost
-        ? prev
-        : counts,
-    );
+      attr.needsUpdate = true;
+      setKpi((prev) =>
+        prev.done === counts.done &&
+        prev.active === counts.active &&
+        prev.planned === counts.planned &&
+        prev.ghost === counts.ghost
+          ? prev
+          : counts,
+      );
+    });
+    return () => cancelAnimationFrame(raf);
   }, [dateMs, parsed, ranges]);
 
   const pct = Math.round((dayIdx / numDays) * 100);

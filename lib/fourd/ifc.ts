@@ -9,7 +9,7 @@
  * 'use client' 컴포넌트에서만 동적 import 로 사용 (SSR 불가).
  */
 import * as THREE from "three";
-import { IfcAPI } from "web-ifc";
+import { IfcAPI, IFCRELCONTAINEDINSPATIALSTRUCTURE } from "web-ifc";
 
 import type { IfcElementMeta } from "./match";
 
@@ -67,7 +67,7 @@ function decodeIfcString(s: string): string {
 /** 요소 expressID → 소속 층 이름 (IfcRelContainedInSpatialStructure). */
 function buildStoreyMap(api: IfcAPI, modelID: number): Map<number, string> {
   const map = new Map<number, string>();
-  const RELS = api.GetLineIDsWithType(modelID, /* IFCRELCONTAINEDINSPATIALSTRUCTURE */ 1095909175);
+  const RELS = api.GetLineIDsWithType(modelID, IFCRELCONTAINEDINSPATIALSTRUCTURE);
   for (let i = 0; i < RELS.size(); i++) {
     const rel = api.GetLine(modelID, RELS.get(i));
     const struct = rel.RelatingStructure;
