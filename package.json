@@ -6,7 +6,9 @@
     "dev": "next dev --webpack --hostname 0.0.0.0 --port 1999",
     "build": "next build",
     "start": "next start --hostname 0.0.0.0 --port 1999",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "node scripts/copy-wasm.mjs",
+    "prebuild": "node scripts/copy-wasm.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1011.0",
@@ -19,12 +21,15 @@
     "regenerator-runtime": "^0.14.1",
     "remark-gfm": "^4.0.1",
     "speak-tts": "^2.0.8",
+    "three": "^0.182.0",
+    "web-ifc": "^0.0.68",
     "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@types/node": "25.5.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "^0.182.0",
     "eslint": "9.39.1",
     "eslint-config-next": "16.1.6",
     "typescript": "5.9.3"

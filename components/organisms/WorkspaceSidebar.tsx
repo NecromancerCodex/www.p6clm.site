@@ -41,6 +41,7 @@ const PROCESS_GROUP = {
         { path: "/schedule/progress",     label: "공정 진도율" },
         { path: "/schedule/resource",     label: "자원 계획·실적" },
         { path: "/schedule/performance",  label: "실적 분석" },
+        { path: "/fourd",                 label: "4D 시뮬레이션" },
       ],
     },
   ],

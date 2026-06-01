@@ -1,0 +1,201 @@
+/**
+ * 클라이언트 IFC 파서 (web-ifc WASM) → three.js 지오메트리 + 요소 메타.
+ *
+ * 성능: 16k+ 요소를 개별 Mesh로 만들면 draw call 폭발 → 단일 BufferGeometry +
+ * 정점색상(vertexColors) 으로 합치고, 요소별 정점 범위(vStart/vCount)를 기록해
+ * 타임라인 변경 시 해당 범위 색만 갱신한다 (1 draw call).
+ *
+ * web-ifc wasm 은 /public/web-ifc/ 에서 서빙 (SetWasmPath).
+ * 'use client' 컴포넌트에서만 동적 import 로 사용 (SSR 불가).
+ */
+import * as THREE from "three";
+import { IfcAPI } from "web-ifc";
+
+import type { IfcElementMeta } from "./match";
+
+export interface ParsedElement extends IfcElementMeta {
+  vStart: number; // 정점 시작 인덱스
+  vCount: number; // 정점 개수
+}
+
+export interface ParsedIfc {
+  geometry: THREE.BufferGeometry; // position + normal + color(동적)
+  elements: ParsedElement[];
+  center: THREE.Vector3;
+  radius: number;
+}
+
+let _api: IfcAPI | null = null;
+
+async function getApi(): Promise<IfcAPI> {
+  if (_api) return _api;
+  const api = new IfcAPI();
+  api.SetWasmPath("/web-ifc/"); // public/web-ifc/web-ifc.wasm
+  await api.Init();
+  _api = api;
+  return api;
+}
+
+/** 요소 expressID → 소속 층 이름 (IfcRelContainedInSpatialStructure). */
+function buildStoreyMap(api: IfcAPI, modelID: number): Map<number, string> {
+  const map = new Map<number, string>();
+  const RELS = api.GetLineIDsWithType(modelID, /* IFCRELCONTAINEDINSPATIALSTRUCTURE */ 1095909175);
+  for (let i = 0; i < RELS.size(); i++) {
+    const rel = api.GetLine(modelID, RELS.get(i));
+    const struct = rel.RelatingStructure;
+    let name = "";
+    try {
+      const s = api.GetLine(modelID, struct.value);
+      name = s.Name?.value ?? "";
+    } catch {
+      name = "";
+    }
+    const related = rel.RelatedElements ?? [];
+    for (const r of related) {
+      map.set(r.value, name);
+    }
+  }
+  return map;
+}
+
+const WANTED_TYPES = new Set([
+  "IFCWALL",
+  "IFCWALLSTANDARDCASE",
+  "IFCSLAB",
+  "IFCBEAM",
+  "IFCCOLUMN",
+  "IFCFOOTING",
+  "IFCBUILDINGELEMENTPROXY",
+  "IFCCOVERING",
+  "IFCRAILING",
+  "IFCMEMBER",
+  "IFCPLATE",
+]);
+
+function toPascalIfc(upper: string): string {
+  // "IFCWALLSTANDARDCASE" → "IfcWallStandardCase" (match.ts classify 와 호환)
+  const map: Record<string, string> = {
+    IFCWALL: "IfcWall",
+    IFCWALLSTANDARDCASE: "IfcWallStandardCase",
+    IFCSLAB: "IfcSlab",
+    IFCBEAM: "IfcBeam",
+    IFCCOLUMN: "IfcColumn",
+    IFCFOOTING: "IfcFooting",
+    IFCBUILDINGELEMENTPROXY: "IfcBuildingElementProxy",
+    IFCCOVERING: "IfcCovering",
+    IFCRAILING: "IfcRailing",
+    IFCMEMBER: "IfcMember",
+    IFCPLATE: "IfcPlate",
+  };
+  return map[upper] ?? upper;
+}
+
+/**
+ * IFC ArrayBuffer → 파싱 결과.
+ * onProgress: 0~1 진행률 콜백.
+ */
+export async function parseIfc(
+  buffer: ArrayBuffer,
+  onProgress?: (p: number, msg: string) => void,
+): Promise<ParsedIfc> {
+  const api = await getApi();
+  onProgress?.(0.05, "모델 여는 중…");
+  const modelID = api.OpenModel(new Uint8Array(buffer));
+
+  onProgress?.(0.15, "층 구조 분석 중…");
+  const storeyMap = buildStoreyMap(api, modelID);
+
+  // 누적 버퍼
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const elements: ParsedElement[] = [];
+  const tmp = new THREE.Matrix4();
+  const v = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  const normalMat = new THREE.Matrix3();
+
+  onProgress?.(0.25, "지오메트리 스트리밍 중… (대용량 IFC는 1~2분)");
+
+  // 요소별 메타 캐시 (globalId/type) — GetLine 호출 최소화
+  const metaCache = new Map<number, { globalId: string; ifcType: string } | null>();
+  function meta(expressID: number) {
+    if (metaCache.has(expressID)) return metaCache.get(expressID)!;
+    let out: { globalId: string; ifcType: string } | null = null;
+    try {
+      const line = api.GetLine(modelID, expressID);
+      const typeCode = api.GetLineType(modelID, expressID);
+      const typeName = api.GetNameFromTypeCode(typeCode) as unknown as string;
+      out = {
+        globalId: line.GlobalId?.value ?? String(expressID),
+        ifcType: toPascalIfc(String(typeName).toUpperCase()),
+      };
+    } catch {
+      out = null;
+    }
+    metaCache.set(expressID, out);
+    return out;
+  }
+
+  let count = 0;
+  api.StreamAllMeshes(modelID, (flatMesh: any) => {
+    const expressID = flatMesh.expressID;
+    const m = meta(expressID);
+    if (!m) return;
+    if (!WANTED_TYPES.has(m.ifcType.toUpperCase())) return;
+
+    const vStart = positions.length / 3;
+    const placed = flatMesh.geometries;
+    for (let i = 0; i < placed.size(); i++) {
+      const pg = placed.get(i);
+      const geom = api.GetGeometry(modelID, pg.geometryExpressID);
+      const verts = api.GetVertexArray(geom.GetVertexData(), geom.GetVertexDataSize());
+      const idx = api.GetIndexArray(geom.GetIndexData(), geom.GetIndexDataSize());
+      const mat = pg.flatTransformation as number[];
+      tmp.fromArray(mat);
+      normalMat.getNormalMatrix(tmp);
+      // web-ifc 정점 = [px,py,pz,nx,ny,nz] interleaved. 인덱스로 삼각형 전개(비인덱스).
+      for (let k = 0; k < idx.length; k++) {
+        const base = idx[k] * 6;
+        v.set(verts[base], verts[base + 1], verts[base + 2]).applyMatrix4(tmp);
+        n.set(verts[base + 3], verts[base + 4], verts[base + 5]).applyMatrix3(normalMat).normalize();
+        positions.push(v.x, v.y, v.z);
+        normals.push(n.x, n.y, n.z);
+      }
+    }
+    const vCount = positions.length / 3 - vStart;
+    if (vCount > 0) {
+      elements.push({
+        globalId: m.globalId,
+        expressID,
+        ifcType: m.ifcType,
+        storeyName: storeyMap.get(expressID) ?? null,
+        vStart,
+        vCount,
+      });
+    }
+    count++;
+    if (count % 1000 === 0) onProgress?.(Math.min(0.9, 0.25 + count / 20000), `요소 ${count}개…`);
+  });
+
+  api.CloseModel(modelID);
+  onProgress?.(0.92, "버퍼 구성 중…");
+
+  const geometry = new THREE.BufferGeometry();
+  const posArr = new Float32Array(positions);
+  geometry.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
+  geometry.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(normals), 3));
+  // 색상 attribute (동적 갱신) — 초기 회색
+  const colArr = new Float32Array(positions.length).fill(0.6);
+  geometry.setAttribute("color", new THREE.BufferAttribute(colArr, 3));
+
+  geometry.computeBoundingSphere();
+  const bs = geometry.boundingSphere!;
+  onProgress?.(1, `완료 — 요소 ${elements.length}개`);
+
+  return {
+    geometry,
+    elements,
+    center: bs.center.clone(),
+    radius: bs.radius,
+  };
+}
