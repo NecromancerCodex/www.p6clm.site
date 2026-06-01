@@ -30,6 +30,7 @@ interface Props {
   index: ScheduleIndex;
 }
 
+const DAY = 86400000;
 function fmt(ms: number): string {
   const d = new Date(ms);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -39,7 +40,11 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const [dateMs, setDateMs] = useState<number>(index.maxDate);
+  // 슬라이더 격자: min/max/value 를 모두 일(日) 경계(DAY 배수)로 스냅.
+  // 안 그러면 controlled range input 이 value↔step 불일치로 onChange 무한 재발화(React #185).
+  const tMin = useMemo(() => Math.floor(index.minDate / DAY) * DAY, [index.minDate]);
+  const tMax = useMemo(() => Math.ceil(index.maxDate / DAY) * DAY, [index.maxDate]);
+  const [dateMs, setDateMs] = useState<number>(tMax);
   const [kpi, setKpi] = useState({ done: 0, active: 0, planned: 0, ghost: 0 });
 
   // ── three.js 씬 1회 셋업 ──
@@ -131,9 +136,9 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
   }, [dateMs, parsed, ranges]);
 
   const pct = useMemo(() => {
-    const span = index.maxDate - index.minDate || 1;
-    return Math.round(((dateMs - index.minDate) / span) * 100);
-  }, [dateMs, index]);
+    const span = tMax - tMin || 1;
+    return Math.round(((dateMs - tMin) / span) * 100);
+  }, [dateMs, tMin, tMax]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 8 }}>
@@ -152,9 +157,9 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
         <strong style={{ minWidth: 96 }}>{fmt(dateMs)}</strong>
         <input
           type="range"
-          min={index.minDate}
-          max={index.maxDate}
-          step={86400000}
+          min={tMin}
+          max={tMax}
+          step={DAY}
           value={dateMs}
           onChange={(e) => setDateMs(Number(e.target.value))}
           style={{ flex: 1 }}
@@ -163,8 +168,8 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
         <span style={{ minWidth: 44, textAlign: "right" }}>{pct}%</span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9ca3af" }}>
-        <span>{fmt(index.minDate)}</span>
-        <span>{fmt(index.maxDate)}</span>
+        <span>{fmt(tMin)}</span>
+        <span>{fmt(tMax)}</span>
       </div>
     </div>
   );

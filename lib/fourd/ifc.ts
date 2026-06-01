@@ -36,6 +36,34 @@ async function getApi(): Promise<IfcAPI> {
   return api;
 }
 
+/**
+ * IFC STEP 문자열 디코드. web-ifc 는 한글을 \X2\<UTF-16BE hex>\X0\ 로 raw 반환한다.
+ *   예: "502_1\X2\CE35\X0\ SL" → "502_1층 SL"  (CE35 = U+CE35 "층")
+ * \X2\…\X0\ (UTF-16BE) 와 \X\HH (latin1) 만 처리. 인코딩 없으면 원본 그대로.
+ */
+function decodeIfcString(s: string): string {
+  if (!s || s.indexOf("\\X") === -1) return s;
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    if (s.startsWith("\\X2\\", i)) {
+      i += 4;
+      let hex = "";
+      while (i < s.length && !s.startsWith("\\X0\\", i)) hex += s[i++];
+      i += 4; // \X0\ 스킵
+      for (let j = 0; j + 4 <= hex.length; j += 4) {
+        out += String.fromCharCode(parseInt(hex.slice(j, j + 4), 16));
+      }
+    } else if (s.startsWith("\\X\\", i)) {
+      out += String.fromCharCode(parseInt(s.slice(i + 3, i + 5), 16));
+      i += 5;
+    } else {
+      out += s[i++];
+    }
+  }
+  return out;
+}
+
 /** 요소 expressID → 소속 층 이름 (IfcRelContainedInSpatialStructure). */
 function buildStoreyMap(api: IfcAPI, modelID: number): Map<number, string> {
   const map = new Map<number, string>();
@@ -46,7 +74,7 @@ function buildStoreyMap(api: IfcAPI, modelID: number): Map<number, string> {
     let name = "";
     try {
       const s = api.GetLine(modelID, struct.value);
-      name = s.Name?.value ?? "";
+      name = decodeIfcString(s.Name?.value ?? "");
     } catch {
       name = "";
     }
