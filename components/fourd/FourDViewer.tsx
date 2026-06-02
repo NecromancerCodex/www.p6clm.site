@@ -83,6 +83,8 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const boxHelperRef = useRef<THREE.Box3Helper | null>(null);
   // 슬라이더는 정수 day-index(0..numDays)로 구동한다. epoch ms 격자로 돌리면
   // value↔step 불일치로 controlled input 이 onChange 무한 재발화(React #185)를 일으킨다.
   const tMin = useMemo(() => Math.floor(index.minDate / DAY) * DAY, [index.minDate]);
@@ -103,6 +105,7 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0e1116);
+    sceneRef.current = scene;
 
     const w = mount.clientWidth;
     const h = mount.clientHeight;
@@ -132,6 +135,17 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
     const mesh = new THREE.Mesh(parsed.geometry, material);
     scene.add(mesh);
     colorAttrRef.current = parsed.geometry.getAttribute("color") as THREE.BufferAttribute;
+
+    // 바닥 그리드 (공간 기준)
+    const grid = new THREE.GridHelper(parsed.radius * 4, 40, 0x334155, 0x1e293b);
+    grid.position.set(parsed.center.x, parsed.center.y - parsed.radius, parsed.center.z);
+    scene.add(grid);
+
+    // 그룹 영역 박스 (hover 시 갱신) — 처음엔 숨김
+    const boxHelper = new THREE.Box3Helper(new THREE.Box3(), new THREE.Color(0xfbbf24));
+    boxHelper.visible = false;
+    scene.add(boxHelper);
+    boxHelperRef.current = boxHelper;
 
     let raf = 0;
     const animate = () => {
@@ -222,6 +236,35 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
     });
     return () => cancelAnimationFrame(raf);
   }, [dateMs, parsed, ranges]);
+
+  // ── hover 그룹의 공간 영역(바운딩 박스) 표시 ──
+  // 같은 공정단위(via, 예 "CR@01" = 1층 코어)에 속한 모든 부재를 감싸는 박스 →
+  // "이 공정이 어디부터 어디까지인지" 가시화.
+  useEffect(() => {
+    const helper = boxHelperRef.current;
+    if (!helper) return;
+    const mr = hover ? ranges.get(hover.el.globalId) : undefined;
+    if (!mr?.range) {
+      helper.visible = false;
+      return;
+    }
+    const via = mr.via;
+    const pos = parsed.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const box = new THREE.Box3();
+    const v = new THREE.Vector3();
+    for (const el of parsed.elements) {
+      if (ranges.get(el.globalId)?.via !== via) continue;
+      const end = el.vStart + el.vCount;
+      for (let i = el.vStart; i < end; i++) box.expandByPoint(v.fromBufferAttribute(pos, i));
+    }
+    if (box.isEmpty()) {
+      helper.visible = false;
+      return;
+    }
+    helper.box.copy(box);
+    helper.visible = true;
+    helper.updateMatrixWorld(true);
+  }, [hover, parsed, ranges]);
 
   const pct = Math.round((dayIdx / numDays) * 100);
 
