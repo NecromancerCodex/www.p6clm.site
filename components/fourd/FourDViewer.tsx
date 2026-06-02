@@ -158,6 +158,7 @@ interface Props {
   ranges: Map<string, MatchResult>;
   minDate: number;
   maxDate: number;
+  activities?: { name: string; start: number; end: number }[];
 }
 
 const DAY = 86400000;
@@ -166,7 +167,7 @@ function fmt(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
+export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -592,6 +593,37 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
         <span>{fmt(tMin)}</span>
         <span>{fmt(tMin + numDays * DAY)}</span>
       </div>
+
+      {/* 공정표 (간트) — 활동 막대, 현재 날짜 동기 */}
+      {activities.length > 0 && (
+        <div style={{ borderTop: "1px solid #1e293b", paddingTop: 6 }}>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>공정표 ({activities.length}개 활동)</div>
+          <div style={{ position: "relative", maxHeight: 150, overflowY: "auto" }}>
+            {[...activities]
+              .sort((a, b) => a.start - b.start)
+              .map((a, i) => {
+                const span = tMin + numDays * DAY - tMin || 1;
+                const left = ((a.start - tMin) / span) * 100;
+                const w = Math.max(((a.end - a.start) / span) * 100, 0.4);
+                const done = dateMs >= a.end;
+                const active = dateMs >= a.start && dateMs < a.end;
+                const col = done ? "#10b981" : active ? "#22d3ee" : "#475569";
+                return (
+                  <div key={i} style={{ position: "relative", height: 11, marginBottom: 2 }}>
+                    <div
+                      title={a.name}
+                      style={{ position: "absolute", left: `${left}%`, width: `${w}%`, height: 9, top: 1, background: col, borderRadius: 2, opacity: done || active ? 1 : 0.55 }}
+                    />
+                  </div>
+                );
+              })}
+            {/* 현재 날짜 마커 */}
+            <div
+              style={{ position: "absolute", top: 0, bottom: 0, left: `${Math.min(Math.max(((dateMs - tMin) / (numDays * DAY || 1)) * 100, 0), 100)}%`, width: 1, background: "#f87171" }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

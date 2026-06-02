@@ -528,7 +528,21 @@ export default function FourDPage() {
             </div>
           </details>
           <div style={{ flex: 1, minHeight: 400 }}>
-            <FourDViewer parsed={ready.parsed} ranges={ready.ranges} minDate={ready.minDate} maxDate={ready.maxDate} />
+            <FourDViewer
+              parsed={ready.parsed}
+              ranges={ready.ranges}
+              minDate={ready.minDate}
+              maxDate={ready.maxDate}
+              activities={
+                ready.codeIndex
+                  ? [...ready.codeIndex.byKey.entries()].map(([k, r]) => ({
+                      name: ready.candidates.find((c) => c.key === k)?.name || k,
+                      start: r.start,
+                      end: r.end,
+                    }))
+                  : []
+              }
+            />
           </div>
         </>
       )}
