@@ -182,8 +182,10 @@ export interface CodeIndex {
 
 const codeKey = (trade: string, zone: string, storey: string, wt: string) =>
   `${trade}|${zone}|${storey}|${wt}`;
-const unitKey = (zone: string, storey: string, mtype: string, unit: string) =>
-  `MO|${zone}|${storey}|${mtype}|${unit}`;
+// 유닛 키 — 모듈 번호(unit)로만. 4D 코드의 type 필드(36/46)는 스케줄 내부코드라
+// BIM 실제 타입과 어긋난다(ZC 코드=46 ↔ BIM=36, 활동명은 둘 다 "36Type"). 그래서 제외.
+// pmisx 도 활동명의 모듈 번호로 매칭한다.
+const unitKey = (zone: string, storey: string, unit: string) => `MO|${zone}|${storey}|${unit}`;
 const phaseKey = (zone: string, storey: string, wt: string, phase: string) =>
   `ST|${zone}|${storey}|${wt}|${phase}`;
 
@@ -214,7 +216,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     maxD = Math.max(maxD, e);
     if (d.trade === "MO") {
       mergeRange(byKey, codeKey("MO", d.zone, d.storey, "MD"), s, e);
-      if (d.mtype && d.unit) mergeRange(byUnit, unitKey(d.zone, d.storey, d.mtype, d.unit), s, e);
+      if (d.unit) mergeRange(byUnit, unitKey(d.zone, d.storey, d.unit), s, e);
     } else {
       const wt = d.worktype ?? "";
       mergeRange(byKey, codeKey("ST", d.zone, d.storey, wt), s, e);
@@ -261,8 +263,8 @@ export function buildCandidates(tasks: ScheduleTask[]): Candidate[] {
 export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
   if (!el.trade || !el.zone || !el.storey4d) return { range: null, via: "no_meta" };
   if (el.trade === "MO") {
-    if (el.mtype && el.unit) {
-      const uk = unitKey(el.zone, el.storey4d, el.mtype, el.unit.padStart(2, "0"));
+    if (el.unit) {
+      const uk = unitKey(el.zone, el.storey4d, el.unit.padStart(2, "0"));
       const ru = idx.byUnit.get(uk);
       if (ru) return { range: ru, via: uk }; // 유닛 단위 (세분)
     }
