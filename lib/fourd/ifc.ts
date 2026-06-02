@@ -16,6 +16,9 @@ import type { IfcElementMeta } from "./match";
 export interface ParsedElement extends IfcElementMeta {
   vStart: number; // 정점 시작 인덱스
   vCount: number; // 정점 개수
+  cx: number; // bbox 중심 X (월드)
+  cy: number; // bbox 중심 Y (월드, 수직)
+  cz: number; // bbox 중심 Z (월드)
 }
 
 export interface ParsedIfc {
@@ -192,6 +195,17 @@ export async function parseIfc(
     }
     const vCount = positions.length / 3 - vStart;
     if (vCount > 0) {
+      // bbox 중심 (월드) — 그리드 베이 배정용
+      let mnx = Infinity, mny = Infinity, mnz = Infinity, mxx = -Infinity, mxy = -Infinity, mxz = -Infinity;
+      for (let i = vStart * 3; i < positions.length; i += 3) {
+        const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+        if (x < mnx) mnx = x;
+        if (x > mxx) mxx = x;
+        if (y < mny) mny = y;
+        if (y > mxy) mxy = y;
+        if (z < mnz) mnz = z;
+        if (z > mxz) mxz = z;
+      }
       elements.push({
         globalId: m.globalId,
         expressID,
@@ -199,6 +213,9 @@ export async function parseIfc(
         storeyName: storeyMap.get(expressID) ?? null,
         vStart,
         vCount,
+        cx: (mnx + mxx) / 2,
+        cy: (mny + mxy) / 2,
+        cz: (mnz + mxz) / 2,
       });
     }
     count++;
