@@ -293,11 +293,15 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
     const onResize = () => {
       const nw = mount.clientWidth;
       const nh = mount.clientHeight;
+      if (nw === 0 || nh === 0) return;
       camera.aspect = nw / nh;
       camera.updateProjectionMatrix();
       renderer.setSize(nw, nh);
     };
     window.addEventListener("resize", onResize);
+    // 컨테이너 크기 변화(공정표·토글로 뷰어 높이 변동)에도 캔버스 동기 → 레이캐스트 좌표 언싱크 방지
+    const ro = new ResizeObserver(() => onResize());
+    ro.observe(mount);
 
     // ── 마우스 오버 → 레이캐스트로 요소 식별 (70ms 스로틀) ──
     const ray = new THREE.Raycaster();
@@ -325,6 +329,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
 
     return () => {
       cancelAnimationFrame(raf);
+      ro.disconnect();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
