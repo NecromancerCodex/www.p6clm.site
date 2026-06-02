@@ -64,7 +64,9 @@ function workKo(wt: string | undefined, via: string): string {
 function procLabel(el: ParsedElement, via: string): string {
   if (el.zone && el.storey4d) {
     const st = el.storey4d === "PT" ? "기초" : el.storey4d === "RF" ? "지붕" : `${Number(el.storey4d)}층`;
-    const unit = el.unit ? ` ${el.unit}호` : "";
+    // via 가 유닛 키(…|숫자)면 유닛 단위 매칭, …|MD 면 구역단위 묶음(공정표에 유닛 활동 없음)
+    const isUnit = /\|\d+$/.test(via);
+    const unit = el.unit ? (isUnit ? ` ${el.unit}호` : ` ${el.unit}호(구역단위 묶음)`) : "";
     return `${el.zone} ${st} ${workKo(el.wt, via)}${unit}`;
   }
   return `${cleanStorey(el.storeyName)} ${workKo(el.wt, via)}`;
