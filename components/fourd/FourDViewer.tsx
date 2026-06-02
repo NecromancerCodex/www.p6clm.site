@@ -163,6 +163,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
   const [realistic, setRealistic] = useState(false);
   const realisticRef = useRef(false);
   realisticRef.current = realistic;
+  // 자유시점(WASD 이동) 모드
+  const [fly, setFly] = useState(false);
+  const flyRef = useRef(false);
+  flyRef.current = fly;
 
   // ── three.js 씬 1회 셋업 ──
   useEffect(() => {
@@ -208,8 +212,46 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
     grid.position.set(parsed.center.x, parsed.center.y - parsed.radius, parsed.center.z);
     scene.add(grid);
 
+    // ── WASD 자유시점 ── 누른 키 추적 → 카메라+타겟 함께 이동(마우스 회전 유지)
+    const keys: Record<string, boolean> = {};
+    const moveCodes = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft", "ControlLeft", "KeyQ", "KeyE"]);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!flyRef.current) return;
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      keys[e.code] = true;
+      if (moveCodes.has(e.code)) e.preventDefault();
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      keys[e.code] = false;
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    const clock = new THREE.Clock();
+    const fwd = new THREE.Vector3();
+    const right = new THREE.Vector3();
+    const move = new THREE.Vector3();
+
     let raf = 0;
     const animate = () => {
+      const dt = clock.getDelta();
+      if (flyRef.current) {
+        const spd = (parsed.radius || 50) * 1.4 * dt;
+        camera.getWorldDirection(fwd);
+        right.crossVectors(fwd, camera.up).normalize();
+        move.set(0, 0, 0);
+        if (keys["KeyW"]) move.add(fwd);
+        if (keys["KeyS"]) move.addScaledVector(fwd, -1);
+        if (keys["KeyD"]) move.add(right);
+        if (keys["KeyA"]) move.addScaledVector(right, -1);
+        if (keys["Space"] || keys["KeyE"]) move.y += 1;
+        if (keys["ShiftLeft"] || keys["ControlLeft"] || keys["KeyQ"]) move.y -= 1;
+        if (move.lengthSq() > 0) {
+          move.normalize().multiplyScalar(spd);
+          camera.position.add(move);
+          controls.target.add(move);
+        }
+      }
       controls.update();
       renderer.render(scene, camera);
       raf = requestAnimationFrame(animate);
@@ -252,6 +294,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
       renderer.domElement.removeEventListener("pointermove", onMove);
       renderer.domElement.removeEventListener("pointerleave", onLeave);
       controls.dispose();
@@ -433,9 +477,25 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
         <span style={{ color: "#60a5fa" }}>● 미착수 {kpi.planned.toLocaleString()}</span>
         <span style={{ color: "#6b7280" }}>● 미매칭 {kpi.ghost.toLocaleString()}</span>
         <button
-          onClick={() => setRealistic((v) => !v)}
+          onClick={() => setFly((v) => !v)}
           style={{
             marginLeft: "auto",
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: "1px solid " + (fly ? "#3b82f6" : "#475569"),
+            background: fly ? "#3b82f6" : "transparent",
+            color: fly ? "#fff" : "#94a3b8",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+          title="WASD 이동 · Space/E 위 · Shift/Q 아래 · 마우스 드래그 회전"
+        >
+          {fly ? "🎮 자유시점 ON (WASD)" : "자유시점 OFF"}
+        </button>
+        <button
+          onClick={() => setRealistic((v) => !v)}
+          style={{
             padding: "6px 12px",
             borderRadius: 999,
             border: "1px solid " + (realistic ? "#10b981" : "#475569"),
@@ -450,6 +510,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
           {realistic ? "🏗 실사 모드 ON" : "실사 모드 OFF"}
         </button>
       </div>
+      {fly && (
+        <div style={{ fontSize: 11, color: "#93c5fd", marginTop: -4 }}>
+          🎮 자유시점: W/A/S/D 이동 · Space·E 위 · Shift·Q 아래 · 마우스 드래그 시점 회전
+        </div>
+      )}
 
       {/* 타임라인 */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
