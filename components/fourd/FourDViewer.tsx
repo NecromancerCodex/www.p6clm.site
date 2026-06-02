@@ -102,12 +102,18 @@ function colorFor(status: number): number[] {
   return C_GHOST;
 }
 
-/** 실사 모드 — 부재 종류별 재질색 (콘크리트 등). */
+/** 실사 모드 — 부재 종류별 재질색 (콘크리트·유리·목재 등). */
 function materialColor(ifcType: string): number[] {
   if (ifcType === "IfcFooting") return [0.40, 0.40, 0.38]; // 기초 — 진한 콘크리트
   if (ifcType === "IfcWall" || ifcType === "IfcWallStandardCase" || ifcType === "IfcColumn")
     return [0.70, 0.70, 0.67]; // 코어 — 콘크리트 회색
   if (ifcType === "IfcSlab" || ifcType === "IfcBeam") return [0.62, 0.62, 0.59]; // 슬래브·보
+  if (ifcType === "IfcWindow" || ifcType === "IfcCurtainWall") return [0.42, 0.66, 0.82]; // 유리 — 청색
+  if (ifcType === "IfcDoor") return [0.55, 0.40, 0.26]; // 문 — 목재 갈색
+  if (ifcType === "IfcStair" || ifcType === "IfcStairFlight") return [0.66, 0.66, 0.63]; // 계단
+  if (ifcType === "IfcRailing" || ifcType === "IfcMember") return [0.55, 0.56, 0.58]; // 난간·부재 — 금속
+  if (ifcType === "IfcFurnishingElement") return [0.72, 0.66, 0.55]; // 가구
+  if (ifcType === "IfcFlowTerminal") return [0.78, 0.78, 0.80]; // 설비
   if (ifcType === "IfcCovering") return [0.80, 0.76, 0.66]; // 마감 — 베이지
   return [0.78, 0.74, 0.66]; // 모듈/기타 — 프리캐스트 베이지
 }

@@ -161,6 +161,7 @@ function buildProcMap(api: IfcAPI, modelID: number): Map<number, ProcMeta> {
   return map;
 }
 
+// 구조·모듈(매칭 대상) + 건축 디테일(유리창·문·계단 등 — pmisx 수준 시각 정교함)
 const WANTED_TYPES = new Set([
   "IFCWALL",
   "IFCWALLSTANDARDCASE",
@@ -173,6 +174,14 @@ const WANTED_TYPES = new Set([
   "IFCRAILING",
   "IFCMEMBER",
   "IFCPLATE",
+  // 건축 디테일
+  "IFCWINDOW",
+  "IFCDOOR",
+  "IFCSTAIR",
+  "IFCSTAIRFLIGHT",
+  "IFCCURTAINWALL",
+  "IFCFURNISHINGELEMENT",
+  "IFCFLOWTERMINAL",
 ]);
 
 function toPascalIfc(upper: string): string {
@@ -189,6 +198,13 @@ function toPascalIfc(upper: string): string {
     IFCRAILING: "IfcRailing",
     IFCMEMBER: "IfcMember",
     IFCPLATE: "IfcPlate",
+    IFCWINDOW: "IfcWindow",
+    IFCDOOR: "IfcDoor",
+    IFCSTAIR: "IfcStair",
+    IFCSTAIRFLIGHT: "IfcStairFlight",
+    IFCCURTAINWALL: "IfcCurtainWall",
+    IFCFURNISHINGELEMENT: "IfcFurnishingElement",
+    IFCFLOWTERMINAL: "IfcFlowTerminal",
   };
   return map[upper] ?? upper;
 }

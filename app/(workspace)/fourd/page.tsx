@@ -29,7 +29,6 @@ import {
   type ScheduleTask,
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
-import { fillBySequence } from "../../../lib/fourd/sequence";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
 
 interface Ready {
@@ -178,16 +177,10 @@ export default function FourDPage() {
       let codeIndex: CodeIndex | null = null;
       if (useCode) {
         codeIndex = buildCodeIndex(tasks);
+        // 규칙은 "확정 매칭"만 — 실제 활동에 연결되는 것(유닛/단계/구역/층).
+        // 활동이 없는 하드케이스(ZA/ZC 유닛불일치·PT구조·주차장)는 미매칭으로 두고
+        // 온톨로지 grounding AI(정책 버튼)가 판단한다. (규칙이 추정으로 때우지 않음)
         ({ ranges, summary } = matchAllHybrid(parsed.elements, codeIndex, sidx));
-        // Phase 1 — 규칙기반 선후행 보정: 위치 분명한 미매칭 부재에 순서 보간 날짜
-        const seqFilled = fillBySequence(parsed.elements, ranges, codeIndex);
-        if (seqFilled > 0) {
-          summary = {
-            ...summary,
-            matched: summary.matched + seqFilled,
-            byVia: { ...summary.byVia, "순서기반(규칙)": seqFilled },
-          };
-        }
         minDate = Math.min(codeIndex.minDate, sidx.minDate);
         maxDate = Math.max(codeIndex.maxDate, sidx.maxDate);
       } else {
