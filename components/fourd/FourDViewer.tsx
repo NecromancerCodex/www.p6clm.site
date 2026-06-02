@@ -8,8 +8,51 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import type { ParsedIfc } from "../../lib/fourd/ifc";
+import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, type MatchResult, type ScheduleIndex } from "../../lib/fourd/match";
+
+// IFC 타입 → 한글 부재명
+const TYPE_KO: Record<string, string> = {
+  IfcWall: "벽",
+  IfcWallStandardCase: "벽",
+  IfcColumn: "기둥",
+  IfcSlab: "슬래브",
+  IfcBeam: "보",
+  IfcFooting: "기초",
+  IfcBuildingElementProxy: "부재",
+  IfcCovering: "마감",
+  IfcRailing: "난간",
+  IfcMember: "부재",
+  IfcPlate: "판",
+};
+
+/** "502_3층 SL" → "3층" (블록코드·공종코드 제거). */
+function cleanStorey(name: string | null): string {
+  if (!name) return "—";
+  return name.replace(/^[A-Za-z0-9]+_/, "").replace(/\s+[A-Z]{1,3}$/, "").trim() || name;
+}
+
+/** via("CR@03"/"MO@05"/"FT@PT") → 공종 한글. */
+function workKo(via: string): string {
+  if (via.startsWith("FT")) return "기초";
+  if (via.startsWith("CR")) return "코어·골조(벽·기둥)";
+  if (via.startsWith("MO")) return "층 모듈/마감";
+  return "";
+}
+
+/** 정점 인덱스 → 소속 요소 (elements 는 vStart 오름차순 → 이진탐색). */
+function findElementByVertex(els: ParsedElement[], vIdx: number): ParsedElement | null {
+  let lo = 0;
+  let hi = els.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const e = els[mid];
+    if (vIdx < e.vStart) hi = mid - 1;
+    else if (vIdx >= e.vStart + e.vCount) lo = mid + 1;
+    else return e;
+  }
+  return null;
+}
 
 // use4DSchedule.js 팔레트
 const C_DONE = [0.063, 0.725, 0.506]; // green
@@ -50,6 +93,8 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
   const [dayIdx, setDayIdx] = useState<number>(numDays); // 초기: 마지막 날(완료 시점)
   const dateMs = tMin + dayIdx * DAY;
   const [kpi, setKpi] = useState({ done: 0, active: 0, planned: 0, ghost: 0 });
+  // 마우스 오버한 요소 (툴팁) — 화면 좌표 + 요소
+  const [hover, setHover] = useState<{ x: number; y: number; el: ParsedElement } | null>(null);
 
   // ── three.js 씬 1회 셋업 ──
   useEffect(() => {
@@ -105,9 +150,35 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
     };
     window.addEventListener("resize", onResize);
 
+    // ── 마우스 오버 → 레이캐스트로 요소 식별 (70ms 스로틀) ──
+    const ray = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let lastRC = 0;
+    const onMove = (ev: PointerEvent) => {
+      if (ev.timeStamp - lastRC < 70) return;
+      lastRC = ev.timeStamp;
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      ray.setFromCamera(mouse, camera);
+      const hits = ray.intersectObject(mesh, false);
+      const fi = hits[0]?.faceIndex;
+      if (fi == null) {
+        setHover(null);
+        return;
+      }
+      const el = findElementByVertex(parsed.elements, fi * 3);
+      setHover(el ? { x: ev.clientX - rect.left, y: ev.clientY - rect.top, el } : null);
+    };
+    const onLeave = () => setHover(null);
+    renderer.domElement.addEventListener("pointermove", onMove);
+    renderer.domElement.addEventListener("pointerleave", onLeave);
+
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      renderer.domElement.removeEventListener("pointermove", onMove);
+      renderer.domElement.removeEventListener("pointerleave", onLeave);
       controls.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
@@ -156,7 +227,63 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: 8 }}>
-      <div ref={mountRef} style={{ flex: 1, minHeight: 360, borderRadius: 8, overflow: "hidden", background: "#0e1116" }} />
+      <div style={{ position: "relative", flex: 1, minHeight: 360 }}>
+        <div
+          ref={mountRef}
+          style={{ position: "absolute", inset: 0, borderRadius: 8, overflow: "hidden", background: "#0e1116" }}
+        />
+        {hover &&
+          (() => {
+            const mr = ranges.get(hover.el.globalId);
+            const range = mr?.range ?? null;
+            const st = statusAt(dateMs, range);
+            const stMeta =
+              st === 2
+                ? { t: "완료", c: "#10b981" }
+                : st === 1
+                  ? { t: "진행중", c: "#22d3ee" }
+                  : st === 0
+                    ? { t: "미착수", c: "#60a5fa" }
+                    : { t: "미매칭", c: "#9ca3af" };
+            return (
+              <div
+                style={{
+                  position: "absolute",
+                  left: Math.min(hover.x + 14, 9999),
+                  top: hover.y + 14,
+                  maxWidth: 280,
+                  padding: "8px 10px",
+                  background: "rgba(15,17,22,0.95)",
+                  border: "1px solid #334155",
+                  borderRadius: 8,
+                  color: "#e2e8f0",
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                  pointerEvents: "none",
+                  zIndex: 10,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>
+                  {TYPE_KO[hover.el.ifcType] ?? hover.el.ifcType} · {cleanStorey(hover.el.storeyName)}
+                </div>
+                {range && mr ? (
+                  <>
+                    <div>
+                      공정: {cleanStorey(hover.el.storeyName)} {workKo(mr.via)}
+                    </div>
+                    <div style={{ color: "#94a3b8" }}>
+                      기간: {fmt(range.start)} ~ {fmt(range.end)}
+                    </div>
+                    <div style={{ color: stMeta.c, fontWeight: 600 }}>상태: {stMeta.t}</div>
+                  </>
+                ) : (
+                  <div style={{ color: "#fbbf24" }}>공정 없음 (공정표에 일정 미존재)</div>
+                )}
+              </div>
+            );
+          })()}
+      </div>
 
       {/* KPI */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 13 }}>
