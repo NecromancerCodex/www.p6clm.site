@@ -26,6 +26,7 @@ export interface ParsedElement extends IfcElementMeta {
   wt?: string; // CR | FT | PR | MD
   mtype?: string; // Lv.5 모델 타입 (36 | 46) — MO 유닛 매칭용
   unit?: string; // Lv.6 모듈 번호 (1~8)
+  phase?: string; // Lv.8 단계 (RB/FM/CN/IN) — 단계별 날짜 매칭
   recalibrated?: boolean; // PT 태그였으나 높이로 실제 층 보정됨
 }
 
@@ -104,6 +105,7 @@ export interface ProcMeta {
   wt?: string;
   mtype?: string;
   unit?: string;
+  phase?: string; // Lv.8 단계 (RB/FM/CN/IN)
 }
 
 /**
@@ -120,6 +122,7 @@ function buildProcMap(api: IfcAPI, modelID: number): Map<number, ProcMeta> {
     "Lv.5 Type": "mtype",
     "Lv.6 Unit": "unit",
     "Lv.7 WorkType": "wt",
+    "Lv.8 Phase": "phase",
   };
   const RELS = api.GetLineIDsWithType(modelID, IFCRELDEFINESBYPROPERTIES);
   for (let i = 0; i < RELS.size(); i++) {
@@ -294,6 +297,7 @@ export async function parseIfc(
         wt: pm?.wt,
         mtype: pm?.mtype,
         unit: pm?.unit,
+        phase: pm?.phase,
       });
     }
     count++;

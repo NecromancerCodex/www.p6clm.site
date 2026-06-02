@@ -166,11 +166,13 @@ export interface ProcElement {
   wt?: string;
   mtype?: string;
   unit?: string;
+  phase?: string;
 }
 
 export interface CodeIndex {
   byKey: Map<string, DateRange>; // 거친 키: ST|zone|storey|wt, MO|zone|storey|MD (집계)
   byUnit: Map<string, DateRange>; // 유닛 키: MO|zone|storey|mtype|unit (세분 — pmisx 식 모듈단위)
+  byPhase: Map<string, DateRange>; // 단계 키: ST|zone|storey|wt|phase (단계별 — 콘크리트 등)
   minDate: number;
   maxDate: number;
 }
@@ -179,6 +181,8 @@ const codeKey = (trade: string, zone: string, storey: string, wt: string) =>
   `${trade}|${zone}|${storey}|${wt}`;
 const unitKey = (zone: string, storey: string, mtype: string, unit: string) =>
   `MO|${zone}|${storey}|${mtype}|${unit}`;
+const phaseKey = (zone: string, storey: string, wt: string, phase: string) =>
+  `ST|${zone}|${storey}|${wt}|${phase}`;
 
 function mergeRange(m: Map<string, DateRange>, key: string, s: number, e: number) {
   const cur = m.get(key);
@@ -194,6 +198,7 @@ function mergeRange(m: Map<string, DateRange>, key: string, s: number, e: number
 export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   const byKey = new Map<string, DateRange>();
   const byUnit = new Map<string, DateRange>();
+  const byPhase = new Map<string, DateRange>();
   let minD = Infinity;
   let maxD = -Infinity;
   for (const t of tasks) {
@@ -208,12 +213,15 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
       mergeRange(byKey, codeKey("MO", d.zone, d.storey, "MD"), s, e);
       if (d.mtype && d.unit) mergeRange(byUnit, unitKey(d.zone, d.storey, d.mtype, d.unit), s, e);
     } else {
-      mergeRange(byKey, codeKey("ST", d.zone, d.storey, d.worktype ?? ""), s, e);
+      const wt = d.worktype ?? "";
+      mergeRange(byKey, codeKey("ST", d.zone, d.storey, wt), s, e);
+      if (d.phase) mergeRange(byPhase, phaseKey(d.zone, d.storey, wt, d.phase), s, e);
     }
   }
   return {
     byKey,
     byUnit,
+    byPhase,
     minDate: minD === Infinity ? Date.now() : minD,
     maxDate: maxD === -Infinity ? Date.now() : maxD,
   };
@@ -259,7 +267,14 @@ export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
     const rc = idx.byKey.get(ck);
     return rc ? { range: rc, via: ck } : { range: null, via: `no_act:${ck}` };
   }
-  const key = codeKey("ST", el.zone, el.storey4d, el.wt || "");
+  // ST: 단계(phase) 키 우선 → 콘크리트 등 단계별 정확 날짜. 없으면 집계 폴백.
+  const wt = el.wt || "";
+  if (el.phase) {
+    const pk = phaseKey(el.zone, el.storey4d, wt, el.phase);
+    const rp = idx.byPhase.get(pk);
+    if (rp) return { range: rp, via: pk };
+  }
+  const key = codeKey("ST", el.zone, el.storey4d, wt);
   const r = idx.byKey.get(key);
   return r ? { range: r, via: key } : { range: null, via: `no_act:${key}` };
 }
