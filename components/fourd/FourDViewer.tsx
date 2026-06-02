@@ -66,6 +66,15 @@ function findElementByVertex(els: ParsedElement[], vIdx: number): ParsedElement 
   return null;
 }
 
+/** 미매칭 사유 → 정확한 한글 설명 (via 기반). */
+function unmatchedReason(via: string): string {
+  if (via === "no_meta") return "BIM 공정 속성·층 정보 없음";
+  if (via === "no_storey") return "층 인식 불가 (GL·기계실 등 비시공 레벨)";
+  if (via.includes("PT")) return "기초(PT)층 — 공정표에 해당 공종 일정 없음";
+  if (via.includes("RF")) return "지붕(RF) — 공정표에 해당 공종 일정 없음";
+  return "공정표에 해당 공정단위 일정 없음";
+}
+
 // use4DSchedule.js 팔레트
 const C_DONE = [0.063, 0.725, 0.506]; // green
 const C_ACTIVE = [0.133, 0.827, 0.933]; // cyan
@@ -357,7 +366,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
                     <div style={{ color: stMeta.c, fontWeight: 600 }}>상태: {stMeta.t}</div>
                   </>
                 ) : (
-                  <div style={{ color: "#fbbf24" }}>공정 없음 (공정표에 일정 미존재)</div>
+                  <div style={{ color: "#fbbf24" }}>
+                    미매칭 — {unmatchedReason(ranges.get(hover.el.globalId)?.via ?? "")}
+                  </div>
                 )}
               </div>
             );
