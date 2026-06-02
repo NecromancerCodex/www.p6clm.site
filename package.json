@@ -22,6 +22,7 @@
     "remark-gfm": "^4.0.1",
     "speak-tts": "^2.0.8",
     "three": "^0.182.0",
+    "three-mesh-bvh": "^0.9.10",
     "web-ifc": "^0.0.68",
     "zustand": "^5.0.13"
   },

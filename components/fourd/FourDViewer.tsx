@@ -7,6 +7,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
+
+// three-mesh-bvh — 레이캐스트 O(삼각형수)→O(log) 가속. 대용량 단일 지오메트리 hover 렉 해소.
+type BvhGeom = THREE.BufferGeometry & { computeBoundsTree: () => void; disposeBoundsTree: () => void };
+(THREE.BufferGeometry.prototype as unknown as { computeBoundsTree: unknown }).computeBoundsTree = computeBoundsTree;
+(THREE.BufferGeometry.prototype as unknown as { disposeBoundsTree: unknown }).disposeBoundsTree = disposeBoundsTree;
+(THREE.Mesh.prototype as unknown as { raycast: unknown }).raycast = acceleratedRaycast;
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, type MatchResult } from "../../lib/fourd/match";
@@ -222,6 +229,12 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
     const mesh = new THREE.Mesh(parsed.geometry, material);
     scene.add(mesh);
     colorAttrRef.current = parsed.geometry.getAttribute("color") as THREE.BufferAttribute;
+    // BVH 빌드(1회) — 이후 hover 레이캐스트가 즉시 응답
+    try {
+      (parsed.geometry as BvhGeom).computeBoundsTree();
+    } catch {
+      /* BVH 빌드 실패 시 일반 레이캐스트 폴백 */
+    }
 
     // 바닥 그리드 (공간 기준)
     const grid = new THREE.GridHelper(parsed.radius * 4, 40, 0x334155, 0x1e293b);
@@ -316,6 +329,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
       renderer.domElement.removeEventListener("pointerleave", onLeave);
       controls.dispose();
       renderer.dispose();
+      try {
+        (parsed.geometry as BvhGeom).disposeBoundsTree();
+      } catch {
+        /* noop */
+      }
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
   }, [parsed]);
