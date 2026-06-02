@@ -351,9 +351,16 @@ export async function parseIfc(
   const posArr = new Float32Array(positions);
   geometry.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(normals), 3));
-  // 색상 attribute (동적 갱신) — 초기 회색
-  const colArr = new Float32Array(positions.length).fill(0.6);
-  geometry.setAttribute("color", new THREE.BufferAttribute(colArr, 3));
+  // 색상 attribute — RGBA(투명도 포함, 동적 갱신). 초기 회색·불투명.
+  const numVerts = positions.length / 3;
+  const colArr = new Float32Array(numVerts * 4);
+  for (let i = 0; i < numVerts; i++) {
+    colArr[i * 4] = 0.6;
+    colArr[i * 4 + 1] = 0.6;
+    colArr[i * 4 + 2] = 0.6;
+    colArr[i * 4 + 3] = 1;
+  }
+  geometry.setAttribute("color", new THREE.BufferAttribute(colArr, 4));
 
   geometry.computeBoundingSphere();
   const bs = geometry.boundingSphere!;

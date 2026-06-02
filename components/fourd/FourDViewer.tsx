@@ -83,7 +83,7 @@ function unmatchedReason(via: string): string {
   return "공정표에 해당 공정단위 일정 없음";
 }
 
-// use4DSchedule.js 팔레트
+// use4DSchedule.js 팔레트 (상태 모드)
 const C_DONE = [0.063, 0.725, 0.506]; // green
 const C_ACTIVE = [0.133, 0.827, 0.933]; // cyan
 const C_PLANNED = [0.376, 0.647, 0.98]; // blue
@@ -97,13 +97,34 @@ function colorFor(status: number): number[] {
   return C_GHOST;
 }
 
-/** 요소 정점 범위에 색 채우기. */
-function paintElement(arr: Float32Array, el: ParsedElement, c: number[]) {
-  const end = (el.vStart + el.vCount) * 3;
-  for (let i = el.vStart * 3; i < end; i += 3) {
+/** 실사 모드 — 부재 종류별 재질색 (콘크리트 등). */
+function materialColor(ifcType: string): number[] {
+  if (ifcType === "IfcFooting") return [0.40, 0.40, 0.38]; // 기초 — 진한 콘크리트
+  if (ifcType === "IfcWall" || ifcType === "IfcWallStandardCase" || ifcType === "IfcColumn")
+    return [0.70, 0.70, 0.67]; // 코어 — 콘크리트 회색
+  if (ifcType === "IfcSlab" || ifcType === "IfcBeam") return [0.62, 0.62, 0.59]; // 슬래브·보
+  if (ifcType === "IfcCovering") return [0.80, 0.76, 0.66]; // 마감 — 베이지
+  return [0.78, 0.74, 0.66]; // 모듈/기타 — 프리캐스트 베이지
+}
+
+/**
+ * 요소의 표시 색·투명도.
+ *  실사 ON: 재질색 + 완료(status2)만 불투명, 나머지 투명(안 보임)
+ *  실사 OFF: 상태색 + 전체 불투명
+ */
+function elemColor(el: ParsedElement, status: number, realistic: boolean): { c: number[]; a: number } {
+  if (realistic) return { c: materialColor(el.ifcType), a: status === 2 ? 1 : 0 };
+  return { c: colorFor(status), a: 1 };
+}
+
+/** 요소 정점 범위에 RGBA 채우기. */
+function paintElement(arr: Float32Array, el: ParsedElement, c: number[], a: number) {
+  const end = (el.vStart + el.vCount) * 4;
+  for (let i = el.vStart * 4; i < end; i += 4) {
     arr[i] = c[0];
     arr[i + 1] = c[1];
     arr[i + 2] = c[2];
+    arr[i + 3] = a;
   }
 }
 
@@ -138,6 +159,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
   const [kpi, setKpi] = useState({ done: 0, active: 0, planned: 0, ghost: 0 });
   // 마우스 오버한 요소 (툴팁) — 화면 좌표 + 요소
   const [hover, setHover] = useState<{ x: number; y: number; el: ParsedElement } | null>(null);
+  // 실사 모드 (재질색 + 미완성 투명) — ref 로 효과에서 즉시 참조
+  const [realistic, setRealistic] = useState(false);
+  const realisticRef = useRef(false);
+  realisticRef.current = realistic;
 
   // ── three.js 씬 1회 셋업 ──
   useEffect(() => {
@@ -172,7 +197,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
     dir2.position.set(-1, 1, -1);
     scene.add(dir2);
 
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    // alphaTest: 정점 alpha 0(미완성)인 조각은 버려 완전 투명·깊이미기록 → 깔끔한 성장 효과
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(parsed.geometry, material);
     scene.add(mesh);
     colorAttrRef.current = parsed.geometry.getAttribute("color") as THREE.BufferAttribute;
@@ -243,27 +269,23 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
     if (!attr) return;
     const raf = requestAnimationFrame(() => {
       const arr = attr.array as Float32Array;
+      const realistic = realisticRef.current;
       const counts = { done: 0, active: 0, planned: 0, ghost: 0 };
       for (const el of parsed.elements) {
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
-        const c = colorFor(st);
         if (st === 2) counts.done++;
         else if (st === 1) counts.active++;
         else if (st === 0) counts.planned++;
         else counts.ghost++;
-        const end = (el.vStart + el.vCount) * 3;
-        for (let i = el.vStart * 3; i < end; i += 3) {
-          arr[i] = c[0];
-          arr[i + 1] = c[1];
-          arr[i + 2] = c[2];
-        }
+        const { c, a } = elemColor(el, st, realistic);
+        paintElement(arr, el, c, a);
       }
-      // 강조 중인 공정단위가 있으면 상태색 위에 다시 덮어쓰기
+      // 강조 중인 공정단위가 있으면 위에 덮어쓰기 (강조는 항상 보이게 alpha 1)
       const via = hiliteViaRef.current;
       if (via) {
         for (const el of parsed.elements) {
-          if (ranges.get(el.globalId)?.via === via) paintElement(arr, el, C_HILITE);
+          if (ranges.get(el.globalId)?.via === via) paintElement(arr, el, C_HILITE, 1);
         }
       }
       attr.needsUpdate = true;
@@ -277,7 +299,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
       );
     });
     return () => cancelAnimationFrame(raf);
-  }, [dateMs, parsed, ranges]);
+  }, [dateMs, parsed, ranges, realistic]);
 
   // ── hover 한 공정단위 실제 부재를 황색 강조 (증분: 그룹이 바뀔 때만 재색칠) ──
   // 박스(AABB)는 U자 형상에서 겹쳐 부정확 → 실제 부재를 칠해 정확한 공정 범위를 보인다.
@@ -291,20 +313,22 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
     if (newVia === hiliteViaRef.current) return; // 같은 그룹 → 변화 없음
 
     let count = 0;
-    // 1) 이전 강조 그룹 → 상태색 복원
+    const realistic = realisticRef.current;
+    // 1) 이전 강조 그룹 → 원래 색·투명도 복원
     const prevVia = hiliteViaRef.current;
     if (prevVia) {
       for (const el of parsed.elements) {
         if (ranges.get(el.globalId)?.via !== prevVia) continue;
         const st = statusAt(dateMs, ranges.get(el.globalId)?.range ?? null);
-        paintElement(arr, el, colorFor(st));
+        const { c, a } = elemColor(el, st, realistic);
+        paintElement(arr, el, c, a);
       }
     }
-    // 2) 새 그룹 → 황색 강조
+    // 2) 새 그룹 → 황색 강조 (항상 보이게)
     if (newVia) {
       for (const el of parsed.elements) {
         if (ranges.get(el.globalId)?.via !== newVia) continue;
-        paintElement(arr, el, C_HILITE);
+        paintElement(arr, el, C_HILITE, 1);
         count++;
       }
     }
@@ -402,12 +426,29 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
           })()}
       </div>
 
-      {/* KPI */}
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 13 }}>
+      {/* KPI + 실사 모드 토글 */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
         <span style={{ color: "#10b981" }}>● 완료 {kpi.done.toLocaleString()}</span>
         <span style={{ color: "#22d3ee" }}>● 진행중 {kpi.active.toLocaleString()}</span>
         <span style={{ color: "#60a5fa" }}>● 미착수 {kpi.planned.toLocaleString()}</span>
         <span style={{ color: "#6b7280" }}>● 미매칭 {kpi.ghost.toLocaleString()}</span>
+        <button
+          onClick={() => setRealistic((v) => !v)}
+          style={{
+            marginLeft: "auto",
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: "1px solid " + (realistic ? "#10b981" : "#475569"),
+            background: realistic ? "#10b981" : "transparent",
+            color: realistic ? "#fff" : "#94a3b8",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+          title="재질색(콘크리트 등) + 완성된 부재만 표시 (미완성 투명)"
+        >
+          {realistic ? "🏗 실사 모드 ON" : "실사 모드 OFF"}
+        </button>
       </div>
 
       {/* 타임라인 */}
