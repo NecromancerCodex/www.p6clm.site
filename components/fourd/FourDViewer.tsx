@@ -443,17 +443,21 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
                       style={{
                         color: mr.via.startsWith("policy")
                           ? "#c4b5fd"
-                          : mr.via.includes("|")
-                            ? "#34d399"
-                            : "#94a3b8",
+                          : mr.via.startsWith("seq")
+                            ? "#f0abfc"
+                            : mr.via.includes("|")
+                              ? "#34d399"
+                              : "#94a3b8",
                         fontSize: 11,
                       }}
                     >
                       {mr.via.startsWith("policy")
                         ? "◇ 정책(AI) 매칭 — 시공순서 추론"
-                        : mr.via.includes("|")
-                          ? "✓ 구역 정확 매칭"
-                          : "○ 층 단위 매칭 (구역 미상)"}
+                        : mr.via.startsWith("seq")
+                          ? "▷ 순서기반(규칙) — 선후행 보간 날짜"
+                          : mr.via.includes("|")
+                            ? "✓ 구역 정확 매칭"
+                            : "○ 층 단위 매칭 (구역 미상)"}
                     </div>
                     {hiliteCount > 0 && (
                       <div style={{ color: "#fbbf24" }}>
