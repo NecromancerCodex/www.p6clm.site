@@ -173,8 +173,6 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const hiliteViaRef = useRef<string | null>(null); // 현재 강조 중인 공정단위(via)
-  const prevStatusRef = useRef<Int8Array | null>(null); // 부분 업로드용 직전 상태
-  const renderKeyRef = useRef<string>(""); // 전체 재색칠 트리거(분석/모드 변경) 감지
   // 슬라이더는 정수 day-index(0..numDays)로 구동한다. epoch ms 격자로 돌리면
   // value↔step 불일치로 controlled input 이 onChange 무한 재발화(React #185)를 일으킨다.
   const tMin = useMemo(() => Math.floor(minDate / DAY) * DAY, [minDate]);
@@ -354,36 +352,19 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
       const arr = attr.array as Float32Array;
       const realistic = realisticRef.current;
       const via = hiliteViaRef.current;
-      const els = parsed.elements;
-      // 분석/모드 바뀜 or 첫 실행 → 전체 재색칠. 슬라이더(날짜)만 바뀌면 변경 부재만 부분 업로드.
-      const key = `${els.length}|${realistic}`;
-      let prev = prevStatusRef.current;
-      const full = !prev || prev.length !== els.length || renderKeyRef.current !== key;
-      if (full) {
-        prev = new Int8Array(els.length);
-        prevStatusRef.current = prev;
-        renderKeyRef.current = key;
-      }
-      (attr as unknown as { clearUpdateRanges?: () => void }).clearUpdateRanges?.();
-      const addRange = (attr as unknown as { addUpdateRange?: (s: number, c: number) => void }).addUpdateRange;
       const counts = { done: 0, active: 0, planned: 0, ghost: 0 };
-      for (let i = 0; i < els.length; i++) {
-        const el = els[i];
+      // 전체 재색칠 (정확성 우선 — 부분 업로드는 정합성 버그로 폐기)
+      for (const el of parsed.elements) {
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
         if (st === 2) counts.done++;
         else if (st === 1) counts.active++;
         else if (st === 0) counts.planned++;
         else counts.ghost++;
-        // 상태가 바뀐 부재(또는 전체 재색칠)만 다시 칠하고 그 범위만 GPU 업로드
-        if (full || st !== prev![i]) {
-          if (via && mr?.via === via) paintElement(arr, el, C_HILITE, 1);
-          else {
-            const { c, a } = elemColor(el, st, realistic);
-            paintElement(arr, el, c, a);
-          }
-          if (!full) addRange?.(el.vStart * 4, el.vCount * 4);
-          prev![i] = st;
+        if (via && mr?.via === via) paintElement(arr, el, C_HILITE, 1);
+        else {
+          const { c, a } = elemColor(el, st, realistic);
+          paintElement(arr, el, c, a);
         }
       }
       attr.needsUpdate = true;
