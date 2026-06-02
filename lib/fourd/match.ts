@@ -228,6 +228,37 @@ export function matchAllByCode(
   return { ranges, summary: { total: elements.length, matched, byVia } };
 }
 
+/**
+ * 계층적 확실성 매칭 — 추측 없이 확실한 것만.
+ *  1순위: 공정 PSet 있으면 코드(zone) 정확 매칭 (최소 공정단위)
+ *  2순위: 없으면 IfcBuildingStorey + 부재타입 → 층 단위 규칙 매칭 (구역 미상)
+ *  안 되면 미매칭(회색).
+ */
+export function matchAllHybrid(
+  elements: (IfcElementMeta & ProcElement)[],
+  codeIdx: CodeIndex,
+  storeyIdx: ScheduleIndex,
+): { ranges: Map<string, MatchResult>; summary: MatchSummary } {
+  const ranges = new Map<string, MatchResult>();
+  const byVia: Record<string, number> = {};
+  let matched = 0;
+  for (const el of elements) {
+    let r = matchByCode(el, codeIdx);
+    if (r.via === "no_meta") r = matchElement(el, storeyIdx); // 공정 PSet 없음 → 층 폴백
+    ranges.set(el.globalId, r);
+    if (r.range) matched++;
+    const tag = r.range
+      ? r.via.includes("|")
+        ? "구역정확"
+        : "층단위"
+      : r.via.startsWith("no")
+        ? r.via.split(/[:@]/)[0]
+        : r.via;
+    byVia[tag] = (byVia[tag] ?? 0) + 1;
+  }
+  return { ranges, summary: { total: elements.length, matched, byVia } };
+}
+
 /** 단일 요소 매칭 — (storey, category) → 스케줄 날짜범위. zone 무시 폴백. */
 export function matchElement(el: IfcElementMeta, idx: ScheduleIndex): MatchResult {
   const ns = normStorey(el.storeyName);

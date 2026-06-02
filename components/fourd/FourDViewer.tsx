@@ -343,6 +343,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
                 {range && mr ? (
                   <>
                     <div>공정: {procLabel(hover.el, mr.via)}</div>
+                    <div style={{ color: mr.via.includes("|") ? "#34d399" : "#94a3b8", fontSize: 11 }}>
+                      {mr.via.includes("|") ? "✓ 구역 정확 매칭" : "○ 층 단위 매칭 (구역 미상)"}
+                    </div>
                     {hiliteCount > 0 && (
                       <div style={{ color: "#fbbf24" }}>
                         이 공정단위 부재 {hiliteCount.toLocaleString()}개 강조 중

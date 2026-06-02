@@ -18,7 +18,7 @@ import {
   buildScheduleIndex,
   decodeActId,
   matchAll,
-  matchAllByCode,
+  matchAllHybrid,
   type MatchResult,
   type MatchSummary,
   type ScheduleTask,
@@ -150,21 +150,21 @@ export default function FourDPage() {
       // 3) 매칭 — 공정 PSet(REV) 있으면 코드매칭(zone 정확), 없으면 층근사 폴백
       setProgress({ p: 1, msg: "매칭 중…" });
       const procCount = parsed.elements.filter((e) => e.trade).length;
-      const useCode = procCount > parsed.elements.length * 0.3;
+      const useCode = procCount > 0; // 공정 PSet 있으면 hybrid(zone정확 + 층폴백)
       let ranges: Map<string, MatchResult>;
       let summary: MatchSummary;
       let minDate: number;
       let maxDate: number;
+      const sidx = buildScheduleIndex(tasks);
       if (useCode) {
         const cidx = buildCodeIndex(tasks);
-        ({ ranges, summary } = matchAllByCode(parsed.elements, cidx));
-        minDate = cidx.minDate;
-        maxDate = cidx.maxDate;
+        ({ ranges, summary } = matchAllHybrid(parsed.elements, cidx, sidx));
+        minDate = Math.min(cidx.minDate, sidx.minDate);
+        maxDate = Math.max(cidx.maxDate, sidx.maxDate);
       } else {
-        const index = buildScheduleIndex(tasks);
-        ({ ranges, summary } = matchAll(parsed.elements, index));
-        minDate = index.minDate;
-        maxDate = index.maxDate;
+        ({ ranges, summary } = matchAll(parsed.elements, sidx));
+        minDate = sidx.minDate;
+        maxDate = sidx.maxDate;
       }
 
       const topVia = Object.entries(summary.byVia)
