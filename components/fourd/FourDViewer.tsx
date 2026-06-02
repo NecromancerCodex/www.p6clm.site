@@ -32,6 +32,14 @@ function cleanStorey(name: string | null): string {
   return name.replace(/^[A-Za-z0-9]+_/, "").replace(/\s+[A-Z]{1,3}$/, "").trim() || name;
 }
 
+/** 표시용 층 — 공정 태그(storey4d) 우선(PT/RF 명시), 없으면 공간 층 이름. */
+function storeyDisplay(el: ParsedElement): string {
+  if (el.storey4d) {
+    return el.storey4d === "PT" ? "기초(PT)" : el.storey4d === "RF" ? "지붕(RF)" : `${Number(el.storey4d)}층`;
+  }
+  return cleanStorey(el.storeyName);
+}
+
 /** 공종코드 → 한글. */
 function workKo(wt: string | undefined, via: string): string {
   const w = wt ?? "";
@@ -347,7 +355,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
                 }}
               >
                 <div style={{ fontWeight: 600 }}>
-                  {TYPE_KO[hover.el.ifcType] ?? hover.el.ifcType} · {cleanStorey(hover.el.storeyName)}
+                  {TYPE_KO[hover.el.ifcType] ?? hover.el.ifcType} · {storeyDisplay(hover.el)}
+                  {hover.el.zone ? ` · ${hover.el.zone}` : ""}
                 </div>
                 {range && mr ? (
                   <>

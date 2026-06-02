@@ -24,7 +24,8 @@ export interface ParsedElement extends IfcElementMeta {
   zone?: string; // ZA | ZB | ZC | AB ...
   storey4d?: string; // 01 | 02 | PT | RF ...
   wt?: string; // CR | FT | PR | MD
-  unit?: string; // 모듈 번호
+  mtype?: string; // Lv.5 모델 타입 (36 | 46) — MO 유닛 매칭용
+  unit?: string; // Lv.6 모듈 번호 (1~8)
 }
 
 export interface ParsedIfc {
@@ -100,6 +101,7 @@ export interface ProcMeta {
   zone?: string;
   storey4d?: string;
   wt?: string;
+  mtype?: string;
   unit?: string;
 }
 
@@ -114,6 +116,7 @@ function buildProcMap(api: IfcAPI, modelID: number): Map<number, ProcMeta> {
     "Lv.2 Trade": "trade",
     "Lv.3 Zone": "zone",
     "Lv.4 Storey": "storey4d",
+    "Lv.5 Type": "mtype",
     "Lv.6 Unit": "unit",
     "Lv.7 WorkType": "wt",
   };
@@ -288,6 +291,7 @@ export async function parseIfc(
         zone: pm?.zone,
         storey4d: pm?.storey4d,
         wt: pm?.wt,
+        mtype: pm?.mtype,
         unit: pm?.unit,
       });
     }

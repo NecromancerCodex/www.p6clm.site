@@ -164,38 +164,56 @@ export interface ProcElement {
   zone?: string;
   storey4d?: string;
   wt?: string;
+  mtype?: string;
+  unit?: string;
 }
 
 export interface CodeIndex {
-  byKey: Map<string, DateRange>;
+  byKey: Map<string, DateRange>; // 거친 키: ST|zone|storey|wt, MO|zone|storey|MD (집계)
+  byUnit: Map<string, DateRange>; // 유닛 키: MO|zone|storey|mtype|unit (세분 — pmisx 식 모듈단위)
   minDate: number;
   maxDate: number;
 }
 
 const codeKey = (trade: string, zone: string, storey: string, wt: string) =>
   `${trade}|${zone}|${storey}|${wt}`;
+const unitKey = (zone: string, storey: string, mtype: string, unit: string) =>
+  `MO|${zone}|${storey}|${mtype}|${unit}`;
 
-/** XER tasks → (trade|zone|storey|wt) 별 집계 날짜범위. MO 의 wt 는 항상 MD. */
+function mergeRange(m: Map<string, DateRange>, key: string, s: number, e: number) {
+  const cur = m.get(key);
+  if (!cur) m.set(key, { start: s, end: e });
+  else m.set(key, { start: Math.min(cur.start, s), end: Math.max(cur.end, e) });
+}
+
+/**
+ * XER tasks → 2단계 인덱스.
+ *  byKey  : ST|zone|storey|wt, MO|zone|storey|MD (거친 집계 — 폴백)
+ *  byUnit : MO|zone|storey|mtype|unit (유닛 세분 — 모듈 개별 색칠)
+ */
 export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   const byKey = new Map<string, DateRange>();
+  const byUnit = new Map<string, DateRange>();
   let minD = Infinity;
   let maxD = -Infinity;
   for (const t of tasks) {
     const d = decodeActId(t.code);
     if (!d) continue;
-    const wt = d.trade === "MO" ? "MD" : (d.worktype ?? "");
-    const key = codeKey(d.trade, d.zone, d.storey, wt);
     const s = t.start ? Date.parse(t.start) : NaN;
     const e = t.end ? Date.parse(t.end) : NaN;
     if (Number.isNaN(s) || Number.isNaN(e)) continue;
     minD = Math.min(minD, s);
     maxD = Math.max(maxD, e);
-    const cur = byKey.get(key);
-    if (!cur) byKey.set(key, { start: s, end: e });
-    else byKey.set(key, { start: Math.min(cur.start, s), end: Math.max(cur.end, e) });
+    if (d.trade === "MO") {
+      mergeRange(byKey, codeKey("MO", d.zone, d.storey, "MD"), s, e);
+      if (d.mtype && d.unit) mergeRange(byUnit, unitKey(d.zone, d.storey, d.mtype, d.unit), s, e);
+    } else {
+      mergeRange(byKey, codeKey("ST", d.zone, d.storey, d.worktype ?? ""), s, e);
+    }
   }
   return {
     byKey,
+    byUnit,
     minDate: minD === Infinity ? Date.now() : minD,
     maxDate: maxD === -Infinity ? Date.now() : maxD,
   };
@@ -224,11 +242,24 @@ export function buildCandidates(tasks: ScheduleTask[]): Candidate[] {
   return [...map.values()];
 }
 
-/** 단일 요소 코드 매칭 — 공정 PSet 키로 직접 조회. */
+/**
+ * 단일 요소 코드 매칭 — 유닛 키 우선(세분) → 거친 키 폴백.
+ *  MO 부재: MO|zone|storey|mtype|pad(unit) → 없으면 MO|zone|storey|MD
+ *  ST 부재: ST|zone|storey|wt
+ */
 export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
   if (!el.trade || !el.zone || !el.storey4d) return { range: null, via: "no_meta" };
-  const wt = el.wt || (el.trade === "MO" ? "MD" : "");
-  const key = codeKey(el.trade, el.zone, el.storey4d, wt);
+  if (el.trade === "MO") {
+    if (el.mtype && el.unit) {
+      const uk = unitKey(el.zone, el.storey4d, el.mtype, el.unit.padStart(2, "0"));
+      const ru = idx.byUnit.get(uk);
+      if (ru) return { range: ru, via: uk }; // 유닛 단위 (세분)
+    }
+    const ck = codeKey("MO", el.zone, el.storey4d, "MD");
+    const rc = idx.byKey.get(ck);
+    return rc ? { range: rc, via: ck } : { range: null, via: `no_act:${ck}` };
+  }
+  const key = codeKey("ST", el.zone, el.storey4d, el.wt || "");
   const r = idx.byKey.get(key);
   return r ? { range: r, via: key } : { range: null, via: `no_act:${key}` };
 }
