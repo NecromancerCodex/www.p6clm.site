@@ -361,6 +361,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
                 {range && mr ? (
                   <>
                     <div>공정: {procLabel(hover.el, mr.via)}</div>
+                    {hover.el.recalibrated && (
+                      <div style={{ color: "#fbbf24", fontSize: 11 }}>
+                        ⚙ BIM PT태그 → 높이로 {storeyDisplay(hover.el)} 보정 (시공순서 정합)
+                      </div>
+                    )}
                     <div
                       style={{
                         color: mr.via.startsWith("policy")

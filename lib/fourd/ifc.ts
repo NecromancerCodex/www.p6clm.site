@@ -22,10 +22,11 @@ export interface ParsedElement extends IfcElementMeta {
   // 공정 PSet (REV IFC) — 없으면 undefined (구버전 IFC)
   trade?: string; // ST | MO
   zone?: string; // ZA | ZB | ZC | AB ...
-  storey4d?: string; // 01 | 02 | PT | RF ...
+  storey4d?: string; // 01 | 02 | PT | RF ... (elevation 보정 후)
   wt?: string; // CR | FT | PR | MD
   mtype?: string; // Lv.5 모델 타입 (36 | 46) — MO 유닛 매칭용
   unit?: string; // Lv.6 모듈 번호 (1~8)
+  recalibrated?: boolean; // PT 태그였으나 높이로 실제 층 보정됨
 }
 
 export interface ParsedIfc {
@@ -300,6 +301,46 @@ export async function parseIfc(
   });
 
   api.CloseModel(modelID);
+
+  // ── elevation 보정 ──
+  // BIM 의 PT(기초) 공정태그가 진짜 피트뿐 아니라 상부(2·3층 높이) 부재에도 붙어있어,
+  // 그대로 매칭하면 높은 부재가 기초공정(최조기) 날짜를 받아 시공순서가 뒤집힌다.
+  // → 숫자 층(01/02/03..)의 중앙 높이로 밴드를 만들고, PT 태그여도 물리적으로 높으면
+  //   가장 가까운 층으로 재지정. 진짜 낮은 피트만 PT 유지.
+  onProgress?.(0.91, "층 높이 보정 중…");
+  {
+    const tmp = new Map<string, number[]>();
+    for (const el of elements) {
+      if (el.storey4d && /^\d+$/.test(el.storey4d)) {
+        (tmp.get(el.storey4d) ?? tmp.set(el.storey4d, []).get(el.storey4d)!).push(el.cy);
+      }
+    }
+    const floors: { storey: string; y: number }[] = [];
+    for (const [storey, ys] of tmp) {
+      ys.sort((a, b) => a - b);
+      floors.push({ storey, y: ys[Math.floor(ys.length / 2)] });
+    }
+    floors.sort((a, b) => a.y - b.y);
+    if (floors.length) {
+      const floor1Y = floors[0].y; // 최저 숫자층(통상 1층) 중앙 높이
+      for (const el of elements) {
+        // PT 태그인데 1층 높이 이상이면(진짜 피트는 1층보다 낮음) → 높이로 실제 층 보정
+        if (el.storey4d === "PT" && el.cy > floor1Y - 1.5) {
+          let best = floors[0].storey;
+          let bd = Infinity;
+          for (const f of floors) {
+            const d = Math.abs(el.cy - f.y);
+            if (d < bd) {
+              bd = d;
+              best = f.storey;
+            }
+          }
+          el.storey4d = best;
+          el.recalibrated = true;
+        }
+      }
+    }
+  }
   onProgress?.(0.92, "버퍼 구성 중…");
 
   const geometry = new THREE.BufferGeometry();
