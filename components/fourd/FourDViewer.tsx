@@ -118,13 +118,18 @@ function materialColor(ifcType: string): number[] {
   return [0.78, 0.74, 0.66]; // 모듈/기타 — 프리캐스트 베이지
 }
 
+const C_CONTEXT = [0.52, 0.52, 0.52]; // 미매칭(공정無) 정적 컨텍스트 회색
+
 /**
  * 요소의 표시 색·투명도.
- *  실사 ON: 재질색 + 완료(status2)만 불투명, 나머지 투명(안 보임)
+ *  실사 ON: 완료=재질색 / 미매칭(공정無)=정적 회색(항상 보임, 컨텍스트) / 미착수·진행중=투명
  *  실사 OFF: 상태색 + 전체 불투명
  */
 function elemColor(el: ParsedElement, status: number, realistic: boolean): { c: number[]; a: number } {
-  if (realistic) return { c: materialColor(el.ifcType), a: status === 2 ? 1 : 0 };
+  if (realistic) {
+    if (status === -1) return { c: C_CONTEXT, a: 1 }; // 공정 없는 실제 형상 → 정적 컨텍스트
+    return { c: materialColor(el.ifcType), a: status === 2 ? 1 : 0 }; // 완료=재질, 미완성=투명
+  }
   return { c: colorFor(status), a: 1 };
 }
 
