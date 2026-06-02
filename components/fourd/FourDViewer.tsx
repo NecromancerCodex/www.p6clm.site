@@ -10,9 +10,6 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, type MatchResult, type ScheduleIndex } from "../../lib/fourd/match";
-import { kmeans2d } from "../../lib/fourd/zone";
-
-const ZONE_K = 3; // 그룹을 나눌 구역 수 (U자 3개 동 기준)
 
 // IFC 타입 → 한글 부재명
 const TYPE_KO: Record<string, string> = {
@@ -62,12 +59,23 @@ const C_DONE = [0.063, 0.725, 0.506]; // green
 const C_ACTIVE = [0.133, 0.827, 0.933]; // cyan
 const C_PLANNED = [0.376, 0.647, 0.98]; // blue
 const C_GHOST = [0.32, 0.34, 0.4]; // 미매칭 (어두운 회색)
+const C_HILITE = [1.0, 0.85, 0.2]; // hover 공정단위 강조 (황색)
 
 function colorFor(status: number): number[] {
   if (status === 2) return C_DONE;
   if (status === 1) return C_ACTIVE;
   if (status === 0) return C_PLANNED;
   return C_GHOST;
+}
+
+/** 요소 정점 범위에 색 채우기. */
+function paintElement(arr: Float32Array, el: ParsedElement, c: number[]) {
+  const end = (el.vStart + el.vCount) * 3;
+  for (let i = el.vStart * 3; i < end; i += 3) {
+    arr[i] = c[0];
+    arr[i + 1] = c[1];
+    arr[i + 2] = c[2];
+  }
 }
 
 interface Props {
@@ -87,7 +95,7 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const boxHelpersRef = useRef<THREE.Box3Helper[]>([]);
+  const hiliteViaRef = useRef<string | null>(null); // 현재 강조 중인 공정단위(via)
   // 슬라이더는 정수 day-index(0..numDays)로 구동한다. epoch ms 격자로 돌리면
   // value↔step 불일치로 controlled input 이 onChange 무한 재발화(React #185)를 일으킨다.
   const tMin = useMemo(() => Math.floor(index.minDate / DAY) * DAY, [index.minDate]);
@@ -143,16 +151,6 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
     const grid = new THREE.GridHelper(parsed.radius * 4, 40, 0x334155, 0x1e293b);
     grid.position.set(parsed.center.x, parsed.center.y - parsed.radius, parsed.center.z);
     scene.add(grid);
-
-    // 구역 박스 풀 (hover 시 갱신) — ZONE_K 개 미리 생성, 처음엔 숨김
-    const helpers: THREE.Box3Helper[] = [];
-    for (let j = 0; j < ZONE_K; j++) {
-      const bh = new THREE.Box3Helper(new THREE.Box3(), new THREE.Color(0x64748b));
-      bh.visible = false;
-      scene.add(bh);
-      helpers.push(bh);
-    }
-    boxHelpersRef.current = helpers;
 
     let raf = 0;
     const animate = () => {
@@ -231,6 +229,13 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
           arr[i + 2] = c[2];
         }
       }
+      // 강조 중인 공정단위가 있으면 상태색 위에 다시 덮어쓰기
+      const via = hiliteViaRef.current;
+      if (via) {
+        for (const el of parsed.elements) {
+          if (ranges.get(el.globalId)?.via === via) paintElement(arr, el, C_HILITE);
+        }
+      }
       attr.needsUpdate = true;
       setKpi((prev) =>
         prev.done === counts.done &&
@@ -244,55 +249,39 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
     return () => cancelAnimationFrame(raf);
   }, [dateMs, parsed, ranges]);
 
-  // ── hover 그룹을 구역(zone)별로 분할해 박스 표시 ──
-  // 같은 공정단위(via, 예 "CR@01" = 1층 코어)에 속한 부재를 수평면에서 ZONE_K 개로
-  // 클러스터링 → 구역별 박스. hover 한 부재의 구역은 황색, 나머지는 회색.
-  // → "이 층 공정이 어느 구역들로 나뉘고, 지금 가리킨 부재가 어느 구역인지" 가시화.
-  const [zoneInfo, setZoneInfo] = useState<{ idx: number; total: number } | null>(null);
+  // ── hover 한 공정단위 실제 부재를 황색 강조 (증분: 그룹이 바뀔 때만 재색칠) ──
+  // 박스(AABB)는 U자 형상에서 겹쳐 부정확 → 실제 부재를 칠해 정확한 공정 범위를 보인다.
+  const [hiliteCount, setHiliteCount] = useState(0);
   useEffect(() => {
-    const helpers = boxHelpersRef.current;
-    if (!helpers.length) return;
-    const hideAll = () => helpers.forEach((h) => (h.visible = false));
+    const attr = colorAttrRef.current;
+    if (!attr) return;
+    const arr = attr.array as Float32Array;
     const mr = hover ? ranges.get(hover.el.globalId) : undefined;
-    if (!mr?.range) {
-      hideAll();
-      setZoneInfo(null);
-      return;
-    }
-    const via = mr.via;
-    // 그룹 부재 수집
-    const group = parsed.elements.filter((e) => ranges.get(e.globalId)?.via === via);
-    const labels = kmeans2d(
-      group.map((e) => ({ x: e.cx, z: e.cz })),
-      ZONE_K,
-    );
-    const hoverGid = hover!.el.globalId;
-    const hoverZone = labels[group.findIndex((e) => e.globalId === hoverGid)] ?? 0;
+    const newVia = mr?.range ? mr.via : null;
+    if (newVia === hiliteViaRef.current) return; // 같은 그룹 → 변화 없음
 
-    const pos = parsed.geometry.getAttribute("position") as THREE.BufferAttribute;
-    const v = new THREE.Vector3();
-    const boxes: THREE.Box3[] = Array.from({ length: ZONE_K }, () => new THREE.Box3());
-    group.forEach((el, gi) => {
-      const b = boxes[labels[gi]];
-      const end = el.vStart + el.vCount;
-      for (let i = el.vStart; i < end; i++) b.expandByPoint(v.fromBufferAttribute(pos, i));
-    });
-
-    let zonesShown = 0;
-    helpers.forEach((h, j) => {
-      if (j >= ZONE_K || boxes[j].isEmpty()) {
-        h.visible = false;
-        return;
+    let count = 0;
+    // 1) 이전 강조 그룹 → 상태색 복원
+    const prevVia = hiliteViaRef.current;
+    if (prevVia) {
+      for (const el of parsed.elements) {
+        if (ranges.get(el.globalId)?.via !== prevVia) continue;
+        const st = statusAt(dateMs, ranges.get(el.globalId)?.range ?? null);
+        paintElement(arr, el, colorFor(st));
       }
-      zonesShown++;
-      h.box.copy(boxes[j]);
-      h.visible = true;
-      const active = j === hoverZone;
-      (h.material as THREE.LineBasicMaterial).color.set(active ? 0xfbbf24 : 0x475569);
-      h.updateMatrixWorld(true);
-    });
-    setZoneInfo({ idx: hoverZone + 1, total: zonesShown });
-  }, [hover, parsed, ranges]);
+    }
+    // 2) 새 그룹 → 황색 강조
+    if (newVia) {
+      for (const el of parsed.elements) {
+        if (ranges.get(el.globalId)?.via !== newVia) continue;
+        paintElement(arr, el, C_HILITE);
+        count++;
+      }
+    }
+    hiliteViaRef.current = newVia;
+    attr.needsUpdate = true;
+    setHiliteCount(count);
+  }, [hover, parsed, ranges, dateMs]);
 
   const pct = Math.round((dayIdx / numDays) * 100);
 
@@ -343,9 +332,9 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
                     <div>
                       공정: {cleanStorey(hover.el.storeyName)} {workKo(mr.via)}
                     </div>
-                    {zoneInfo && (
+                    {hiliteCount > 0 && (
                       <div style={{ color: "#fbbf24" }}>
-                        구역: {zoneInfo.idx} / {zoneInfo.total} (위치 기반 분할)
+                        이 공정 부재 {hiliteCount.toLocaleString()}개 강조 중
                       </div>
                     )}
                     <div style={{ color: "#94a3b8" }}>
