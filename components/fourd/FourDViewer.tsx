@@ -32,9 +32,12 @@ function cleanStorey(name: string | null): string {
   return name.replace(/^[A-Za-z0-9]+_/, "").replace(/\s+[A-Z]{1,3}$/, "").trim() || name;
 }
 
-/** 표시용 층 — 공정 태그(storey4d) 우선(PT/RF 명시), 없으면 공간 층 이름. */
+/**
+ * 표시용 층 — 공정 태그(storey4d)는 zone 도 있거나 높이보정된 경우만 신뢰(PT/RF 명시).
+ * zone 없는 불완전 PT 태그(주차장지붕 등)는 공간 층 이름을 보여 사유와 일치시킨다.
+ */
 function storeyDisplay(el: ParsedElement): string {
-  if (el.storey4d) {
+  if (el.storey4d && (el.zone || el.recalibrated)) {
     return el.storey4d === "PT" ? "기초(PT)" : el.storey4d === "RF" ? "지붕(RF)" : `${Number(el.storey4d)}층`;
   }
   return cleanStorey(el.storeyName);
@@ -74,8 +77,10 @@ function findElementByVertex(els: ParsedElement[], vIdx: number): ParsedElement 
   return null;
 }
 
-/** 미매칭 사유 → 정확한 한글 설명 (via 기반). */
-function unmatchedReason(via: string): string {
+/** 미매칭 사유 → 정확한 한글 설명 (via + 공간 층이름 기반). */
+function unmatchedReason(via: string, storeyName: string | null): string {
+  if (storeyName && storeyName.includes("주차장"))
+    return "주차장지붕(별도/포디움 구조) — 공정표에 전용 일정 없음 (정책 매칭 대상)";
   if (via === "no_meta") return "BIM 공정 속성·층 정보 없음";
   if (via === "no_storey") return "층 인식 불가 (GL·기계실 등 비시공 레벨)";
   if (via.includes("PT")) return "기초(PT)층 — 공정표에 해당 공종 일정 없음";
@@ -462,7 +467,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
                   </>
                 ) : (
                   <div style={{ color: "#fbbf24" }}>
-                    미매칭 — {unmatchedReason(ranges.get(hover.el.globalId)?.via ?? "")}
+                    미매칭 — {unmatchedReason(ranges.get(hover.el.globalId)?.via ?? "", hover.el.storeyName)}
                   </div>
                 )}
               </div>

@@ -73,9 +73,12 @@ export function classifyIfcType(ifcType: string): Category {
 /** IFC IfcBuildingStorey.Name → XER storey 코드. */
 export function normStorey(storeyName: string | null | undefined): string | null {
   if (!storeyName) return null;
-  const m = /_(\d+)\s*층/.exec(storeyName) || /(\d+)\s*F/i.exec(storeyName);
-  if (m) return m[1].padStart(2, "0");
   const s = storeyName;
+  // 주차장지붕 등은 포디움/별도 구조 — 건물 RF(파라펫, 공정 끝)에 자동 귀속하면
+  // 시공순서가 틀어진다. 전용 공정이 없으므로 미매칭 → 정책(AI)이 판단하게 둔다.
+  if (s.includes("주차장")) return null;
+  const m = /_(\d+)\s*층/.exec(s) || /(\d+)\s*F/i.exec(s);
+  if (m) return m[1].padStart(2, "0");
   const u = s.toUpperCase();
   if (s.includes("지붕") || s.includes("오탑") || s.includes("파라펫") || /\bRF\b/.test(u))
     return "RF";
