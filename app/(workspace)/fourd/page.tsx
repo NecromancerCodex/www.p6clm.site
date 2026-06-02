@@ -49,6 +49,17 @@ interface Ready {
   };
 }
 
+interface ReportData {
+  total: number;
+  matched: number;
+  unmatched: number;
+  activityTotal: number;
+  noBim: { key: string; name: string }[]; // 공정 활동 있는데 BIM 부재 없음
+  noSchedule: { label: string; count: number; sample: string }[]; // BIM 부재 있는데 공정 없음
+  seqViolations: string[]; // 타임라인 순서 위반 (아래층>위층, 공종순서 등)
+  clashes4d: string[]; // 4D Clash — 같은 공간(zone·층)에서 작업 기간 중첩
+}
+
 function Dropzone({
   label,
   accept,
@@ -305,6 +316,104 @@ export default function FourDPage() {
     }
   }, [ready]);
 
+  // ── 시뮬레이션 보고서 — 공정표↔BIM 양방향 정합성 진단 ──
+  const [report, setReport] = useState<ReportData | null>(null);
+  const buildReport = useCallback(() => {
+    if (!ready) return;
+    const { ranges, parsed, candidates } = ready;
+    const KO_CAT: Record<string, string> = { CORE: "벽·기둥", FOOT: "기초", MOD: "슬래브·보·모듈" };
+    const koStorey = (s: string | null) =>
+      !s ? "?" : s === "PT" ? "기초(PT)" : s === "RF" ? "지붕(RF)" : `${Number(s)}층`;
+
+    // via → 대표 활동키 (유닛/단계/정책 → coarse 후보키)
+    const viaToActivity = (via: string | undefined): string | null => {
+      if (!via) return null;
+      if (via.startsWith("policy|")) return via.slice(7);
+      const p = via.split("|");
+      if (p[0] === "MO" && p.length >= 3) return `MO|${p[1]}|${p[2]}|MD`;
+      if (p[0] === "ST" && p.length >= 4) return `ST|${p[1]}|${p[2]}|${p[3]}`;
+      return null; // 층 폴백(MO@04) 등 — 특정 활동 아님
+    };
+
+    // ① BIM 있는데 공정 없음 (미매칭 부재)
+    const noSched = new Map<string, { label: string; count: number; sample: string }>();
+    let unmatched = 0;
+    for (const el of parsed.elements) {
+      if (ranges.get(el.globalId)?.range) continue;
+      unmatched++;
+      const s = el.storey4d ?? normStorey(el.storeyName);
+      const cat = classifyIfcType(el.ifcType);
+      const k = `${el.zone ?? "-"}|${s ?? "-"}|${cat}`;
+      const g = noSched.get(k);
+      if (g) g.count++;
+      else
+        noSched.set(k, {
+          label: `${el.zone ? el.zone + " " : ""}${koStorey(s)} ${KO_CAT[cat] ?? cat}`,
+          count: 1,
+          sample: el.storeyName ?? "",
+        });
+    }
+
+    // ② 공정 활동 있는데 BIM 없음 (매칭된 부재가 0인 후보 활동)
+    const covered = new Set<string>();
+    for (const el of parsed.elements) {
+      const k = viaToActivity(ranges.get(el.globalId)?.via);
+      if (k) covered.add(k);
+    }
+    const noBim = candidates.filter((c) => !covered.has(c.key)).map((c) => ({ key: c.key, name: c.name }));
+
+    // ③ 타임라인 순서 검토 + ④ 4D Clash — codeIndex 날짜로 검증
+    const FR = (s: string) => (s === "PT" ? 0 : s === "RF" ? 13 : parseInt(s, 10) || 0);
+    const OPN: Record<string, string> = { FT: "기초", CR: "골조", MD: "모듈", PR: "파라펫" };
+    const seqViolations: string[] = [];
+    const clashes4d: string[] = [];
+    const idx = ready.codeIndex;
+    if (idx) {
+      // 키 파싱: ST|zone|storey|wt, MO|zone|storey|MD → {zone,floor,op,start,end}
+      const acts: { zone: string; floor: string; op: string; start: number; end: number }[] = [];
+      for (const [k, r] of idx.byKey) {
+        const p = k.split("|");
+        acts.push({ zone: p[1], floor: p[2], op: p[0] === "MO" ? "MD" : p[3], start: r.start, end: r.end });
+      }
+      // 순서: (zone,op)별 층 오름차순 시작일 단조 검증
+      const byZoneOp = new Map<string, typeof acts>();
+      for (const a of acts) (byZoneOp.get(`${a.zone}|${a.op}`) ?? byZoneOp.set(`${a.zone}|${a.op}`, []).get(`${a.zone}|${a.op}`)!).push(a);
+      for (const [zo, list] of byZoneOp) {
+        const [zone, op] = zo.split("|");
+        list.sort((a, b) => FR(a.floor) - FR(b.floor));
+        for (let i = 1; i < list.length; i++) {
+          if (list[i].start < list[i - 1].start - 86400000) {
+            seqViolations.push(`${zone} ${OPN[op] ?? op}: ${list[i].floor}층이 ${list[i - 1].floor}층보다 먼저 시작 (순서 역전)`);
+          }
+        }
+      }
+      // 4D Clash: (zone,floor)에서 서로 다른 공종 작업기간 중첩
+      const byZF = new Map<string, typeof acts>();
+      for (const a of acts) (byZF.get(`${a.zone}|${a.floor}`) ?? byZF.set(`${a.zone}|${a.floor}`, []).get(`${a.zone}|${a.floor}`)!).push(a);
+      for (const [zf, list] of byZF) {
+        const [zone, floor] = zf.split("|");
+        for (let i = 0; i < list.length; i++)
+          for (let j = i + 1; j < list.length; j++) {
+            const a = list[i], b = list[j];
+            if (a.op !== b.op && a.start < b.end && b.start < a.end) {
+              clashes4d.push(`${zone} ${floor}층: ${OPN[a.op] ?? a.op} ↔ ${OPN[b.op] ?? b.op} 작업기간 중첩`);
+            }
+          }
+      }
+    }
+
+    setReport({
+      total: parsed.elements.length,
+      matched: parsed.elements.length - unmatched,
+      unmatched,
+      activityTotal: candidates.length,
+      noBim,
+      noSchedule: [...noSched.values()].sort((a, b) => b.count - a.count),
+      seqViolations: seqViolations.slice(0, 30),
+      clashes4d: [...new Set(clashes4d)].slice(0, 30),
+    });
+  }, [ready]);
+
   return (
     <div style={{ padding: 20, height: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
@@ -395,6 +504,20 @@ export default function FourDPage() {
                   +{ready.policyCount.toLocaleString()}개 정책 매칭 (해당 없는 건 회색 유지)
                 </span>
               )}
+              <button
+                onClick={buildReport}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #0ea5e9",
+                  background: "#0ea5e9",
+                  color: "#fff",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                📋 시뮬레이션 보고서
+              </button>
             </div>
           )}
           <details style={{ fontSize: 12, color: "#64748b" }}>
@@ -409,6 +532,69 @@ export default function FourDPage() {
           </div>
         </>
       )}
+
+      {report && <ReportModal report={report} onClose={() => setReport(null)} />}
+    </div>
+  );
+}
+
+function ReportModal({ report, onClose }: { report: ReportData; onClose: () => void }) {
+  const rate = Math.round((report.matched / Math.max(report.total, 1)) * 100);
+  const Section = ({ title, color, items, empty }: { title: string; color: string; items: string[]; empty: string }) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontWeight: 700, color, marginBottom: 4 }}>
+        {title} ({items.length})
+      </div>
+      {items.length === 0 ? (
+        <div style={{ color: "#10b981", fontSize: 13 }}>✓ {empty}</div>
+      ) : (
+        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6, maxHeight: 160, overflow: "auto" }}>
+          {items.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 12, padding: 24, maxWidth: 720, width: "100%", maxHeight: "85vh", overflow: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>📋 4D 시뮬레이션 진단 보고서</h2>
+          <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+            닫기
+          </button>
+        </div>
+        <div style={{ fontSize: 13, color: "#475569", marginBottom: 16, padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
+          요소 {report.total.toLocaleString()}개 중 <strong style={{ color: "#10b981" }}>{report.matched.toLocaleString()}개 매칭 ({rate}%)</strong> · 공정활동 {report.activityTotal}종 · 미매칭 {report.unmatched.toLocaleString()}개
+        </div>
+
+        <Section title="① BIM 있는데 공정 없음 (공정표 누락 의심)" color="#dc2626"
+          empty="모든 부재가 공정에 연결됨"
+          items={report.noSchedule.map((g) => `${g.label} — ${g.count.toLocaleString()}개${g.sample ? ` (예: ${g.sample})` : ""}`)} />
+
+        <Section title="② 공정 있는데 BIM 없음 (모델 누락/미시공 의심)" color="#ea580c"
+          empty="모든 공정활동에 BIM 부재 연결됨"
+          items={report.noBim.map((a) => `${a.name} [${a.key}]`)} />
+
+        <Section title="③ 타임라인 순서 위반 (아래→위, 공종 순서)" color="#d97706"
+          empty="공정 순서 정합 — 층·공종 순서 정상"
+          items={report.seqViolations} />
+
+        <Section title="④ 4D Clash (같은 공간·동시 작업 중첩)" color="#7c3aed"
+          empty="동일 공간 작업기간 중첩 없음"
+          items={report.clashes4d} />
+
+        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, borderTop: "1px solid #e2e8f0", paddingTop: 8 }}>
+          ※ 3D Clash(형상 겹침)는 형상 간섭 계산이 필요해 별도 — 추후 추가. 본 보고서는 공정표↔BIM 정합·시간축 기준.
+        </div>
+      </div>
     </div>
   );
 }
