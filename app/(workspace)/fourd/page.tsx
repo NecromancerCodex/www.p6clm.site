@@ -14,12 +14,13 @@ import { useCallback, useRef, useState } from "react";
 import { FourDViewer } from "../../../components/fourd/FourDViewer";
 import { uploadSchedule } from "../../../lib/api/schedule";
 import {
+  buildCodeIndex,
   buildScheduleIndex,
   decodeActId,
   matchAll,
+  matchAllByCode,
   type MatchResult,
   type MatchSummary,
-  type ScheduleIndex,
   type ScheduleTask,
 } from "../../../lib/fourd/match";
 import type { ParsedIfc } from "../../../lib/fourd/ifc";
@@ -27,14 +28,14 @@ import type { ParsedIfc } from "../../../lib/fourd/ifc";
 interface Ready {
   parsed: ParsedIfc;
   ranges: Map<string, MatchResult>;
-  index: ScheduleIndex;
+  minDate: number;
+  maxDate: number;
   summary: MatchSummary;
   taskCount: number; // 공정표 총 활동 수
   codeCount: number; // 그 중 4D 코드 디코드 성공 수
+  mode: "code" | "storey"; // 매칭 방식 (REV 공정PSet vs 층근사)
   diag: {
-    storeyNonNull: number; // storeyName 이 있는 요소 수
-    sampleStoreys: string[]; // 샘플 층이름(raw)
-    indexStoreys: string[]; // 스케줄 인덱스가 가진 층키
+    procCount: number; // 공정 PSet 보유 요소 수
     topVia: string; // byVia 상위 요약
   };
 }
@@ -140,44 +141,48 @@ export default function FourDPage() {
             `task_code 또는 UDF "Act ID_4D" 에 4D 코드가 있는 XER 인지 확인하세요.`,
         );
       }
-      const index = buildScheduleIndex(tasks);
 
       // 2) IFC 파싱 (브라우저 web-ifc, 동적 import — SSR 회피)
       const { parseIfc } = await import("../../../lib/fourd/ifc");
       const buf = await ifcFile.arrayBuffer();
       const parsed = await parseIfc(buf, (p, msg) => setProgress({ p, msg }));
 
-      // 3) 매칭
+      // 3) 매칭 — 공정 PSet(REV) 있으면 코드매칭(zone 정확), 없으면 층근사 폴백
       setProgress({ p: 1, msg: "매칭 중…" });
-      const { ranges, summary } = matchAll(parsed.elements, index);
+      const procCount = parsed.elements.filter((e) => e.trade).length;
+      const useCode = procCount > parsed.elements.length * 0.3;
+      let ranges: Map<string, MatchResult>;
+      let summary: MatchSummary;
+      let minDate: number;
+      let maxDate: number;
+      if (useCode) {
+        const cidx = buildCodeIndex(tasks);
+        ({ ranges, summary } = matchAllByCode(parsed.elements, cidx));
+        minDate = cidx.minDate;
+        maxDate = cidx.maxDate;
+      } else {
+        const index = buildScheduleIndex(tasks);
+        ({ ranges, summary } = matchAll(parsed.elements, index));
+        minDate = index.minDate;
+        maxDate = index.maxDate;
+      }
 
-      // 진단 — 0매칭 시 어디서 끊겼는지 가시화
-      const storeyNonNull = parsed.elements.filter((e) => e.storeyName).length;
-      const sampleStoreys = Array.from(
-        new Set(parsed.elements.map((e) => e.storeyName).filter(Boolean) as string[]),
-      ).slice(0, 6);
-      const indexStoreys = Array.from(
-        new Set([
-          ...index.crByStorey.keys(),
-          ...index.ftStoreys.keys(),
-          ...index.moByStorey.keys(),
-          ...index.prStoreys.keys(),
-        ]),
-      ).sort();
       const topVia = Object.entries(summary.byVia)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 4)
+        .slice(0, 5)
         .map(([k, v]) => `${k}:${v}`)
         .join("  ");
 
       setReady({
         parsed,
         ranges,
-        index,
+        minDate,
+        maxDate,
         summary,
         taskCount: tasks.length,
         codeCount,
-        diag: { storeyNonNull, sampleStoreys, indexStoreys, topVia },
+        mode: useCode ? "code" : "storey",
+        diag: { procCount, topVia },
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -220,7 +225,8 @@ export default function FourDPage() {
           </button>
           {ifcFile && ifcFile.size > 40 * 1024 * 1024 && (
             <p style={{ color: "#d97706", fontSize: 13, margin: 0 }}>
-              ⚠ IFC {Math.round(ifcFile.size / 1024 / 1024)}MB — 브라우저 파싱에 1~2분 + 메모리 다소 소요됩니다.
+              ⚠ IFC {Math.round(ifcFile.size / 1024 / 1024)}MB — 브라우저 파싱·공정속성 분석에{" "}
+              {ifcFile.size > 80 * 1024 * 1024 ? "2~4분" : "1~2분"} + 메모리 소요. (REV 파일이 zone 정확 매칭됩니다)
             </p>
           )}
           {progress && (
@@ -238,7 +244,8 @@ export default function FourDPage() {
       {ready && (
         <>
           <div style={{ fontSize: 13, color: "#475569" }}>
-            공정 {ready.taskCount.toLocaleString()}건(4D코드 {ready.codeCount.toLocaleString()}) ·{" "}
+            {ready.mode === "code" ? "구역 정확 매칭(공정PSet)" : "층 근사 매칭"} ·{" "}
+            공정 {ready.taskCount.toLocaleString()}건 ·{" "}
             요소 {ready.summary.total.toLocaleString()}개 중{" "}
             <strong style={{ color: "#10b981" }}>{ready.summary.matched.toLocaleString()}개 매칭</strong>{" "}
             ({Math.round((ready.summary.matched / Math.max(ready.summary.total, 1)) * 100)}%)
@@ -254,16 +261,14 @@ export default function FourDPage() {
             </button>
           </div>
           <details style={{ fontSize: 12, color: "#64748b" }}>
-            <summary style={{ cursor: "pointer" }}>진단 (매칭 디버그)</summary>
+            <summary style={{ cursor: "pointer" }}>진단</summary>
             <div style={{ marginTop: 6, lineHeight: 1.7, fontFamily: "monospace" }}>
-              <div>storey 보유 요소: {ready.diag.storeyNonNull.toLocaleString()} / {ready.summary.total.toLocaleString()}</div>
-              <div>IFC 층이름 샘플: {ready.diag.sampleStoreys.join(" | ") || "(없음)"}</div>
-              <div>스케줄 층키: {ready.diag.indexStoreys.join(", ") || "(없음)"}</div>
+              <div>공정 PSet 보유 요소: {ready.diag.procCount.toLocaleString()} / {ready.summary.total.toLocaleString()}</div>
               <div>byVia: {ready.diag.topVia}</div>
             </div>
           </details>
           <div style={{ flex: 1, minHeight: 400 }}>
-            <FourDViewer parsed={ready.parsed} ranges={ready.ranges} index={ready.index} />
+            <FourDViewer parsed={ready.parsed} ranges={ready.ranges} minDate={ready.minDate} maxDate={ready.maxDate} />
           </div>
         </>
       )}

@@ -9,7 +9,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
-import { statusAt, type MatchResult, type ScheduleIndex } from "../../lib/fourd/match";
+import { statusAt, type MatchResult } from "../../lib/fourd/match";
 
 // IFC 타입 → 한글 부재명
 const TYPE_KO: Record<string, string> = {
@@ -32,12 +32,24 @@ function cleanStorey(name: string | null): string {
   return name.replace(/^[A-Za-z0-9]+_/, "").replace(/\s+[A-Z]{1,3}$/, "").trim() || name;
 }
 
-/** via("CR@03"/"MO@05"/"FT@PT") → 공종 한글. */
-function workKo(via: string): string {
-  if (via.startsWith("FT")) return "기초";
-  if (via.startsWith("CR")) return "코어·골조(벽·기둥)";
-  if (via.startsWith("MO")) return "층 모듈/마감";
-  return "";
+/** 공종코드 → 한글. */
+function workKo(wt: string | undefined, via: string): string {
+  const w = wt ?? "";
+  if (w === "FT" || via.startsWith("FT")) return "기초";
+  if (w === "CR" || via.startsWith("CR")) return "코어·골조(벽·기둥)";
+  if (w === "PR") return "파라펫";
+  if (w === "MD" || via.startsWith("MO")) return "모듈/마감";
+  return w;
+}
+
+/** 부재의 공정 라벨 — 공정PSet(zone) 있으면 "ZA 3층 코어", 없으면 층 근사. */
+function procLabel(el: ParsedElement, via: string): string {
+  if (el.zone && el.storey4d) {
+    const st = el.storey4d === "PT" ? "기초" : el.storey4d === "RF" ? "지붕" : `${Number(el.storey4d)}층`;
+    const unit = el.unit ? ` ${el.unit}호` : "";
+    return `${el.zone} ${st} ${workKo(el.wt, via)}${unit}`;
+  }
+  return `${cleanStorey(el.storeyName)} ${workKo(el.wt, via)}`;
 }
 
 /** 정점 인덱스 → 소속 요소 (elements 는 vStart 오름차순 → 이진탐색). */
@@ -81,7 +93,8 @@ function paintElement(arr: Float32Array, el: ParsedElement, c: number[]) {
 interface Props {
   parsed: ParsedIfc;
   ranges: Map<string, MatchResult>;
-  index: ScheduleIndex;
+  minDate: number;
+  maxDate: number;
 }
 
 const DAY = 86400000;
@@ -90,7 +103,7 @@ function fmt(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FourDViewer({ parsed, ranges, index }: Props) {
+export function FourDViewer({ parsed, ranges, minDate, maxDate }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -98,10 +111,10 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
   const hiliteViaRef = useRef<string | null>(null); // 현재 강조 중인 공정단위(via)
   // 슬라이더는 정수 day-index(0..numDays)로 구동한다. epoch ms 격자로 돌리면
   // value↔step 불일치로 controlled input 이 onChange 무한 재발화(React #185)를 일으킨다.
-  const tMin = useMemo(() => Math.floor(index.minDate / DAY) * DAY, [index.minDate]);
+  const tMin = useMemo(() => Math.floor(minDate / DAY) * DAY, [minDate]);
   const numDays = useMemo(
-    () => Math.max(1, Math.ceil((index.maxDate - index.minDate) / DAY)),
-    [index.minDate, index.maxDate],
+    () => Math.max(1, Math.ceil((maxDate - minDate) / DAY)),
+    [minDate, maxDate],
   );
   const [dayIdx, setDayIdx] = useState<number>(numDays); // 초기: 마지막 날(완료 시점)
   const dateMs = tMin + dayIdx * DAY;
@@ -329,12 +342,10 @@ export function FourDViewer({ parsed, ranges, index }: Props) {
                 </div>
                 {range && mr ? (
                   <>
-                    <div>
-                      공정: {cleanStorey(hover.el.storeyName)} {workKo(mr.via)}
-                    </div>
+                    <div>공정: {procLabel(hover.el, mr.via)}</div>
                     {hiliteCount > 0 && (
                       <div style={{ color: "#fbbf24" }}>
-                        이 공정 부재 {hiliteCount.toLocaleString()}개 강조 중
+                        이 공정단위 부재 {hiliteCount.toLocaleString()}개 강조 중
                       </div>
                     )}
                     <div style={{ color: "#94a3b8" }}>

@@ -150,7 +150,82 @@ export interface IfcElementMeta {
 
 export interface MatchResult {
   range: DateRange | null; // null = 미매칭
-  via: string; // 매칭 경로 (CR@03 / MO@03 / FT@PT / none)
+  via: string; // 매칭 경로/그룹 키 (코드매칭: "ST|ZA|03|CR")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 코드 기반 매칭 (REV IFC 공정 PSet) — 부재의 (trade·zone·storey·worktype) 로
+// XER 4D 코드와 직접 매칭. zone 정확. storey 근사 매칭(matchElement)보다 정밀.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ProcElement {
+  globalId: string;
+  trade?: string;
+  zone?: string;
+  storey4d?: string;
+  wt?: string;
+}
+
+export interface CodeIndex {
+  byKey: Map<string, DateRange>;
+  minDate: number;
+  maxDate: number;
+}
+
+const codeKey = (trade: string, zone: string, storey: string, wt: string) =>
+  `${trade}|${zone}|${storey}|${wt}`;
+
+/** XER tasks → (trade|zone|storey|wt) 별 집계 날짜범위. MO 의 wt 는 항상 MD. */
+export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
+  const byKey = new Map<string, DateRange>();
+  let minD = Infinity;
+  let maxD = -Infinity;
+  for (const t of tasks) {
+    const d = decodeActId(t.code);
+    if (!d) continue;
+    const wt = d.trade === "MO" ? "MD" : (d.worktype ?? "");
+    const key = codeKey(d.trade, d.zone, d.storey, wt);
+    const s = t.start ? Date.parse(t.start) : NaN;
+    const e = t.end ? Date.parse(t.end) : NaN;
+    if (Number.isNaN(s) || Number.isNaN(e)) continue;
+    minD = Math.min(minD, s);
+    maxD = Math.max(maxD, e);
+    const cur = byKey.get(key);
+    if (!cur) byKey.set(key, { start: s, end: e });
+    else byKey.set(key, { start: Math.min(cur.start, s), end: Math.max(cur.end, e) });
+  }
+  return {
+    byKey,
+    minDate: minD === Infinity ? Date.now() : minD,
+    maxDate: maxD === -Infinity ? Date.now() : maxD,
+  };
+}
+
+/** 단일 요소 코드 매칭 — 공정 PSet 키로 직접 조회. */
+export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
+  if (!el.trade || !el.zone || !el.storey4d) return { range: null, via: "no_meta" };
+  const wt = el.wt || (el.trade === "MO" ? "MD" : "");
+  const key = codeKey(el.trade, el.zone, el.storey4d, wt);
+  const r = idx.byKey.get(key);
+  return r ? { range: r, via: key } : { range: null, via: `no_act:${key}` };
+}
+
+/** 전체 코드 매칭 + 요약. */
+export function matchAllByCode(
+  elements: (IfcElementMeta & ProcElement)[],
+  idx: CodeIndex,
+): { ranges: Map<string, MatchResult>; summary: MatchSummary } {
+  const ranges = new Map<string, MatchResult>();
+  const byVia: Record<string, number> = {};
+  let matched = 0;
+  for (const el of elements) {
+    const r = matchByCode(el, idx);
+    ranges.set(el.globalId, r);
+    if (r.range) matched++;
+    const viaTag = r.via.startsWith("no") ? r.via.split(":")[0] : "matched";
+    byVia[viaTag] = (byVia[viaTag] ?? 0) + 1;
+  }
+  return { ranges, summary: { total: elements.length, matched, byVia } };
 }
 
 /** 단일 요소 매칭 — (storey, category) → 스케줄 날짜범위. zone 무시 폴백. */

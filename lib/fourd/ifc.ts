@@ -9,7 +9,7 @@
  * 'use client' 컴포넌트에서만 동적 import 로 사용 (SSR 불가).
  */
 import * as THREE from "three";
-import { IfcAPI, IFCRELCONTAINEDINSPATIALSTRUCTURE } from "web-ifc";
+import { IfcAPI, IFCRELCONTAINEDINSPATIALSTRUCTURE, IFCRELDEFINESBYPROPERTIES } from "web-ifc";
 
 import type { IfcElementMeta } from "./match";
 
@@ -19,6 +19,12 @@ export interface ParsedElement extends IfcElementMeta {
   cx: number; // bbox 중심 X (월드)
   cy: number; // bbox 중심 Y (월드, 수직)
   cz: number; // bbox 중심 Z (월드)
+  // 공정 PSet (REV IFC) — 없으면 undefined (구버전 IFC)
+  trade?: string; // ST | MO
+  zone?: string; // ZA | ZB | ZC | AB ...
+  storey4d?: string; // 01 | 02 | PT | RF ...
+  wt?: string; // CR | FT | PR | MD
+  unit?: string; // 모듈 번호
 }
 
 export interface ParsedIfc {
@@ -89,6 +95,65 @@ function buildStoreyMap(api: IfcAPI, modelID: number): Map<number, string> {
   return map;
 }
 
+export interface ProcMeta {
+  trade?: string;
+  zone?: string;
+  storey4d?: string;
+  wt?: string;
+  unit?: string;
+}
+
+/**
+ * 요소 expressID → 공정 PSet 값 (REV IFC 의 Lv.2~Lv.7).
+ * Lv.2 Trade=ST/MO, Lv.3 Zone=ZA.., Lv.4 Storey=01.., Lv.6 Unit, Lv.7 WorkType=CR/FT/MD.
+ * 구버전 IFC(공정 PSet 없음)는 빈 맵 반환 → 매칭이 storey 방식으로 폴백.
+ */
+function buildProcMap(api: IfcAPI, modelID: number): Map<number, ProcMeta> {
+  const map = new Map<number, ProcMeta>();
+  const LV: Record<string, keyof ProcMeta> = {
+    "Lv.2 Trade": "trade",
+    "Lv.3 Zone": "zone",
+    "Lv.4 Storey": "storey4d",
+    "Lv.6 Unit": "unit",
+    "Lv.7 WorkType": "wt",
+  };
+  const RELS = api.GetLineIDsWithType(modelID, IFCRELDEFINESBYPROPERTIES);
+  for (let i = 0; i < RELS.size(); i++) {
+    let rel: { RelatingPropertyDefinition?: { value: number }; RelatedObjects?: { value: number }[] };
+    try {
+      rel = api.GetLine(modelID, RELS.get(i));
+    } catch {
+      continue;
+    }
+    const pd = rel.RelatingPropertyDefinition;
+    if (!pd) continue;
+    let pset: { HasProperties?: { value: number }[] };
+    try {
+      pset = api.GetLine(modelID, pd.value);
+    } catch {
+      continue;
+    }
+    if (!pset.HasProperties) continue;
+    const vals: ProcMeta = {};
+    for (const ph of pset.HasProperties) {
+      let p: { Name?: { value: string }; NominalValue?: { value: string } };
+      try {
+        p = api.GetLine(modelID, ph.value);
+      } catch {
+        continue;
+      }
+      const nm = p.Name?.value ?? "";
+      const key = Object.keys(LV).find((k) => nm.startsWith(k));
+      if (key && p.NominalValue) vals[LV[key]] = String(p.NominalValue.value);
+    }
+    if (!vals.zone && !vals.storey4d) continue;
+    for (const o of rel.RelatedObjects ?? []) {
+      map.set(o.value, { ...map.get(o.value), ...vals });
+    }
+  }
+  return map;
+}
+
 const WANTED_TYPES = new Set([
   "IFCWALL",
   "IFCWALLSTANDARDCASE",
@@ -135,6 +200,8 @@ export async function parseIfc(
 
   onProgress?.(0.15, "층 구조 분석 중…");
   const storeyMap = buildStoreyMap(api, modelID);
+  onProgress?.(0.2, "공정 속성 분석 중…");
+  const procMap = buildProcMap(api, modelID);
 
   // 누적 버퍼
   const positions: number[] = [];
@@ -206,6 +273,7 @@ export async function parseIfc(
         if (z < mnz) mnz = z;
         if (z > mxz) mxz = z;
       }
+      const pm = procMap.get(expressID);
       elements.push({
         globalId: m.globalId,
         expressID,
@@ -216,6 +284,11 @@ export async function parseIfc(
         cx: (mnx + mxx) / 2,
         cy: (mny + mxy) / 2,
         cz: (mnz + mxz) / 2,
+        trade: pm?.trade,
+        zone: pm?.zone,
+        storey4d: pm?.storey4d,
+        wt: pm?.wt,
+        unit: pm?.unit,
       });
     }
     count++;
