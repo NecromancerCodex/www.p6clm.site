@@ -216,6 +216,7 @@ export default function FourDPage() {
 
   // ── 정책기반 AI 매칭 — 규칙 미매칭 그룹을 gpt-5-mini 로 후보활동에 연결 ──
   const [policyBusy, setPolicyBusy] = useState(false);
+  const [policyProg, setPolicyProg] = useState("");
   const runPolicy = useCallback(async () => {
     if (!ready || !ready.codeIndex) return;
     setPolicyBusy(true);
@@ -260,8 +261,17 @@ export default function FourDPage() {
         reason: g.reason,
       }));
 
-      // 2) LLM 정책매칭
-      const assignments = await policyMatch(unmatched, ready.candidates);
+      // 2) LLM 정책매칭 — 그룹을 배치(루프)로 쪼개 호출 (응답 잘림 방지)
+      const BATCH = 12;
+      const assignments: Awaited<ReturnType<typeof policyMatch>> = [];
+      const total = Math.ceil(unmatched.length / BATCH);
+      for (let i = 0; i < unmatched.length; i += BATCH) {
+        setPolicyProg(`${Math.floor(i / BATCH) + 1}/${total} 배치`);
+        const slice = unmatched.slice(i, i + BATCH);
+        const part = await policyMatch(slice, ready.candidates);
+        assignments.push(...part);
+      }
+      setPolicyProg("");
 
       // 3) 적용 — activity_key 있고 confidence≥0.6 인 것만 (없으면 회색 유지)
       const newRanges = new Map(ready.ranges);
@@ -288,6 +298,7 @@ export default function FourDPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setPolicyBusy(false);
+      setPolicyProg("");
     }
   }, [ready]);
 
@@ -374,7 +385,7 @@ export default function FourDPage() {
                   cursor: policyBusy ? "default" : "pointer",
                 }}
               >
-                {policyBusy ? "AI 분석 중…" : "🤖 정책기반 AI 매칭 (미매칭 채우기)"}
+                {policyBusy ? `AI 분석 중… ${policyProg}` : "🤖 정책기반 AI 매칭 (미매칭 채우기)"}
               </button>
               {ready.policyCount > 0 && (
                 <span style={{ color: "#7c3aed" }}>
