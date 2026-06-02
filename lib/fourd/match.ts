@@ -201,6 +201,29 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   };
 }
 
+export interface Candidate {
+  key: string; // trade|zone|storey|wt
+  name: string; // 한글 활동명 (LLM 의미매칭 신호)
+  zone?: string;
+  storey?: string;
+  wt?: string;
+}
+
+/** XER tasks → 후보 활동(키별 대표 활동명). 정책매칭 LLM 입력용. */
+export function buildCandidates(tasks: ScheduleTask[]): Candidate[] {
+  const map = new Map<string, Candidate>();
+  for (const t of tasks) {
+    const d = decodeActId(t.code);
+    if (!d) continue;
+    const wt = d.trade === "MO" ? "MD" : (d.worktype ?? "");
+    const key = codeKey(d.trade, d.zone, d.storey, wt);
+    if (!map.has(key)) {
+      map.set(key, { key, name: t.name || key, zone: d.zone, storey: d.storey, wt });
+    }
+  }
+  return [...map.values()];
+}
+
 /** 단일 요소 코드 매칭 — 공정 PSet 키로 직접 조회. */
 export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
   if (!el.trade || !el.zone || !el.storey4d) return { range: null, via: "no_meta" };

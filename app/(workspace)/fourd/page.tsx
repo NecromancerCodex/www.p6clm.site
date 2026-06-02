@@ -14,16 +14,22 @@ import { useCallback, useRef, useState } from "react";
 import { FourDViewer } from "../../../components/fourd/FourDViewer";
 import { uploadSchedule } from "../../../lib/api/schedule";
 import {
+  buildCandidates,
   buildCodeIndex,
   buildScheduleIndex,
+  classifyIfcType,
   decodeActId,
   matchAll,
   matchAllHybrid,
+  normStorey,
+  type Candidate,
+  type CodeIndex,
   type MatchResult,
   type MatchSummary,
   type ScheduleTask,
 } from "../../../lib/fourd/match";
-import type { ParsedIfc } from "../../../lib/fourd/ifc";
+import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
+import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
 
 interface Ready {
   parsed: ParsedIfc;
@@ -34,6 +40,9 @@ interface Ready {
   taskCount: number; // 공정표 총 활동 수
   codeCount: number; // 그 중 4D 코드 디코드 성공 수
   mode: "code" | "storey"; // 매칭 방식 (REV 공정PSet vs 층근사)
+  codeIndex: CodeIndex | null; // 정책매칭 적용 시 활동키→날짜 조회용
+  candidates: Candidate[]; // 정책매칭 후보 활동
+  policyCount: number; // 정책(AI)으로 추가 매칭된 부재 수
   diag: {
     procCount: number; // 공정 PSet 보유 요소 수
     topVia: string; // byVia 상위 요약
@@ -122,7 +131,16 @@ export default function FourDPage() {
       let tasks: ScheduleTask[];
       if (/\.xer$/i.test(scheduleFile.name)) {
         const { parseXerTasks } = await import("../../../lib/fourd/xer");
-        tasks = parseXerTasks(await scheduleFile.text());
+        // XER 는 CP949(EUC-KR) — UTF-8 로 읽으면 한글 활동명이 깨진다(정책매칭 LLM 신호 손상).
+        // 코드·날짜는 ASCII 라 EUC-KR 디코드해도 안전.
+        const bytes = await scheduleFile.arrayBuffer();
+        let text: string;
+        try {
+          text = new TextDecoder("euc-kr").decode(bytes);
+        } catch {
+          text = new TextDecoder().decode(bytes);
+        }
+        tasks = parseXerTasks(text);
       } else {
         const snap = await uploadSchedule(scheduleFile);
         const rawTasks = (snap.tasks ?? []) as unknown as Array<Record<string, unknown>>;
@@ -156,11 +174,12 @@ export default function FourDPage() {
       let minDate: number;
       let maxDate: number;
       const sidx = buildScheduleIndex(tasks);
+      let codeIndex: CodeIndex | null = null;
       if (useCode) {
-        const cidx = buildCodeIndex(tasks);
-        ({ ranges, summary } = matchAllHybrid(parsed.elements, cidx, sidx));
-        minDate = Math.min(cidx.minDate, sidx.minDate);
-        maxDate = Math.max(cidx.maxDate, sidx.maxDate);
+        codeIndex = buildCodeIndex(tasks);
+        ({ ranges, summary } = matchAllHybrid(parsed.elements, codeIndex, sidx));
+        minDate = Math.min(codeIndex.minDate, sidx.minDate);
+        maxDate = Math.max(codeIndex.maxDate, sidx.maxDate);
       } else {
         ({ ranges, summary } = matchAll(parsed.elements, sidx));
         minDate = sidx.minDate;
@@ -182,6 +201,9 @@ export default function FourDPage() {
         taskCount: tasks.length,
         codeCount,
         mode: useCode ? "code" : "storey",
+        codeIndex,
+        candidates: codeIndex ? buildCandidates(tasks) : [],
+        policyCount: 0,
         diag: { procCount, topVia },
       });
     } catch (e) {
@@ -191,6 +213,83 @@ export default function FourDPage() {
       setProgress(null);
     }
   }, [scheduleFile, ifcFile]);
+
+  // ── 정책기반 AI 매칭 — 규칙 미매칭 그룹을 gpt-5-mini 로 후보활동에 연결 ──
+  const [policyBusy, setPolicyBusy] = useState(false);
+  const runPolicy = useCallback(async () => {
+    if (!ready || !ready.codeIndex) return;
+    setPolicyBusy(true);
+    setError(null);
+    try {
+      const KO_CAT: Record<string, string> = { CORE: "벽·기둥", FOOT: "기초", MOD: "슬래브·보·모듈" };
+      const koStorey = (s: string | null) =>
+        !s ? "?" : s === "PT" ? "기초(PT)" : s === "RF" ? "지붕(RF)" : `${Number(s)}층`;
+
+      // 1) 미매칭 요소 그룹핑 (zone|storey|category|reason)
+      const groups = new Map<
+        string,
+        { els: ParsedElement[]; types: Set<string>; storey: string | null; zone: string | null; cat: string; reason: string }
+      >();
+      for (const el of ready.parsed.elements) {
+        if (ready.ranges.get(el.globalId)?.range) continue; // 이미 매칭됨
+        const storey = el.storey4d ?? normStorey(el.storeyName);
+        const cat = classifyIfcType(el.ifcType);
+        const zone = el.zone ?? null;
+        const reason = (ready.ranges.get(el.globalId)?.via ?? "").split(/[:@]/)[0];
+        const gkey = `${reason}|${zone ?? "-"}|${storey ?? "-"}|${cat}`;
+        let g = groups.get(gkey);
+        if (!g) {
+          g = { els: [], types: new Set(), storey, zone, cat, reason };
+          groups.set(gkey, g);
+        }
+        g.els.push(el);
+        g.types.add(el.ifcType);
+      }
+      if (groups.size === 0) {
+        setPolicyBusy(false);
+        return;
+      }
+
+      const unmatched: UnmatchedGroup[] = [...groups.entries()].map(([key, g]) => ({
+        key,
+        label: `${g.zone ? g.zone + " " : ""}${koStorey(g.storey)} ${KO_CAT[g.cat] ?? g.cat}`,
+        count: g.els.length,
+        ifc_types: [...g.types],
+        storey: g.storey,
+        zone: g.zone,
+        reason: g.reason,
+      }));
+
+      // 2) LLM 정책매칭
+      const assignments = await policyMatch(unmatched, ready.candidates);
+
+      // 3) 적용 — activity_key 있고 confidence≥0.6 인 것만 (없으면 회색 유지)
+      const newRanges = new Map(ready.ranges);
+      let applied = 0;
+      for (const a of assignments) {
+        if (!a.activity_key || a.confidence < 0.6) continue;
+        const range = ready.codeIndex.byKey.get(a.activity_key);
+        const g = groups.get(a.group_key);
+        if (!range || !g) continue;
+        for (const el of g.els) {
+          newRanges.set(el.globalId, { range, via: `policy|${a.activity_key}` });
+          applied++;
+        }
+      }
+
+      const byVia = { ...ready.summary.byVia, "정책(AI)": applied };
+      setReady({
+        ...ready,
+        ranges: newRanges,
+        summary: { ...ready.summary, matched: ready.summary.matched + applied, byVia },
+        policyCount: applied,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPolicyBusy(false);
+    }
+  }, [ready]);
 
   return (
     <div style={{ padding: 20, height: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -260,6 +359,30 @@ export default function FourDPage() {
               새로 분석
             </button>
           </div>
+          {ready.codeIndex && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+              <button
+                onClick={runPolicy}
+                disabled={policyBusy}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: policyBusy ? "#cbd5e1" : "#7c3aed",
+                  color: "#fff",
+                  fontWeight: 600,
+                  cursor: policyBusy ? "default" : "pointer",
+                }}
+              >
+                {policyBusy ? "AI 분석 중…" : "🤖 정책기반 AI 매칭 (미매칭 채우기)"}
+              </button>
+              {ready.policyCount > 0 && (
+                <span style={{ color: "#7c3aed" }}>
+                  +{ready.policyCount.toLocaleString()}개 정책 매칭 (해당 없는 건 회색 유지)
+                </span>
+              )}
+            </div>
+          )}
           <details style={{ fontSize: 12, color: "#64748b" }}>
             <summary style={{ cursor: "pointer" }}>진단</summary>
             <div style={{ marginTop: 6, lineHeight: 1.7, fontFamily: "monospace" }}>
