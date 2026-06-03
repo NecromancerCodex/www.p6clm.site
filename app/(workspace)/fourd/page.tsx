@@ -29,6 +29,7 @@ import {
   type ScheduleTask,
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
+import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, type Cause } from "../../../lib/fourd/diagnose";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
 
 interface Ready {
@@ -55,7 +56,16 @@ interface ReportData {
   unmatched: number;
   activityTotal: number;
   noBim: { key: string; name: string }[]; // 공정 활동 있는데 BIM 부재 없음
-  noSchedule: { label: string; count: number; sample: string }[]; // BIM 부재 있는데 공정 없음
+  // BIM 부재 있는데 공정 없음 — 원인(C1~C4)별 그룹 + 설명·추천
+  noSchedule: {
+    cause: string;
+    title: string;
+    color: string;
+    explain: string;
+    recommend: string;
+    total: number;
+    items: { label: string; count: number }[];
+  }[];
   seqViolations: string[]; // 타임라인 순서 위반 (아래층>위층, 공종순서 등)
   clashes4d: string[]; // 4D Clash — 같은 공간(zone·층)에서 작업 기간 중첩
 }
@@ -335,8 +345,9 @@ export default function FourDPage() {
       return null; // 층 폴백(MO@04) 등 — 특정 활동 아님
     };
 
-    // ① BIM 있는데 공정 없음 (미매칭 부재)
-    const noSched = new Map<string, { label: string; count: number; sample: string }>();
+    // ① BIM 있는데 공정 없음 (미매칭 부재) → 원인 규칙분류(C1~C4)로 그룹핑 + 설명·추천
+    const schedOpStorey = buildSchedOpStorey(candidates.map((c) => c.key));
+    const noSched = new Map<string, { label: string; count: number; sample: string; via?: string; zone?: string }>();
     let unmatched = 0;
     for (const el of parsed.elements) {
       if (ranges.get(el.globalId)?.range) continue;
@@ -351,8 +362,26 @@ export default function FourDPage() {
           label: `${el.zone ? el.zone + " " : ""}${koStorey(s)} ${KO_CAT[cat] ?? cat}`,
           count: 1,
           sample: el.storeyName ?? "",
+          via: ranges.get(el.globalId)?.via,
+          zone: el.zone,
         });
     }
+    // 원인별 묶기 (대표 via/zone 으로 규칙 분류)
+    const causeMap = new Map<Cause, { title: string; color: string; explain: string; recommend: string; total: number; items: { label: string; count: number }[] }>();
+    for (const g of noSched.values()) {
+      const meta = classifyUnmatched(g.via, g.zone, schedOpStorey);
+      let cg = causeMap.get(meta.cause);
+      if (!cg) {
+        cg = { title: meta.title, color: meta.color, explain: meta.explain, recommend: meta.recommend, total: 0, items: [] };
+        causeMap.set(meta.cause, cg);
+      }
+      cg.total += g.count;
+      cg.items.push({ label: `${g.label}${g.sample ? ` (예: ${g.sample})` : ""}`, count: g.count });
+    }
+    const noSchedule = CAUSE_ORDER.filter((c) => causeMap.has(c)).map((c) => {
+      const cg = causeMap.get(c)!;
+      return { cause: c, ...cg, items: cg.items.sort((a, b) => b.count - a.count) };
+    });
 
     // ② 공정 활동 있는데 BIM 없음 (매칭된 부재가 0인 후보 활동)
     // 4~12층은 BIM에 실제 부재가 없음(GRID만) → "BIM 없음"으로 알려주는 게 정확(미시공/모델누락)
@@ -409,7 +438,7 @@ export default function FourDPage() {
       unmatched,
       activityTotal: candidates.length,
       noBim,
-      noSchedule: [...noSched.values()].sort((a, b) => b.count - a.count),
+      noSchedule,
       seqViolations: seqViolations.slice(0, 30),
       clashes4d: [...new Set(clashes4d)].slice(0, 30),
     });
@@ -590,9 +619,31 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
           요소 {report.total.toLocaleString()}개 중 <strong style={{ color: "#10b981" }}>{report.matched.toLocaleString()}개 매칭 ({rate}%)</strong> · 공정활동 {report.activityTotal}종 · 미매칭 {report.unmatched.toLocaleString()}개
         </div>
 
-        <Section title="① BIM 있는데 공정 없음 (공정표 누락 의심)" color="#dc2626"
-          empty="모든 부재가 공정에 연결됨"
-          items={report.noSchedule.map((g) => `${g.label} — ${g.count.toLocaleString()}개${g.sample ? ` (예: ${g.sample})` : ""}`)} />
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, color: "#dc2626", marginBottom: 6 }}>
+            ① BIM 있는데 공정 없음 — 원인별 분석 ({report.unmatched.toLocaleString()})
+          </div>
+          {report.noSchedule.length === 0 ? (
+            <div style={{ color: "#10b981", fontSize: 13 }}>✓ 모든 부재가 공정에 연결됨</div>
+          ) : (
+            report.noSchedule.map((cg) => (
+              <div key={cg.cause} style={{ borderLeft: `3px solid ${cg.color}`, paddingLeft: 10, marginBottom: 10 }}>
+                <div style={{ fontWeight: 600, color: cg.color, fontSize: 13 }}>
+                  [{cg.cause}] {cg.title} — {cg.total.toLocaleString()}개
+                </div>
+                <div style={{ fontSize: 12, color: "#475569", margin: "2px 0" }}>· 왜: {cg.explain}</div>
+                <div style={{ fontSize: 12, color: "#0f766e", margin: "2px 0" }}>· 권장: {cg.recommend}</div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.5, color: "#64748b", maxHeight: 90, overflow: "auto" }}>
+                  {cg.items.map((it, i) => (
+                    <li key={i}>
+                      {it.label} — {it.count.toLocaleString()}개
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
+        </div>
 
         <Section title="② 공정 있는데 BIM 없음 (모델 누락/미시공 의심)" color="#ea580c"
           empty="모든 공정활동에 BIM 부재 연결됨"
@@ -601,6 +652,12 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
         <Section title="③ 타임라인 순서 위반 (아래→위, 공종 순서)" color="#d97706"
           empty="공정 순서 정합 — 층·공종 순서 정상"
           items={report.seqViolations} />
+        {report.seqViolations.length > 0 && (
+          <div style={{ fontSize: 11, color: "#94a3b8", margin: "-8px 0 16px" }}>
+            · 왜: 같은 구역·공종에서 위층이 아래층보다 먼저 시작하면 통상 시공순서(아래→위)에 어긋납니다.<br />
+            · 권장: 병렬시공/조닝 의도면 정상입니다. 아니라면 선후행(TASKPRED) 연결을 재검토하세요.
+          </div>
+        )}
 
         <Section title="④ 4D Clash (같은 공간·동시 작업 중첩)" color="#7c3aed"
           empty="동일 공간 작업기간 중첩 없음"
