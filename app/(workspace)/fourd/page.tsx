@@ -355,6 +355,7 @@ export default function FourDPage() {
     }
 
     // ② 공정 활동 있는데 BIM 없음 (매칭된 부재가 0인 후보 활동)
+    // 4~12층은 BIM에 실제 부재가 없음(GRID만) → "BIM 없음"으로 알려주는 게 정확(미시공/모델누락)
     const covered = new Set<string>();
     for (const el of parsed.elements) {
       const k = viaToActivity(ranges.get(el.globalId)?.via);

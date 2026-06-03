@@ -315,12 +315,15 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
       mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
       ray.setFromCamera(mouse, camera);
       const hits = ray.intersectObject(mesh, false);
-      const fi = hits[0]?.faceIndex;
-      if (fi == null) {
+      const hit = hits[0];
+      if (!hit) {
         setHover(null);
         return;
       }
-      const el = findElementByVertex(parsed.elements, fi * 3);
+      // three-mesh-bvh 가 BVH 생성 시 geometry 에 index 를 추가 → faceIndex*3 은 더 이상
+      // position 인덱스가 아님(언싱크 원인). face.a 는 index 해석된 실제 정점 인덱스라 안전.
+      const vPos = hit.face ? hit.face.a : (hit.faceIndex ?? 0) * 3;
+      const el = findElementByVertex(parsed.elements, vPos);
       setHover(el ? { x: ev.clientX - rect.left, y: ev.clientY - rect.top, el } : null);
     };
     const onLeave = () => setHover(null);
