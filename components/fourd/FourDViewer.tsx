@@ -239,10 +239,22 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
       /* BVH 빌드 실패 시 일반 레이캐스트 폴백 */
     }
 
-    // 바닥 그리드 (공간 기준)
-    const grid = new THREE.GridHelper(parsed.radius * 4, 40, 0x334155, 0x1e293b);
-    grid.position.set(parsed.center.x, parsed.center.y - parsed.radius, parsed.center.z);
+    // 바닥 그리드 — 건물 실제 바닥(bbox.min.y)에 맞춰 띄움 방지. radius(구 반지름)는 넓은 U자에서
+    // 높이보다 훨씬 커 바닥이 한참 내려감 → 건물이 떠 보이던 원인.
+    parsed.geometry.computeBoundingBox();
+    const groundY = parsed.geometry.boundingBox?.min.y ?? parsed.center.y - parsed.radius;
+    const gridSize = parsed.radius * 4;
+    const grid = new THREE.GridHelper(gridSize, 40, 0x4ade80, 0x15803d); // 초원 그린
+    grid.position.set(parsed.center.x, groundY, parsed.center.z);
     scene.add(grid);
+    // 초원 바닥면 (그리드 살짝 아래 — z-fighting 방지)
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(gridSize, gridSize),
+      new THREE.MeshLambertMaterial({ color: 0x14532d, side: THREE.DoubleSide }),
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(parsed.center.x, groundY - 0.3, parsed.center.z);
+    scene.add(ground);
 
     // ── WASD 자유시점 ── 누른 키 추적 → 카메라+타겟 함께 이동(마우스 회전 유지)
     const keys: Record<string, boolean> = {};
