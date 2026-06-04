@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 
 // three-mesh-bvh — 레이캐스트 O(삼각형수)→O(log) 가속. 대용량 단일 지오메트리 hover 렉 해소.
@@ -219,6 +220,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const [fly, setFly] = useState(false);
   const flyRef = useRef(false);
   flyRef.current = fly;
+  // 관리자 워크(FPS 1인칭 + 벽 충돌) 모드
+  const [walk, setWalk] = useState(false);
+  const walkRef = useRef(false);
+  walkRef.current = walk;
+  const [walkLocked, setWalkLocked] = useState(false); // 포인터락 활성(=마우스룩 중) 여부
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const fpRef = useRef<PointerLockControls | null>(null);
 
   // ── three.js 씬 1회 셋업 ──
   useEffect(() => {
@@ -244,6 +252,46 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(parsed.center);
     controls.update();
+    controlsRef.current = controls;
+
+    // ── 관리자 워크: FPS 1인칭(PointerLock) + 벽 충돌 ──
+    const fp = new PointerLockControls(camera, renderer.domElement);
+    fpRef.current = fp;
+    const onLock = () => {
+      setWalkLocked(true);
+      // 진입 시 1회: 건물 중앙 높이로 내려 수평 시점 정렬 (외부 멀리서 잠겨 벽에 끼는 것 방지)
+      camera.position.y = parsed.center.y;
+      camera.lookAt(parsed.center.x, parsed.center.y, parsed.center.z);
+    };
+    const onUnlock = () => {
+      setWalkLocked(false);
+      controls.enabled = true; // ESC 종료 → 궤도 조작 복귀
+      setWalk(false);
+      setHover(null); // 조준 툴팁 정리 (외부 콜백 — effect 아님)
+    };
+    fp.addEventListener("lock", onLock);
+    fp.addEventListener("unlock", onUnlock);
+    // 워크 모드에서 캔버스 클릭 → 포인터락 요청(브라우저는 사용자 제스처 필요)
+    const onCanvasClick = () => {
+      if (walkRef.current && !fp.isLocked) fp.lock();
+    };
+    renderer.domElement.addEventListener("click", onCanvasClick);
+
+    // 충돌체(bool 0/1): 진행 방향에 벽이 buffer 안이면 true(차단). BVH 가속 레이캐스트 재사용.
+    const COLLIDE = Math.max((parsed.radius || 50) * 0.03, 0.5); // 플레이어 반경(벽과 유지 간격)
+    const collRay = new THREE.Raycaster();
+    collRay.far = COLLIDE;
+    const UP = new THREE.Vector3(0, 1, 0);
+    const axisDir = new THREE.Vector3();
+    const blocked = (origin: THREE.Vector3, sx: number, sz: number): boolean => {
+      axisDir.set(sx, 0, sz);
+      if (axisDir.lengthSq() === 0) return false;
+      axisDir.normalize();
+      collRay.set(origin, axisDir);
+      const h = collRay.intersectObject(mesh, false);
+      return h.length > 0 && h[0].distance < COLLIDE;
+    };
+    const CENTER = new THREE.Vector2(0, 0); // 크로스헤어(화면 중앙) NDC
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.65));
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -286,7 +334,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const keys: Record<string, boolean> = {};
     const moveCodes = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "Space", "ShiftLeft", "ControlLeft", "KeyQ", "KeyE"]);
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!flyRef.current) return;
+      if (!flyRef.current && !walkRef.current) return;
       const t = e.target as HTMLElement;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
       keys[e.code] = true;
@@ -301,10 +349,57 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const fwd = new THREE.Vector3();
     const right = new THREE.Vector3();
     const move = new THREE.Vector3();
+    let lastWalkRC = 0; // 크로스헤어 레이캐스트 스로틀
+    let lastWalkId: string | null = null; // 직전 조준 부재(중복 setState 방지)
 
     let raf = 0;
     const animate = () => {
       const dt = clock.getDelta();
+      // ── 관리자 워크(FPS) — 수평 WASD + 벽 충돌(축별 bool) + 상하 자유 ──
+      if (walkRef.current && fp.isLocked) {
+        const spd = (parsed.radius || 50) * 0.5 * dt; // 보행 속도
+        camera.getWorldDirection(fwd);
+        fwd.y = 0;
+        if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1);
+        fwd.normalize();
+        right.crossVectors(fwd, UP).normalize();
+        let dx = 0, dz = 0;
+        if (keys["KeyW"]) { dx += fwd.x; dz += fwd.z; }
+        if (keys["KeyS"]) { dx -= fwd.x; dz -= fwd.z; }
+        if (keys["KeyD"]) { dx += right.x; dz += right.z; }
+        if (keys["KeyA"]) { dx -= right.x; dz -= right.z; }
+        const hLen = Math.hypot(dx, dz);
+        if (hLen > 0) {
+          dx = (dx / hLen) * spd;
+          dz = (dz / hLen) * spd;
+          // 축별 충돌: 벽이 막은 축만 0, 나머지 축은 진행 → 벽 타고 미끄러짐
+          if (!blocked(camera.position, Math.sign(dx), 0)) camera.position.x += dx;
+          if (!blocked(camera.position, 0, Math.sign(dz))) camera.position.z += dz;
+        }
+        if (keys["Space"] || keys["KeyE"]) camera.position.y += spd; // 상승(층간 자유)
+        if (keys["ShiftLeft"] || keys["ControlLeft"] || keys["KeyQ"]) camera.position.y -= spd; // 하강
+        // 크로스헤어(화면 중앙) 레이캐스트 → 조준 부재 툴팁 유지
+        const ts = clock.elapsedTime * 1000;
+        if (ts - lastWalkRC > 120) {
+          lastWalkRC = ts;
+          ray.setFromCamera(CENTER, camera);
+          const wh = ray.intersectObject(mesh, false)[0];
+          if (!wh) {
+            if (lastWalkId !== null) { lastWalkId = null; setHover(null); }
+          } else {
+            const vp = wh.face ? wh.face.a : (wh.faceIndex ?? 0) * 3;
+            const wel = findElementByVertex(parsed.elements, vp);
+            if (wel && wel.globalId !== lastWalkId) {
+              lastWalkId = wel.globalId;
+              const rc = renderer.domElement.getBoundingClientRect();
+              setHover({ x: rc.width / 2, y: rc.height / 2, el: wel });
+            } else if (!wel && lastWalkId !== null) {
+              lastWalkId = null;
+              setHover(null);
+            }
+          }
+        }
+      }
       if (flyRef.current) {
         const spd = (parsed.radius || 50) * 1.4 * dt;
         camera.getWorldDirection(fwd);
@@ -346,6 +441,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const mouse = new THREE.Vector2();
     let lastRC = 0;
     const onMove = (ev: PointerEvent) => {
+      if (walkRef.current) return; // 워크 모드는 크로스헤어(중앙) 레이캐스트가 담당
       if (ev.timeStamp - lastRC < 70) return;
       lastRC = ev.timeStamp;
       const rect = renderer.domElement.getBoundingClientRect();
@@ -376,6 +472,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       window.removeEventListener("keyup", onKeyUp);
       renderer.domElement.removeEventListener("pointermove", onMove);
       renderer.domElement.removeEventListener("pointerleave", onLeave);
+      renderer.domElement.removeEventListener("click", onCanvasClick);
+      fp.removeEventListener("lock", onLock);
+      fp.removeEventListener("unlock", onUnlock);
+      if (fp.isLocked) fp.unlock();
+      fp.dispose();
       controls.dispose();
       renderer.dispose();
       try {
@@ -386,6 +487,19 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
   }, [parsed]);
+
+  // ── 관리자 워크 토글: 궤도 조작 비활성 / 종료 시 포인터락 해제 ──
+  useEffect(() => {
+    const orbit = controlsRef.current;
+    const fp = fpRef.current;
+    if (!orbit || !fp) return;
+    if (walk) {
+      orbit.enabled = false; // 클릭하면 onCanvasClick → fp.lock()
+    } else {
+      orbit.enabled = true;
+      if (fp.isLocked) fp.unlock(); // → onUnlock 에서 hover 정리
+    }
+  }, [walk]);
 
   // ── 날짜 변경 → 색상 갱신 (RAF 스로틀) ──
   // 드래그 중 onChange 가 프레임당 수십 번 발생하면 10,890개 정점색 재계산이 동기로
@@ -572,6 +686,50 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
               </div>
             );
           })()}
+
+        {/* 관리자 워크: 크로스헤어(조준점) — 잠금 중일 때만 */}
+        {walk && walkLocked && (
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              width: 18,
+              height: 18,
+              pointerEvents: "none",
+              zIndex: 12,
+            }}
+          >
+            <div style={{ position: "absolute", left: 8, top: 0, width: 2, height: 18, background: "rgba(255,255,255,0.85)" }} />
+            <div style={{ position: "absolute", left: 0, top: 8, width: 18, height: 2, background: "rgba(255,255,255,0.85)" }} />
+          </div>
+        )}
+
+        {/* 관리자 워크 진입 안내 — 모드 ON & 아직 미잠금 */}
+        {walk && !walkLocked && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              background: "rgba(10,12,18,0.55)",
+              color: "#e2e8f0",
+              cursor: "pointer",
+              zIndex: 11,
+              borderRadius: 8,
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700 }}>🚶 클릭하여 워크스루 시작</div>
+            <div style={{ fontSize: 13, color: "#cbd5e1" }}>
+              마우스 = 시점 · WASD = 이동 · Space/E = 위 · Shift/Q = 아래 · 벽 통과 불가 · ESC = 종료
+            </div>
+          </div>
+        )}
       </div>
 
       {/* KPI + 실사 모드 토글 */}
@@ -598,7 +756,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
           {hiliteMode === "object" ? "🔍 객체로 보기" : "📦 유닛으로 보기"}
         </button>
         <button
-          onClick={() => setFly((v) => !v)}
+          onClick={() => setFly((v) => { if (!v) setWalk(false); return !v; })}
           style={{
             padding: "6px 12px",
             borderRadius: 999,
@@ -612,6 +770,22 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
           title="WASD 이동 · Space/E 위 · Shift/Q 아래 · 마우스 드래그 회전"
         >
           {fly ? "🎮 자유시점 ON (WASD)" : "자유시점 OFF"}
+        </button>
+        <button
+          onClick={() => setWalk((v) => { if (!v) setFly(false); return !v; })}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: "1px solid " + (walk ? "#a855f7" : "#475569"),
+            background: walk ? "#a855f7" : "transparent",
+            color: walk ? "#fff" : "#94a3b8",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+          title="관리자 1인칭 워크스루 — 클릭하여 시작, 마우스 시점·WASD 이동, 벽 통과 불가, ESC 종료"
+        >
+          {walk ? "🚶 관리자 워크 ON" : "관리자 워크 OFF"}
         </button>
         <button
           onClick={() => setRealistic((v) => !v)}
