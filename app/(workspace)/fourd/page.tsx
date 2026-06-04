@@ -30,7 +30,7 @@ import {
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
-import { deriveWorkPackages, type DerivedPackage } from "../../../lib/fourd/workpackage";
+import { deriveWorkPackages, deriveActivityUnits, type DerivedPackage, type ActivityUnit } from "../../../lib/fourd/workpackage";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
 
 interface Ready {
@@ -644,6 +644,7 @@ export default function FourDPage() {
         <WorkPackageModal
           sessionId={ready.sessionId}
           packages={deriveWorkPackages(ready.tasks, ready.parsed.elements, ready.ranges)}
+          activities={deriveActivityUnits(ready.tasks, ready.parsed.elements, ready.ranges)}
           onClose={() => setWpOpen(false)}
         />
       )}
@@ -770,16 +771,20 @@ function wpLabel(p: DerivedPackage): string {
 function WorkPackageModal({
   sessionId,
   packages,
+  activities,
   onClose,
 }: {
   sessionId: string;
   packages: DerivedPackage[];
+  activities: ActivityUnit[];
   onClose: () => void;
 }) {
   const [saving, setSaving] = useState<"idle" | "saving" | "done" | "error">("idle");
+  const [view, setView] = useState<"bim" | "activity">("bim");
   const totalRule = packages.reduce((s, p) => s + p.bim_count_rule, 0);
   const totalAi = packages.reduce((s, p) => s + p.bim_count_ai, 0);
   const totalStorey = packages.reduce((s, p) => s + p.bim_count_storey, 0);
+  const actLinked = activities.filter((a) => a.status === "연결완료").length;
 
   const save = async () => {
     setSaving("saving");
@@ -834,31 +839,61 @@ function WorkPackageModal({
           </span>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {packages.slice(0, 400).map((p) => (
-            <div key={p.key} style={{ borderLeft: `3px solid ${p.bim_count_ai > 0 ? "#7c3aed" : "#0d9488"}`, paddingLeft: 10, paddingBottom: 4 }}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>
-                {wpLabel(p)}{" "}
-                <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>
-                  부재 {(p.bim_count_rule + p.bim_count_ai + p.bim_count_storey).toLocaleString()}
-                  {p.bim_count_ai > 0 && <span style={{ color: "#7c3aed" }}> (AI {p.bim_count_ai})</span>}
-                  {p.bim_count_storey > 0 && <span style={{ color: "#94a3b8" }}> (층근사 {p.bim_count_storey})</span>}
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, borderBottom: "1px solid #e2e8f0" }}>
+          {([["bim", `🧩 BIM 패키지 (${packages.length})`], ["activity", `📋 공정 활동 (${activities.length}) · 연결 ${actLinked}/${activities.length}`]] as const).map(([v, label]) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{ padding: "6px 12px", border: "none", borderBottom: view === v ? "2px solid #7c3aed" : "2px solid transparent", background: "transparent", color: view === v ? "#7c3aed" : "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {view === "bim" ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {packages.slice(0, 400).map((p) => (
+              <div key={p.key} style={{ borderLeft: `3px solid ${p.bim_count_ai > 0 ? "#7c3aed" : "#0d9488"}`, paddingLeft: 10, paddingBottom: 4 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>
+                  {wpLabel(p)}{" "}
+                  <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>
+                    부재 {(p.bim_count_rule + p.bim_count_ai + p.bim_count_storey).toLocaleString()}
+                    {p.bim_count_ai > 0 && <span style={{ color: "#7c3aed" }}> (AI {p.bim_count_ai})</span>}
+                    {p.bim_count_storey > 0 && <span style={{ color: "#94a3b8" }}> (층근사 {p.bim_count_storey})</span>}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: "#475569", margin: "1px 0" }}>
+                  악세사리: {p.accessories.map((a) => `${a.type} ${a.count}`).join(" · ") || "—"}
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>
+                  공정활동: {p.units.length === 0 ? "(연결 없음)" : p.units.map((u) => `${u.name ?? u.activity_code}${u.phase ? `[${u.phase}]` : ""}`).slice(0, 4).join(", ")}
+                  {p.units.length > 4 && ` 외 ${p.units.length - 4}`}
+                  {p.start && <span style={{ marginLeft: 6, color: "#94a3b8" }}>{p.start}~{p.end}</span>}
+                </div>
+              </div>
+            ))}
+            {packages.length > 400 && (
+              <div style={{ fontSize: 11, color: "#94a3b8" }}>… 외 {(packages.length - 400).toLocaleString()}개 (저장은 전체 포함)</div>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>
+              모든 공정 활동을 BIM 연결 상태로 (PT 포함). pmisx 스타일 — 활동마다 WS시그니처 + 매칭 부재 + 상태.
+            </div>
+            {activities.map((a, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12, padding: "2px 0", borderBottom: "1px solid #f1f5f9" }}>
+                <span style={{ width: 14 }}>{a.status === "연결완료" ? "✅" : "✗"}</span>
+                <span style={{ flex: 1, color: "#334155" }}>{a.name}</span>
+                <span style={{ width: 110, color: "#94a3b8", fontFamily: "monospace", fontSize: 11 }}>{a.ws}</span>
+                <span style={{ width: 70, textAlign: "right", color: a.matched > 0 ? "#0d9488" : "#dc2626", fontWeight: 600 }}>
+                  {a.matched > 0 ? `${a.matched}개${a.ai > 0 ? `(AI${a.ai})` : ""}` : a.reason}
                 </span>
               </div>
-              <div style={{ fontSize: 11, color: "#475569", margin: "1px 0" }}>
-                악세사리: {p.accessories.map((a) => `${a.type} ${a.count}`).join(" · ") || "—"}
-              </div>
-              <div style={{ fontSize: 11, color: "#64748b" }}>
-                공정활동: {p.units.length === 0 ? "(연결 없음)" : p.units.map((u) => `${u.name ?? u.activity_code}${u.phase ? `[${u.phase}]` : ""}`).slice(0, 4).join(", ")}
-                {p.units.length > 4 && ` 외 ${p.units.length - 4}`}
-                {p.start && <span style={{ marginLeft: 6, color: "#94a3b8" }}>{p.start}~{p.end}</span>}
-              </div>
-            </div>
-          ))}
-          {packages.length > 400 && (
-            <div style={{ fontSize: 11, color: "#94a3b8" }}>… 외 {(packages.length - 400).toLocaleString()}개 (저장은 전체 포함)</div>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

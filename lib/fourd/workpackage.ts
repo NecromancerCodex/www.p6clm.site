@@ -8,7 +8,7 @@
  * 패키지(물리) 1 : N 워크유닛(Primavera 공정활동). 공정 날짜는 활동에서 공유.
  * 부재는 매칭 출처(rule/ai/storey)별로 카운트 → "pmisx 정밀 + AI 보강" 가시화.
  */
-import { decodeActId, normStorey, type ScheduleTask } from "./match";
+import { decodeActId, normStorey, classifyIfcType, type DecodedCode, type ScheduleTask } from "./match";
 import type { ParsedElement } from "./ifc";
 
 export interface DerivedUnit {
@@ -169,5 +169,111 @@ export function deriveWorkPackages(
   }
   // 정렬: zone → storey → unit
   out.sort((a, b) => a.key.localeCompare(b.key));
+  return out;
+}
+
+// ── 활동 기준 UnitWork 추출 (pmisx 스타일) ─────────────────────────────────────
+// 모든 공정 활동(PT 포함, 전 phase)을 행으로. BIM 0개여도 "미연결 + 사유"로 표시.
+// (BIM-기준 deriveWorkPackages 와 반대 방향 — 활동에서 BIM 연결 상태를 본다.)
+
+export interface ActivityUnit {
+  code: string;
+  name: string;
+  key: string; // 위치 키 (ST|zone|storey|wt / MO|zone|storey|MD)
+  zone: string;
+  storey: string;
+  worktype: string;
+  phase: string;
+  ws: string; // WorkSignature 등가
+  matched: number; // 연결된 BIM 부재 수 (rule+ai)
+  rule: number;
+  ai: number;
+  status: "연결완료" | "미연결";
+  reason: string; // 미연결 사유
+}
+
+/** 공종/phase → WorkSignature 등가 (pmisx WORKTYPE_WS_HINT 미러). 형틀(FM)은 항상 FORM. */
+function wsOf(d: DecodedCode): string {
+  if (d.phase === "FM") return "WS-STR-FORM";
+  if (d.trade === "MO") return "WS-OSC-MOD";
+  if (d.worktype === "FT") return "WS-STR-FTG";
+  if (d.worktype === "CR") return "WS-STR-CORE";
+  if (d.worktype === "PR") return "WS-STR-PARAPET";
+  return "WS-STR";
+}
+
+export function deriveActivityUnits(
+  tasks: ScheduleTask[],
+  elements: ParsedElement[],
+  ranges: Map<string, RangeVal>,
+): ActivityUnit[] {
+  // 1) 활동 위치(coarse 키)별 매칭 카운트 (rule/ai). 층폴백·미매칭 제외.
+  const loc = new Map<string, { rule: number; ai: number }>();
+  const bump = (k: string, ai: boolean) => {
+    const e = loc.get(k) ?? { rule: 0, ai: 0 };
+    if (ai) e.ai++;
+    else e.rule++;
+    loc.set(k, e);
+  };
+  for (const el of elements) {
+    const rv = ranges.get(el.globalId);
+    if (!rv?.range || !rv.via) continue;
+    const via = rv.via;
+    if (via.startsWith("policy|")) {
+      bump(via.slice(7), true);
+      continue;
+    }
+    if (via.includes("@")) continue; // 층폴백 — 특정 활동 아님
+    if (via.includes("|")) {
+      const p = via.split("|");
+      const key = p[0] === "MO" ? `MO|${p[1]}|${p[2]}|MD` : `ST|${p[1]}|${p[2]}|${p[3]}`;
+      bump(key, false);
+    }
+  }
+  // 2) BIM (공종|층) 존재 — 미연결 사유 판별용
+  const OP: Record<string, string> = { CORE: "CR", MOD: "MD", FOOT: "FT" };
+  const presence = new Set<string>();
+  for (const el of elements) {
+    const op = OP[classifyIfcType(el.ifcType)];
+    const st = el.storey4d ?? normStorey(el.storeyName);
+    if (op && st) presence.add(`${op}|${st}`);
+  }
+  const bimHas = (op: string, st: string) =>
+    op === "PR" ? presence.has(`CR|${st}`) || presence.has(`MD|${st}`) : presence.has(`${op}|${st}`);
+
+  // 3) 활동마다 행
+  const out: ActivityUnit[] = [];
+  for (const t of tasks) {
+    const d = decodeActId(t.code);
+    if (!d) continue;
+    const wt = d.trade === "MO" ? "MD" : d.worktype ?? "";
+    const key = `${d.trade}|${d.zone}|${d.storey}|${wt}`;
+    const c = loc.get(key) ?? { rule: 0, ai: 0 };
+    const matched = c.rule + c.ai;
+    let reason = "";
+    if (matched === 0) {
+      const op = d.trade === "MO" ? "MD" : wt;
+      reason = bimHas(op, d.storey)
+        ? d.trade === "MO"
+          ? "모듈 키 불일치"
+          : "구역 키 불일치"
+        : "해당 위치 BIM 없음";
+    }
+    out.push({
+      code: t.code,
+      name: t.name ?? t.code,
+      key,
+      zone: d.zone,
+      storey: d.storey,
+      worktype: wt,
+      phase: d.phase,
+      ws: wsOf(d),
+      matched,
+      rule: c.rule,
+      ai: c.ai,
+      status: matched > 0 ? "연결완료" : "미연결",
+      reason,
+    });
+  }
   return out;
 }
