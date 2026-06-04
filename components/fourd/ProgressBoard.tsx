@@ -91,7 +91,7 @@ export function ProgressBoard() {
   };
 
   return (
-    <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ padding: 20, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <h1 style={{ margin: 0, fontSize: 20 }}>공정 진도율</h1>
         <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
