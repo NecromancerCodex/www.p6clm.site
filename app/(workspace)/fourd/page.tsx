@@ -12,7 +12,8 @@
 import { useCallback, useRef, useState } from "react";
 
 import { FourDViewer } from "../../../components/fourd/FourDViewer";
-import { uploadSchedule } from "../../../lib/api/schedule";
+import { ScheduleFormView } from "../../../components/documents/DocumentFormViews";
+import { analyzeSchedule, uploadSchedule, type ScheduleReportDoc } from "../../../lib/api/schedule";
 import {
   buildCandidates,
   buildCodeIndex,
@@ -346,6 +347,31 @@ export default function FourDPage() {
 
   // ── 워크패키지 — BIM 메타(호·타입·부재종류)로 세분, Neon 영속화 ──
   const [wpOpen, setWpOpen] = useState(false);
+
+  // ── 공사일보 — 타임라인 슬라이더 '해당일' 기준, 기존 schedule/analyze 재사용 ──
+  const [dailyBusy, setDailyBusy] = useState(false);
+  const [dailyDoc, setDailyDoc] = useState<ScheduleReportDoc | null>(null);
+  const [dailyErr, setDailyErr] = useState<string | null>(null);
+  const runDaily = useCallback(
+    async (dateMs: number) => {
+      if (!scheduleFile) return;
+      // 로컬 날짜 그대로 YYYY-MM-DD (UTC 변환 시 하루 밀림 방지)
+      const d = new Date(dateMs);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      setDailyBusy(true);
+      setDailyErr(null);
+      try {
+        const res = await analyzeSchedule(scheduleFile, "proc_daily", undefined, iso);
+        if (!res.document) throw new Error("보고서 본문이 비어 있습니다.");
+        setDailyDoc(res.document);
+      } catch (e) {
+        setDailyErr(e instanceof Error ? e.message : "공사일보 생성 실패");
+      } finally {
+        setDailyBusy(false);
+      }
+    },
+    [scheduleFile],
+  );
   const buildReport = useCallback(() => {
     if (!ready) return;
     const { ranges, parsed, candidates } = ready;
@@ -495,9 +521,9 @@ export default function FourDPage() {
   return (
     <div style={{ padding: 20, height: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
-        <h1 style={{ margin: 0, fontSize: 20 }}>4D 시뮬레이션 (PoC)</h1>
+        <h1 style={{ margin: 0, fontSize: 20 }}>대시보드</h1>
         <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
-          공정표(P6 XER/PMXML) + BIM(IFC)을 올리면 층·공종별로 매칭해 공정 진행을 4D로 색칠합니다.
+          공정표(P6)와 BIM(IFC)을 올리면 공정 진행 상황을 시각화하고, 해당일 공사일보를 생성합니다.
         </p>
       </div>
 
@@ -626,6 +652,8 @@ export default function FourDPage() {
               minDate={ready.minDate}
               maxDate={ready.maxDate}
               codeToName={new Map(ready.tasks.map((t) => [t.code, t.name ?? t.code]))}
+              onGenerateDaily={scheduleFile ? runDaily : undefined}
+              dailyBusy={dailyBusy}
               activities={
                 ready.codeIndex
                   ? [...ready.codeIndex.byKey.entries()].map(([k, r]) => ({
@@ -640,6 +668,15 @@ export default function FourDPage() {
         </>
       )}
 
+      {dailyErr && (
+        <div
+          style={{ position: "fixed", bottom: 16, right: 16, zIndex: 60, background: "#fee2e2", color: "#991b1b", padding: "10px 14px", borderRadius: 8, fontSize: 13, boxShadow: "0 4px 12px rgba(0,0,0,.15)" }}
+          onClick={() => setDailyErr(null)}
+        >
+          ⚠ 공사일보 생성 실패: {dailyErr} (클릭하여 닫기)
+        </div>
+      )}
+      {dailyDoc && <DailyReportModal doc={dailyDoc} onClose={() => setDailyDoc(null)} />}
       {report && <ReportModal report={report} onClose={() => setReport(null)} />}
       {wpOpen && ready && (
         <WorkPackageModal
@@ -649,6 +686,31 @@ export default function FourDPage() {
           onClose={() => setWpOpen(false)}
         />
       )}
+    </div>
+  );
+}
+
+/** 타임라인 '해당일' 공사일보 — 기존 ScheduleFormView 그대로 렌더 (수치표 결정적 + AI 서술). */
+function DailyReportModal({ doc, onClose }: { doc: ScheduleReportDoc; onClose: () => void }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, overflow: "auto" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 12, padding: 20, maxWidth: 880, width: "100%", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>
+            📄 공사일보 — {doc.reference_date}
+          </h2>
+          <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+            닫기
+          </button>
+        </div>
+        <ScheduleFormView doc={doc} showPipeline={false} />
+      </div>
     </div>
   );
 }

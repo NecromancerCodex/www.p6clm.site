@@ -256,16 +256,21 @@ export async function parseSchedule(
   return (await res.json()) as ScheduleParseResult;
 }
 
-/** PMXML 파일 업로드 → 공정 보고서 생성 (동기). */
+/**
+ * PMXML 파일 업로드 → 공정 보고서 생성 (동기).
+ * targetDate: 공사일보 '금일' 기준일 (YYYY-MM-DD). 4D 슬라이더 날짜 전달용. 미지정 시 서버 today.
+ */
 export async function analyzeSchedule(
   file: File,
   docType: ScheduleDocType,
   projectName?: string,
+  targetDate?: string,
 ): Promise<ScheduleAnalyzeResult> {
   const form = new FormData();
   form.append("file", file);
   form.append("doc_type", docType);
   if (projectName?.trim()) form.append("project_name", projectName.trim());
+  if (targetDate?.trim()) form.append("target_date", targetDate.trim());
 
   const res = await fetch(`${API_BASE}/schedule/analyze`, {
     method: "POST",

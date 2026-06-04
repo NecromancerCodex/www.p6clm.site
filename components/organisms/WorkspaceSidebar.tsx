@@ -12,45 +12,26 @@ import { useChatStore } from "../../stores/chatStore";
 import { logout, fetchMe } from "../../lib/auth";
 
 const NAV_ITEMS = [
-  { path: "/home", label: "AI 대화·문서작성", icon: Bot },
+  { path: "/home", label: "AI 대화", icon: Bot },
 ];
 
-// admin 전용 메뉴 (무전 전화 내역 — STT 검증·보고서 근거 추적)
-const ADMIN_NAV_ITEMS = [
-  { path: "/calls", label: "전화 내역", icon: Phone },
-];
-
-// 공정관리 — 확장형 그룹 (pmisx 구조 재현)
+// 공정관리 — 확장형 그룹. 대시보드(4D)가 기본 진입점.
+// soon: true = 라우트 미연결 placeholder ('준비 중', 비활성). 나중에 path 연결만 하면 됨.
 const PROCESS_GROUP = {
   label: "공정관리",
   icon: CalendarRange,
-  basePath: "/schedule",
-  sections: [
-    {
-      title: "공정 파일 업로드",
-      items: [
-        { path: "/schedule",               label: "공정 파일 업로드" },
-        { path: "/schedule/schedule-files", label: "스케줄 파일" },
-        { path: "/schedule/milestones",     label: "마일스톤 관리" },
-      ],
-    },
-    {
-      title: "공정 조회",
-      items: [
-        { path: "/schedule/construction", label: "공정표" },
-        { path: "/schedule/progress",     label: "공정 진도율" },
-        { path: "/schedule/resource",     label: "자원 계획·실적" },
-        { path: "/schedule/performance",  label: "실적 분석" },
-        { path: "/fourd",                 label: "4D 시뮬레이션" },
-      ],
-    },
+  basePaths: ["/fourd", "/schedule"], // 이 중 하나에 있으면 그룹 자동 펼침
+  items: [
+    { path: "/fourd",             label: "대시보드" },
+    { path: "/schedule/progress", label: "공정 진도율", soon: true },
+    { path: "/schedule/resource", label: "자원 계획",   soon: true },
   ],
 };
 
-const NAV_ITEMS_AFTER = [
-  { path: "/progress", label: "문서저장소", icon: BarChart2 },
-  { path: "/about",    label: "소개",   icon: Info     },
-];
+// 공정관리 그룹 뒤 — 문서 저장소 → (전화내역, admin) → 소개 순.
+const NAV_DOCS = { path: "/progress", label: "문서 저장소", icon: BarChart2 };
+const NAV_CALLS_ADMIN = { path: "/calls", label: "전화내역", icon: Phone }; // admin 전용
+const NAV_ABOUT = { path: "/about", label: "소개", icon: Info };
 
 export function WorkspaceSidebar() {
   const pathname = usePathname();
@@ -66,7 +47,7 @@ export function WorkspaceSidebar() {
   const newChat = useChatStore((s) => s.newChat);
   const deleteSession = useChatStore((s) => s.deleteSession);
 
-  const inProcess = pathname.startsWith(PROCESS_GROUP.basePath);
+  const inProcess = PROCESS_GROUP.basePaths.some((p) => pathname.startsWith(p));
   const [processOpen, setProcessOpen] = useState(inProcess);
 
   // admin 여부 (전화 내역 메뉴 노출 제어) — fetchMe 는 AuthGuard 가 이미 호출, 캐시 재사용
@@ -215,32 +196,44 @@ export function WorkspaceSidebar() {
 
           {processOpen && (
             <div className="ws-subnav">
-              {PROCESS_GROUP.sections.map((sec) => (
-                <div key={sec.title} className="ws-subnav-section">
-                  <div className="ws-subnav-title">{sec.title}</div>
-                  {sec.items.map((it) => {
-                    const active = pathname === it.path;
+              <div className="ws-subnav-section">
+                {PROCESS_GROUP.items.map((it) => {
+                  // 준비 중(soon) — 라우트 미연결, 비활성 표시
+                  if (it.soon) {
                     return (
-                      <Link
+                      <span
                         key={it.path}
-                        href={it.path}
-                        className={`ws-subnav-item${active ? " active" : ""}`}
-                        onClick={closeSidebar}
+                        className="ws-subnav-item is-soon"
+                        aria-disabled="true"
+                        title="준비 중"
                       >
                         <span className="ws-subnav-dot" />
                         {it.label}
-                      </Link>
+                        <span className="ws-subnav-badge">준비 중</span>
+                      </span>
                     );
-                  })}
-                </div>
-              ))}
+                  }
+                  const active = pathname === it.path;
+                  return (
+                    <Link
+                      key={it.path}
+                      href={it.path}
+                      className={`ws-subnav-item${active ? " active" : ""}`}
+                      onClick={closeSidebar}
+                    >
+                      <span className="ws-subnav-dot" />
+                      {it.label}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {NAV_ITEMS_AFTER.map(renderFlat)}
-
-          {/* admin 전용 — 무전 전화 내역 */}
-          {isAdmin && ADMIN_NAV_ITEMS.map(renderFlat)}
+          {/* 문서 저장소 → (전화내역, admin) → 소개 */}
+          {renderFlat(NAV_DOCS)}
+          {isAdmin && renderFlat(NAV_CALLS_ADMIN)}
+          {renderFlat(NAV_ABOUT)}
         </nav>
 
         <div className="ws-sidebar-footer">

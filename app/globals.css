@@ -4454,6 +4454,13 @@ select {
 .ws-subnav-item.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
 .ws-subnav-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.45; flex: 0 0 auto; }
 .ws-subnav-item.active .ws-subnav-dot { opacity: 1; }
+/* 준비 중(soon) — 비활성 placeholder */
+.ws-subnav-item.is-soon { color: var(--muted); opacity: 0.6; cursor: default; }
+.ws-subnav-item.is-soon:hover { background: transparent; }
+.ws-subnav-badge {
+  margin-left: auto; font-size: 0.62rem; font-weight: 600; color: var(--muted);
+  background: var(--surface-soft); padding: 1px 6px; border-radius: 999px; white-space: nowrap;
+}
 
 .sch-snap-select { flex: 1 1 280px; min-width: 200px; cursor: pointer; }
 

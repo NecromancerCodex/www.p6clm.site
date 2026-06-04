@@ -160,6 +160,9 @@ interface Props {
   maxDate: number;
   activities?: { name: string; start: number; end: number }[];
   codeToName?: Map<string, string>; // 4D 코드 → 실제 활동명 (툴팁에 표시)
+  /** '이 날짜 공사일보 생성' — 현재 슬라이더 날짜(ms)를 부모에 전달. 부모가 보유한 XER로 생성. */
+  onGenerateDaily?: (dateMs: number) => void;
+  dailyBusy?: boolean; // 공사일보 생성 진행 중
 }
 
 /** 부재 PSet → 4D 활동코드 재구성 (pmisx ID 와 동일 형식). 예 502HGMOZB013607MDIN */
@@ -179,7 +182,7 @@ function fmt(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName }: Props) {
+export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName, onGenerateDaily, dailyBusy = false }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -194,7 +197,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     () => Math.max(1, Math.ceil((maxDate - minDate) / DAY)),
     [minDate, maxDate],
   );
-  const [dayIdx, setDayIdx] = useState<number>(numDays); // 초기: 마지막 날(완료 시점)
+  // 초기: 오늘(공기 범위 안으로 clamp). 범위 밖이면 가까운 끝. → 공사일보 '금일' 디폴트와 일치.
+  const [dayIdx, setDayIdx] = useState<number>(() =>
+    Math.min(Math.max(Math.round((Date.now() - tMin) / DAY), 0), numDays),
+  );
   const dateMs = tMin + dayIdx * DAY;
   const [kpi, setKpi] = useState({ done: 0, active: 0, planned: 0, ghost: 0 });
   // 마우스 오버한 요소 (툴팁) — 화면 좌표 + 요소
@@ -638,6 +644,27 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
           aria-label="공정 시뮬레이션 날짜"
         />
         <span style={{ minWidth: 44, textAlign: "right" }}>{pct}%</span>
+        {onGenerateDaily && (
+          <button
+            type="button"
+            onClick={() => onGenerateDaily(dateMs)}
+            disabled={dailyBusy}
+            title={`${fmt(dateMs)} 기준 공사일보를 작성합니다`}
+            style={{
+              padding: "5px 10px",
+              borderRadius: 6,
+              border: "none",
+              fontSize: 12,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              color: "#fff",
+              background: dailyBusy ? "#64748b" : "#2563eb",
+              cursor: dailyBusy ? "default" : "pointer",
+            }}
+          >
+            {dailyBusy ? "작성 중…" : "📄 이 날짜 공사일보"}
+          </button>
+        )}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9ca3af" }}>
         <span>{fmt(tMin)}</span>
