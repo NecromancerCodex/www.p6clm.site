@@ -259,12 +259,26 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     fpRef.current = fp;
     const onLock = () => {
       setWalkLocked(true);
-      // 진입 시 1회: 건물 중앙 높이로 내려 수평 시점 정렬 (외부 멀리서 잠겨 벽에 끼는 것 방지)
-      camera.position.y = parsed.center.y;
-      camera.lookAt(parsed.center.x, parsed.center.y, parsed.center.z);
+      clearKeys(); // 진입 시 잔여 키 제거
+      // 시작위치(결정론): 현재 시점 방향으로 건물 외곽 살짝 바깥, 중앙 높이에서 건물을 바라봄.
+      // 멀리서 잠겨 벽에 끼거나 허공에 뜨는 것 방지 + W 로 바로 진입 가능.
+      const toCam = new THREE.Vector3().subVectors(camera.position, parsed.center);
+      toCam.y = 0;
+      if (toCam.lengthSq() < 1e-6) toCam.set(0, 0, 1);
+      toCam.normalize();
+      const dist = (parsed.radius || 50) * 0.9;
+      const eyeY = groundY + EYE; // 지면 위 눈높이 (중력 접지 시작)
+      camera.position.set(
+        parsed.center.x + toCam.x * dist,
+        eyeY,
+        parsed.center.z + toCam.z * dist,
+      );
+      camera.lookAt(parsed.center.x, eyeY, parsed.center.z); // 수평 시점
+      vy = 0; // 진입 시 수직 속도 초기화
     };
     const onUnlock = () => {
       setWalkLocked(false);
+      clearKeys(); // ESC 해제 시 keyup 유실 대비 — 키 고착 방지
       controls.enabled = true; // ESC 종료 → 궤도 조작 복귀
       setWalk(false);
       setHover(null); // 조준 툴팁 정리 (외부 콜백 — effect 아님)
@@ -292,6 +306,23 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       return h.length > 0 && h[0].distance < COLLIDE;
     };
     const CENTER = new THREE.Vector2(0, 0); // 크로스헤어(화면 중앙) NDC
+
+    // ── 중력/접지 (관리자 워크 = 접지형 FPS) ── 전부 건물 스케일에 비례 → 단위 무관.
+    const R = parsed.radius || 50;
+    const EYE = Math.max(R * 0.05, 1.2);   // 눈높이(바닥 위)
+    const GRAV = R * 0.9;                   // 중력 가속(units/s²)
+    const JUMP = R * 0.28;                   // 점프 초기 상승속도
+    let vy = 0;                              // 수직 속도
+    let grounded = false;                    // 접지 여부(점프 가능 조건)
+    const downRay = new THREE.Raycaster();
+    const DOWN = new THREE.Vector3(0, -1, 0);
+    // 카메라 바로 아래 바닥(슬래브) 표면 Y. 없으면 null → 호출측이 그리드 지면으로 클램프.
+    const floorBelowY = (origin: THREE.Vector3): number | null => {
+      downRay.set(origin, DOWN);
+      downRay.far = R * 4;
+      const h = downRay.intersectObject(mesh, false);
+      return h.length > 0 ? h[0].point.y : null;
+    };
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.65));
     const dir = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -343,8 +374,12 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const onKeyUp = (e: KeyboardEvent) => {
       keys[e.code] = false;
     };
+    // 포커스 이탈 시 keyup 유실 → 키 고착(자동 드리프트) 방지: 전체 리셋.
+    const clearKeys = () => { for (const k in keys) keys[k] = false; };
+    const onBlur = () => clearKeys();
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
     const clock = new THREE.Clock();
     const fwd = new THREE.Vector3();
     const right = new THREE.Vector3();
@@ -376,8 +411,23 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
           if (!blocked(camera.position, Math.sign(dx), 0)) camera.position.x += dx;
           if (!blocked(camera.position, 0, Math.sign(dz))) camera.position.z += dz;
         }
-        if (keys["Space"] || keys["KeyE"]) camera.position.y += spd; // 상승(층간 자유)
-        if (keys["ShiftLeft"] || keys["ControlLeft"] || keys["KeyQ"]) camera.position.y -= spd; // 하강
+        // 중력 + 접지: 매 프레임 낙하 가속 → 아래 바닥(없으면 그리드 지면) 위 EYE 에 스냅.
+        vy -= GRAV * dt;
+        let ny = camera.position.y + vy * dt;
+        const fy = floorBelowY(camera.position);
+        const floorTarget = (fy !== null ? fy : groundY) + EYE;
+        if (ny <= floorTarget) {
+          ny = floorTarget; // 바닥 착지
+          vy = 0;
+          grounded = true;
+        } else {
+          grounded = false; // 공중(낙하/점프 중)
+        }
+        camera.position.y = ny;
+        if ((keys["Space"] || keys["KeyE"]) && grounded) {
+          vy = JUMP; // 접지 상태에서만 점프
+          grounded = false;
+        }
         // 크로스헤어(화면 중앙) 레이캐스트 → 조준 부재 툴팁 유지
         const ts = clock.elapsedTime * 1000;
         if (ts - lastWalkRC > 120) {
@@ -470,6 +520,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       window.removeEventListener("resize", onResize);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
       renderer.domElement.removeEventListener("pointermove", onMove);
       renderer.domElement.removeEventListener("pointerleave", onLeave);
       renderer.domElement.removeEventListener("click", onCanvasClick);
@@ -706,9 +757,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
           </div>
         )}
 
-        {/* 관리자 워크 진입 안내 — 모드 ON & 아직 미잠금 */}
+        {/* 관리자 워크 진입 안내 — 모드 ON & 아직 미잠금. 오버레이가 캔버스를 덮으므로
+            포인터락 요청을 오버레이 자체 onClick 에서 직접 호출(캔버스 클릭이 가려짐). */}
         {walk && !walkLocked && (
           <div
+            onClick={() => fpRef.current?.lock()}
             style={{
               position: "absolute",
               inset: 0,
@@ -726,7 +779,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
           >
             <div style={{ fontSize: 18, fontWeight: 700 }}>🚶 클릭하여 워크스루 시작</div>
             <div style={{ fontSize: 13, color: "#cbd5e1" }}>
-              마우스 = 시점 · WASD = 이동 · Space/E = 위 · Shift/Q = 아래 · 벽 통과 불가 · ESC = 종료
+              마우스 = 시점 · WASD = 이동 · Space = 점프 · 중력 적용 · 벽 통과 불가 · ESC = 종료
             </div>
           </div>
         )}
@@ -783,7 +836,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             fontWeight: 600,
             cursor: "pointer",
           }}
-          title="관리자 1인칭 워크스루 — 클릭하여 시작, 마우스 시점·WASD 이동, 벽 통과 불가, ESC 종료"
+          title="관리자 1인칭 워크스루(중력) — 클릭하여 시작, 마우스 시점·WASD 이동·Space 점프, 벽 통과 불가, ESC 종료"
         >
           {walk ? "🚶 관리자 워크 ON" : "관리자 워크 OFF"}
         </button>
