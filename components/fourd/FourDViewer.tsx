@@ -292,7 +292,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     renderer.domElement.addEventListener("click", onCanvasClick);
 
     // 충돌체(bool 0/1): 진행 방향에 벽이 buffer 안이면 true(차단). BVH 가속 레이캐스트 재사용.
-    const COLLIDE = Math.max((parsed.radius || 50) * 0.03, 0.5); // 플레이어 반경(벽과 유지 간격)
+    const COLLIDE = Math.max((parsed.radius || 50) * 0.015, 0.3); // 플레이어 반경(벽과 유지 간격) — 슬림
+    // 통과 가능 부재 — 문은 워크스루 진입 위해 충돌 무시(닫힌 문도 지나감).
+    const PASSABLE = new Set(["IfcDoor"]);
     const collRay = new THREE.Raycaster();
     collRay.far = COLLIDE;
     const UP = new THREE.Vector3(0, 1, 0);
@@ -302,8 +304,16 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       if (axisDir.lengthSq() === 0) return false;
       axisDir.normalize();
       collRay.set(origin, axisDir);
-      const h = collRay.intersectObject(mesh, false);
-      return h.length > 0 && h[0].distance < COLLIDE;
+      // 가까운 순 히트 검사 — 문(통과형)은 건너뛰고, 실제 벽이 buffer 안이면 차단.
+      const hits = collRay.intersectObject(mesh, false);
+      for (const h of hits) {
+        if (h.distance >= COLLIDE) break;
+        const vp = h.face ? h.face.a : (h.faceIndex ?? 0) * 3;
+        const el = findElementByVertex(parsed.elements, vp);
+        if (el && PASSABLE.has(el.ifcType)) continue; // 문 → 통과
+        return true; // 실제 벽 → 차단
+      }
+      return false;
     };
     const CENTER = new THREE.Vector2(0, 0); // 크로스헤어(화면 중앙) NDC
 
