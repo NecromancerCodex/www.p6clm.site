@@ -244,11 +244,11 @@ export async function parseIfc(
 
   onProgress?.(0.25, "지오메트리 스트리밍 중… (대용량 IFC는 1~2분)");
 
-  // 요소별 메타 캐시 (globalId/type) — GetLine 호출 최소화
-  const metaCache = new Map<number, { globalId: string; ifcType: string } | null>();
+  // 요소별 메타 캐시 (globalId/type/name) — GetLine 호출 최소화
+  const metaCache = new Map<number, { globalId: string; ifcType: string; name: string } | null>();
   function meta(expressID: number) {
     if (metaCache.has(expressID)) return metaCache.get(expressID)!;
-    let out: { globalId: string; ifcType: string } | null = null;
+    let out: { globalId: string; ifcType: string; name: string } | null = null;
     try {
       const line = api.GetLine(modelID, expressID);
       const typeCode = api.GetLineType(modelID, expressID);
@@ -256,6 +256,8 @@ export async function parseIfc(
       out = {
         globalId: line.GlobalId?.value ?? String(expressID),
         ifcType: toPascalIfc(String(typeName).toUpperCase()),
+        // 부재 실제 이름(Revit 패밀리/타입 — "기본 벽_A_FIN_외장패널…" 같은 자재·부재명)
+        name: line.Name?.value ?? "",
       };
     } catch {
       out = null;
@@ -308,6 +310,7 @@ export async function parseIfc(
         globalId: m.globalId,
         expressID,
         ifcType: m.ifcType,
+        name: m.name,
         storeyName: storeyMap.get(expressID) ?? null,
         vStart,
         vCount,

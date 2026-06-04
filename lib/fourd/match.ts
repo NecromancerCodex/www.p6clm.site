@@ -150,6 +150,7 @@ export interface IfcElementMeta {
   globalId: string;
   expressID: number;
   ifcType: string;
+  name?: string; // 부재 실제 이름 (Revit 패밀리/타입 — "기본 벽_외장패널…")
   storeyName: string | null;
 }
 

@@ -477,7 +477,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
                   boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                 }}
               >
-                <div style={{ fontWeight: 600 }}>
+                <div style={{ fontWeight: 600, maxWidth: 320, wordBreak: "break-all" }}>
+                  {hover.el.name || (TYPE_KO[hover.el.ifcType] ?? hover.el.ifcType)}
+                </div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>
                   {TYPE_KO[hover.el.ifcType] ?? hover.el.ifcType} · {storeyDisplay(hover.el)}
                   {hover.el.zone ? ` · ${hover.el.zone}` : ""}
                 </div>
