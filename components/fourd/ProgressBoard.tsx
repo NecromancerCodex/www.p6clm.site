@@ -18,6 +18,7 @@ import {
 import {
   listScheduleReports,
   getScheduleReport,
+  aggregateReport,
   type ScheduleReportMeta,
   type ScheduleReportDoc,
 } from "../../lib/api/schedule";
@@ -73,6 +74,24 @@ export function ProgressBoard() {
       if (doc) setOpenedDoc(doc);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "보고서 열기 실패");
+    }
+  }, []);
+
+  // 주간/월간 = 그 주·달 공사일보 집계 생성 (파일 불필요)
+  const [genBusy, setGenBusy] = useState<"weekly" | "monthly" | null>(null);
+  const generateAgg = useCallback(async (period: "weekly" | "monthly") => {
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setGenBusy(period);
+    setErr(null);
+    try {
+      const r = await aggregateReport(period, iso);
+      if (r.document) setOpenedDoc(r.document);
+      setReports(await listScheduleReports());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "집계 생성 실패");
+    } finally {
+      setGenBusy(null);
     }
   }, []);
 
@@ -134,17 +153,37 @@ export function ProgressBoard() {
 
       {/* 보고서 작성 현황 (공사일보/주간/월간) */}
       <div style={{ padding: "12px 16px", background: "#eff6ff", borderRadius: 10, border: "1px solid #bfdbfe" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
           <strong style={{ fontSize: 14, color: "#1e3a8a" }}>📄 보고서 작성 현황</strong>
-          {(() => {
-            const t = todayDot();
-            const hasToday = reports.some((r) => r.doc_type === "proc_daily" && r.date === t);
-            return (
-              <span style={{ fontSize: 13, fontWeight: 600, color: hasToday ? "#10b981" : "#dc2626" }}>
-                오늘({t}) 공사일보 {hasToday ? "✅ 작성됨" : "⬜ 미작성"}
-              </span>
-            );
-          })()}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {(() => {
+              const t = todayDot();
+              const hasToday = reports.some((r) => r.doc_type === "proc_daily" && r.date === t);
+              return (
+                <span style={{ fontSize: 13, fontWeight: 600, color: hasToday ? "#10b981" : "#dc2626" }}>
+                  오늘({t}) 공사일보 {hasToday ? "✅ 작성됨" : "⬜ 미작성"}
+                </span>
+              );
+            })()}
+            <button
+              type="button"
+              onClick={() => generateAgg("weekly")}
+              disabled={genBusy !== null}
+              title="이번 주 공사일보를 모아 주간 보고서 생성"
+              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: genBusy === "weekly" ? "#94a3b8" : "#2563eb", color: "#fff", fontSize: 12, fontWeight: 600, cursor: genBusy ? "default" : "pointer" }}
+            >
+              {genBusy === "weekly" ? "집계 중…" : "주간 생성"}
+            </button>
+            <button
+              type="button"
+              onClick={() => generateAgg("monthly")}
+              disabled={genBusy !== null}
+              title="이번 달 공사일보를 모아 월간 보고서 생성"
+              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: genBusy === "monthly" ? "#94a3b8" : "#7c3aed", color: "#fff", fontSize: 12, fontWeight: 600, cursor: genBusy ? "default" : "pointer" }}
+            >
+              {genBusy === "monthly" ? "집계 중…" : "월간 생성"}
+            </button>
+          </div>
         </div>
         {reports.length === 0 ? (
           <div style={{ fontSize: 13, color: "#64748b" }}>

@@ -296,14 +296,18 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     // 범용 충돌 — '구조 부재'만 막는다(IFC 표준 클래스 기준). 그 외(문·창·커튼월·난간·
     // 설비·가구·마감 등)는 모두 통과. 블록리스트 방식이라 미지 비구조 부재는 통과가 기본값
     // → 특정 건물에 종속되지 않고 어떤 IFC 모델에도 재사용 가능.
+    // 구조 부재 — 차단 대상(IFC 표준 클래스). 어떤 모델에도 재사용.
     const BLOCKING = new Set([
       "IfcWall", "IfcWallStandardCase", "IfcColumn", "IfcSlab", "IfcBeam",
       "IfcFooting", "IfcRoof", "IfcStair", "IfcStairFlight", "IfcRamp",
       "IfcRampFlight", "IfcBuildingElementProxy", // 모듈러 프리캐스트 본체
     ]);
+    // 개구부 — 포털(통과문). 최근접이 이거면 바로 뒤에 벽이 있어도 통과(개구부 미void 모델 대응).
+    const OPENING = new Set(["IfcDoor", "IfcWindow", "IfcCurtainWall", "IfcPlate"]);
     const collRay = new THREE.Raycaster();
     const UP = new THREE.Vector3(0, 1, 0);
-    // origin→dir, maxDist 내 '구조 부재' 최초 히트(없으면 null). 비구조 히트는 건너뜀.
+    // origin→dir, maxDist 내 충돌면 판정:
+    //   최근접 히트가 개구부(문·창) → null(통과, 뒤 벽 무시) / 구조 → 그 면(차단) / 그외 → 건너뜀.
     const firstBlockingHit = (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number) => {
       collRay.set(origin, dir);
       collRay.far = maxDist;
@@ -311,8 +315,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       for (const h of hits) {
         const vp = h.face ? h.face.a : (h.faceIndex ?? 0) * 3;
         const el = findElementByVertex(parsed.elements, vp);
-        if (el && !BLOCKING.has(el.ifcType)) continue; // 비구조 → 통과
-        return h; // 구조 → 이 면이 막음
+        if (!el) continue; // 미상 부재 → 통과(fail-open)
+        if (OPENING.has(el.ifcType)) return null; // 개구부 포털 → 통과
+        if (BLOCKING.has(el.ifcType)) return h;    // 구조 → 차단
+        // 그 외(난간·가구·설비·마감) → 건너뛰고 다음 히트 검사
       }
       return null;
     };
@@ -323,7 +329,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
 
     // ── 중력/접지 (관리자 워크 = 접지형 FPS) ── 전부 건물 스케일에 비례 → 단위 무관.
     const R = parsed.radius || 50;
-    const EYE = Math.max(R * 0.05, 1.2);   // 눈높이(바닥 위)
+    const EYE = Math.max(R * 0.03, 1.0);   // 눈높이(바닥 위) — ~150cm 체감(이전 0.05=거인)
     const GRAV = R * 0.9;                   // 중력 가속(units/s²)
     const JUMP = R * 0.28;                   // 점프 초기 상승속도
     let vy = 0;                              // 수직 속도

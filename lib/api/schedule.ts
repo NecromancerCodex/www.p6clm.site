@@ -268,6 +268,22 @@ export async function getScheduleReport(id: number): Promise<ScheduleReportDoc |
   return (j.document ?? null) as ScheduleReportDoc | null;
 }
 
+/** 그 주/달의 공사일보를 모아 주간/월간 공정현황 보고서 집계·생성. (파일 불필요 — 저장된 일보 집계) */
+export async function aggregateReport(
+  period: "weekly" | "monthly",
+  date: string, // YYYY-MM-DD (그 주/달)
+): Promise<{ id: number | null; doc_type: ScheduleDocType; label: string; daily_count: number; document: ScheduleReportDoc | null }> {
+  const form = new FormData();
+  form.append("period", period);
+  form.append("date_str", date);
+  const res = await fetch(`${API_BASE}/schedule/aggregate`, { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ScheduleApiError(res.status, String((body && (body.detail ?? body.error)) || `${res.status}`));
+  }
+  return await res.json();
+}
+
 /** PMXML 파일 업로드 → 공정표(Gantt) task + 진도 요약 (stateless, 저장 X). */
 export async function parseSchedule(
   file: File,
