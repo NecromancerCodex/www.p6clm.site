@@ -514,12 +514,19 @@ export function ScheduleFormView({
 }) {
   // 진도 편차에 따른 상태 배지 색 (안전점검 risk 배지 클래스 재사용).
   const statusClass = doc.status_level === "지연" ? "sir-risk-high" : "sir-risk-low";
+  // 4D 시뮬레이션 — 진행현황이 '계획 날짜' 기준(실적 아님). 실적/편차 개념 없음.
+  const simulated = !!doc.simulated;
   // 베이스라인 미설정 시 계획 진도·편차 N/A — 근거 없는 수치 방지
   const hasBaseline = doc.planned_percent != null && doc.schedule_variance != null;
-  const plannedStr = hasBaseline ? `${doc.planned_percent}%` : "N/A (베이스라인 미설정)";
-  const varianceStr = hasBaseline
-    ? `${doc.schedule_variance! > 0 ? "+" : ""}${doc.schedule_variance}%p`
-    : "N/A (베이스라인 미설정)";
+  const plannedStr = simulated
+    ? "N/A (시뮬레이션)"
+    : hasBaseline ? `${doc.planned_percent}%` : "N/A (베이스라인 미설정)";
+  const varianceStr = simulated
+    ? "N/A (시뮬레이션)"
+    : hasBaseline ? `${doc.schedule_variance! > 0 ? "+" : ""}${doc.schedule_variance}%p` : "N/A (베이스라인 미설정)";
+  const progressLabel = simulated ? "시뮬레이션 진도(계획 기준)" : "실적 진도율";
+  // 전 활동 임계(CPM 미실행)면 임계공정 미산정
+  const criticalStr = doc.critical_unscheduled ? "미산정 (CPM 미실행)" : `${doc.critical_count}개`;
   const criticalDelayed = doc.delayed.filter((d) => d.is_critical).length;
 
   async function copyAsText() {
@@ -538,9 +545,9 @@ export function ScheduleFormView({
       `기준일:   ${doc.data_date}`,
       `전체 공기: ${doc.project_start} ~ ${doc.project_finish} (총 ${doc.total_duration_days}일)`,
       ``,
-      `[2. 공정 현황 요약]`,
-      `실적 진도: ${doc.overall_percent}%  /  계획 진도: ${plannedStr}  /  편차: ${varianceStr}`,
-      `완료 ${doc.completed_count} / 진행 ${doc.in_progress_count} / 미착수 ${doc.not_started_count}  ·  임계공정 ${doc.critical_count}개`,
+      `[2. 공정 현황 요약]${simulated ? "  (시뮬레이션 — 계획 날짜 기준, 실적 아님)" : ""}`,
+      `${progressLabel}: ${doc.overall_percent}%  /  계획 진도: ${plannedStr}  /  편차: ${varianceStr}`,
+      `완료 ${doc.completed_count} / 진행 ${doc.in_progress_count} / 미착수 ${doc.not_started_count}  ·  임계공정 ${criticalStr}`,
       ``,
       `[3. 지연·임계 공정]`,
       rows || "  (지연 공정 없음)",
@@ -621,18 +628,30 @@ export function ScheduleFormView({
           <div className="sir-section-title">
             2. 공정 현황 요약
             <span className="sir-summary-badge">
-              실적 <strong>{doc.overall_percent}%</strong> &nbsp;/&nbsp; 계획{" "}
-              <strong>{hasBaseline ? `${doc.planned_percent}%` : "N/A"}</strong> &nbsp;·&nbsp; 편차{" "}
-              <strong>{hasBaseline ? varianceStr : "—"}</strong>
+              {simulated ? (
+                <>시뮬레이션 진도 <strong>{doc.overall_percent}%</strong> &nbsp;·&nbsp; <strong>{doc.reference_date}</strong> 기준</>
+              ) : (
+                <>
+                  실적 <strong>{doc.overall_percent}%</strong> &nbsp;/&nbsp; 계획{" "}
+                  <strong>{hasBaseline ? `${doc.planned_percent}%` : "N/A"}</strong> &nbsp;·&nbsp; 편차{" "}
+                  <strong>{hasBaseline ? varianceStr : "—"}</strong>
+                </>
+              )}
             </span>
           </div>
+          {simulated && (
+            <div className="sch-hint" style={{ marginBottom: 8 }}>
+              ※ 시뮬레이션 — 기준일({doc.reference_date})까지 <strong>계획대로 진행됐다는 가정</strong>의 수치입니다(실적 데이터 아님).
+              계획종료가 기준일 이전인 공정은 완료, 진행 구간은 진행, 이후는 미착수로 봅니다.
+            </div>
+          )}
           <table className="sir-info-table">
             <tbody>
               <tr>
-                <th>실적 진도율</th>
+                <th>{progressLabel}</th>
                 <td>{doc.overall_percent}%</td>
                 <th>계획 진도율</th>
-                <td>{hasBaseline ? `${doc.planned_percent}%` : "N/A (베이스라인 미설정)"}</td>
+                <td>{plannedStr}</td>
               </tr>
               <tr>
                 <th>진행 현황</th>
@@ -644,15 +663,15 @@ export function ScheduleFormView({
               </tr>
               <tr>
                 <th>임계공정</th>
-                <td>{doc.critical_count}개</td>
+                <td>{criticalStr}</td>
                 <th>지연 공정</th>
                 <td>{doc.delayed_count}개</td>
               </tr>
             </tbody>
           </table>
           <div className="sch-prog-wrap">
-            <ProgressBar label="실적" pct={doc.overall_percent} variant="actual" />
-            {hasBaseline && <ProgressBar label="계획" pct={doc.planned_percent!} variant="planned" />}
+            <ProgressBar label={simulated ? "계획상" : "실적"} pct={doc.overall_percent} variant="actual" />
+            {!simulated && hasBaseline && <ProgressBar label="계획" pct={doc.planned_percent!} variant="planned" />}
           </div>
         </div>
 
@@ -779,7 +798,7 @@ export function ScheduleFormView({
             4. 지연·임계 공정 (지적 사항)
             <span className="sir-summary-badge">
               지연 <strong>{doc.delayed_count}</strong>건 &nbsp;/&nbsp; 임계{" "}
-              <strong>{doc.critical_count}</strong>건
+              <strong>{doc.critical_unscheduled ? "미산정" : `${doc.critical_count}건`}</strong>
             </span>
           </div>
           {doc.delayed.length > 0 ? (

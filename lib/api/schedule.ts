@@ -62,6 +62,8 @@ export interface ScheduleReportDoc {
   planned_percent: number | null;   // 베이스라인 미설정 시 null (N/A)
   schedule_variance: number | null; // 베이스라인 미설정 시 null (N/A)
   baseline_valid?: boolean;
+  simulated?: boolean;              // 4D 시뮬레이션 — 진행현황이 계획 날짜 기준(실적 아님)
+  critical_unscheduled?: boolean;   // 전 활동 임계=CPM 미실행 → 임계공정 '미산정'
   activity_count: number;
   milestone_count: number;
   completed_count: number;
