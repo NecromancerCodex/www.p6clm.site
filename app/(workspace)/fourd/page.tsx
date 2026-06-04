@@ -800,7 +800,7 @@ export default function FourDPage() {
             </div>
           </details>
           {/* 4D 뷰어 — 고정 높이(자식). 페이지를 내리면 위로 스크롤되며 공정표(부모)가 커짐 */}
-          <div style={{ height: 460, flexShrink: 0 }}>
+          <div style={{ height: 600, flexShrink: 0 }}>
             <FourDViewer
               parsed={ready.parsed}
               ranges={ready.ranges}
