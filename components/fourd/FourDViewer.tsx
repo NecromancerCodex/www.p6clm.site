@@ -292,9 +292,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     renderer.domElement.addEventListener("click", onCanvasClick);
 
     // 충돌체(bool 0/1): 진행 방향에 벽이 buffer 안이면 true(차단). BVH 가속 레이캐스트 재사용.
-    const COLLIDE = Math.max((parsed.radius || 50) * 0.015, 0.3); // 플레이어 반경(벽과 유지 간격) — 슬림
-    // 통과 가능 부재 — 문은 워크스루 진입 위해 충돌 무시(닫힌 문도 지나감).
-    const PASSABLE = new Set(["IfcDoor"]);
+    const COLLIDE = Math.max((parsed.radius || 50) * 0.008, 0.2); // 플레이어 반경(벽과 유지 간격) — 더 슬림
+    // 통과 가능 부재 — 문·창문·커튼월은 워크스루 진입 위해 충돌 무시(닫혀 있어도 지나감).
+    const PASSABLE = new Set(["IfcDoor", "IfcWindow", "IfcCurtainWall", "IfcPlate"]);
     const collRay = new THREE.Raycaster();
     collRay.far = COLLIDE;
     const UP = new THREE.Vector3(0, 1, 0);
