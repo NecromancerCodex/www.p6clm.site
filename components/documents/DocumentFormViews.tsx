@@ -527,6 +527,8 @@ export function ScheduleFormView({
   const progressLabel = simulated ? "시뮬레이션 진도(계획 기준)" : "실적 진도율";
   // 전 활동 임계(CPM 미실행)면 임계공정 미산정
   const criticalStr = doc.critical_unscheduled ? "미산정 (CPM 미실행)" : `${doc.critical_count}개`;
+  // CPM 미실행(전부 임계)이면 개별 활동 '임계' 배지도 무의미 → 숨김.
+  const showCrit = (isCrit: boolean) => !doc.critical_unscheduled && isCrit;
   const criticalDelayed = doc.delayed.filter((d) => d.is_critical).length;
 
   async function copyAsText() {
@@ -688,23 +690,31 @@ export function ScheduleFormView({
               <table className="sir-checklist-table">
                 <thead>
                   <tr>
-                    <th style={{ width: "32%" }}>공정명</th>
-                    <th style={{ width: "30%" }}>WBS 경로</th>
+                    <th style={{ width: "30%" }}>공정명</th>
+                    <th style={{ width: "28%" }}>WBS 경로</th>
                     <th style={{ width: "22%" }}>공정 기간</th>
-                    <th>구분</th>
+                    <th>{simulated ? "진척(계획상)" : "구분"}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {doc.active_today.map((t, i) => (
-                    <tr key={i} className={t.is_critical ? "sir-row-fail" : ""}>
+                    <tr key={i} className={showCrit(t.is_critical) ? "sir-row-fail" : ""}>
                       <td className="sir-target-cell">{t.name}</td>
                       <td>{t.wbs_path || "-"}</td>
                       <td>
                         {t.planned_start} ~ {t.planned_finish}
                       </td>
-                      <td className={`sir-pf-cell ${t.is_critical ? "sir-pf-fail" : "sir-pf-na"}`}>
-                        {t.is_critical ? "⚠ 임계" : "일반"}
-                      </td>
+                      {simulated ? (
+                        <td className="sir-pf-cell">
+                          {t.percent_complete >= 100
+                            ? "금일 완료 예정"
+                            : `진행 ${t.percent_complete}%`}
+                        </td>
+                      ) : (
+                        <td className={`sir-pf-cell ${showCrit(t.is_critical) ? "sir-pf-fail" : "sir-pf-na"}`}>
+                          {showCrit(t.is_critical) ? "⚠ 임계" : "일반"}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -749,7 +759,7 @@ export function ScheduleFormView({
                   </thead>
                   <tbody>
                     {doc.upcoming_critical.map((u, i) => (
-                      <tr key={i} className={u.is_critical ? "sir-row-fail" : ""}>
+                      <tr key={i} className={showCrit(u.is_critical) ? "sir-row-fail" : ""}>
                         <td className="sir-target-cell">{u.name}</td>
                         <td>{u.wbs_path || "-"}</td>
                         <td>
@@ -759,8 +769,8 @@ export function ScheduleFormView({
                             ({u.days_until < 0 ? `${-u.days_until}일 경과` : `D-${u.days_until}`})
                           </span>
                         </td>
-                        <td className={`sir-pf-cell ${u.is_critical ? "sir-pf-fail" : "sir-pf-na"}`}>
-                          {u.is_critical ? "⚠ 임계" : "일반"}
+                        <td className={`sir-pf-cell ${showCrit(u.is_critical) ? "sir-pf-fail" : "sir-pf-na"}`}>
+                          {showCrit(u.is_critical) ? "⚠ 임계" : "착수 예정"}
                         </td>
                       </tr>
                     ))}
@@ -776,7 +786,7 @@ export function ScheduleFormView({
                   {doc.delay_impacts.map((di, i) => (
                     <li key={i}>
                       <strong>{di.name}</strong>
-                      {di.is_critical ? <span className="sch-tag-cp"> 임계</span> : null}
+                      {showCrit(di.is_critical) ? <span className="sch-tag-cp"> 임계</span> : null}
                       {" "}
                       {di.delay_days}일 지연 → 후속 {di.downstream_count}건 영향
                       {di.affected_milestones.length > 0 && (
@@ -814,11 +824,11 @@ export function ScheduleFormView({
               </thead>
               <tbody>
                 {doc.delayed.map((d, i) => (
-                  <tr key={i} className={d.is_critical ? "sir-row-fail" : ""}>
+                  <tr key={i} className={showCrit(d.is_critical) ? "sir-row-fail" : ""}>
                     <td className="sir-target-cell">{d.name}</td>
                     <td>{d.wbs_path || "-"}</td>
-                    <td className={`sir-pf-cell ${d.is_critical ? "sir-pf-fail" : "sir-pf-na"}`}>
-                      {d.is_critical ? "⚠ 임계" : "지연"}
+                    <td className={`sir-pf-cell ${showCrit(d.is_critical) ? "sir-pf-fail" : "sir-pf-na"}`}>
+                      {showCrit(d.is_critical) ? "⚠ 임계" : "지연"}
                     </td>
                     <td>{d.delay_days}일</td>
                     <td className="sir-findings-cell">
@@ -871,12 +881,12 @@ export function ScheduleFormView({
               </thead>
               <tbody>
                 {doc.doc_recommendations.map((r, i) => (
-                  <tr key={i} className={r.is_critical ? "sir-row-fail" : ""}>
+                  <tr key={i} className={showCrit(r.is_critical) ? "sir-row-fail" : ""}>
                     <td className="sir-target-cell">{r.activity_name}</td>
                     <td>{r.work_type}</td>
                     <td>
                       {r.when}
-                      {r.is_critical ? <span className="sch-tag-cp"> 임계</span> : null}
+                      {showCrit(r.is_critical) ? <span className="sch-tag-cp"> 임계</span> : null}
                     </td>
                     <td>
                       {r.doc_types.map((d) => (
