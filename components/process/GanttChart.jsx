@@ -688,26 +688,12 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
     };
   }, [tasks, viewMode, focusId, height, taskInfoWidth]);
 
-  // 슬라이더 날짜 변경 → 세로선만 다시 그림(간트 재생성 없이). 화면 밖이면 가로 스크롤로 보이게.
+  // 슬라이더 날짜 변경 → 세로선만 다시 그림(간트 재생성 없이).
+  // 자동 스크롤은 하지 않는다 — 마커(예: 오늘)로 점프하면 그 시점에 막대 없는 행만 보여
+  // 타임라인이 빈 것처럼 됨. 간트는 공정 시작점(막대 밀집)을 유지하고, 마커는 스크롤해서 확인.
   useEffect(() => {
     const gantt = ganttInstanceRef.current;
-    if (!gantt) return;
-    drawSliderMarker(gantt, markerDate);
-    if (markerDate == null) return;
-    const svg = gantt.$svg;
-    const scrollEl = ganttRef.current?.querySelector(".gantt-container, .scroll-container, .gantt-body");
-    const markerLine = svg?.querySelector(`.${SLIDER_MARKER_CLASS}`);
-    if (!svg || !scrollEl || !markerLine) return;
-    const marginLeft = parseFloat(svg.style?.marginLeft || "0") || 0;
-    const absX = marginLeft + (parseFloat(markerLine.getAttribute("x1")) || 0);
-    const left = scrollEl.scrollLeft;
-    const view = scrollEl.clientWidth;
-    // 마커가 보이는 타임라인 영역([marginLeft, view]) 밖이면 중앙으로 스크롤
-    if (absX - left < marginLeft || absX - left > view) {
-      const next = Math.max(0, absX - view / 2);
-      scrollEl.scrollLeft = next;
-      if (customScrollbarRef.current) customScrollbarRef.current.scrollLeft = next;
-    }
+    if (gantt) drawSliderMarker(gantt, markerDate);
   }, [markerDate]);
 
   return (
