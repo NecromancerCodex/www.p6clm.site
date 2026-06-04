@@ -76,6 +76,7 @@ interface DailyPlan {
   iso: string;
   base: Record<string, UnitStatus>; // 기존 저장된 실적 상태 (code→status)
   items: { code: string; name: string; period: string; done: boolean }[];
+  delayReason: string; // "" | weather | material | equipment | labor | inspection | other
 }
 
 interface ReportData {
@@ -454,6 +455,7 @@ export default function FourDPage() {
           iso: isoOf(dateMs),
           base,
           items: items.map((it) => ({ ...it, done: base[it.code] === "done" })),
+          delayReason: "",
         });
       } catch (e) {
         setDailyErr(e instanceof Error ? e.message : "작업 목록 로드 실패");
@@ -466,6 +468,9 @@ export default function FourDPage() {
 
   const toggleDailyItem = useCallback((code: string) => {
     setDailyPlan((p) => (p ? { ...p, items: p.items.map((it) => (it.code === code ? { ...it, done: !it.done } : it)) } : p));
+  }, []);
+  const setDailyDelayReason = useCallback((reason: string) => {
+    setDailyPlan((p) => (p ? { ...p, delayReason: reason } : p));
   }, []);
 
   // 모달의 완료 선택 → 실적 저장 + 실적 기반 공사일보 생성
@@ -484,7 +489,7 @@ export default function FourDPage() {
       // 전체 상태맵 = 기존 + 오늘 변경 → 보고서가 누적 실적 반영
       const fullMap: Record<string, string> = { ...dailyPlan.base };
       for (const c of changes) fullMap[c.activity_code] = c.status;
-      const res = await analyzeSchedule(scheduleFile, "proc_daily", undefined, dailyPlan.iso, fullMap);
+      const res = await analyzeSchedule(scheduleFile, "proc_daily", undefined, dailyPlan.iso, fullMap, dailyPlan.delayReason || undefined);
       if (!res.document) throw new Error("보고서 본문이 비어 있습니다.");
       setDailyPlan(null);
       setDailyDoc(res.document);
@@ -839,6 +844,7 @@ export default function FourDPage() {
           plan={dailyPlan}
           busy={dailyBusy}
           onToggle={toggleDailyItem}
+          onDelayReason={setDailyDelayReason}
           onGenerate={generateDaily}
           onClose={() => setDailyPlan(null)}
         />
@@ -858,16 +864,28 @@ export default function FourDPage() {
 }
 
 /** 공사일보 작성 전 — 해당일 작업 목록에서 완료한 업무를 체크박스로 선택. */
+const DELAY_OPTIONS: { v: string; label: string }[] = [
+  { v: "", label: "지연 없음" },
+  { v: "weather", label: "기상(우천 등)" },
+  { v: "material", label: "자재 반입 지연" },
+  { v: "equipment", label: "장비" },
+  { v: "labor", label: "인력 부족" },
+  { v: "inspection", label: "검측 지연" },
+  { v: "other", label: "기타" },
+];
+
 function DailyPlanModal({
   plan,
   busy,
   onToggle,
+  onDelayReason,
   onGenerate,
   onClose,
 }: {
   plan: DailyPlan;
   busy: boolean;
   onToggle: (code: string) => void;
+  onDelayReason: (reason: string) => void;
   onGenerate: () => void;
   onClose: () => void;
 }) {
@@ -914,7 +932,21 @@ function DailyPlanModal({
           </div>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+          <span style={{ fontSize: 13, color: "#475569" }}>지연사유</span>
+          <select
+            value={plan.delayReason}
+            onChange={(e) => onDelayReason(e.target.value)}
+            style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 13 }}
+          >
+            {DELAY_OPTIONS.map((o) => (
+              <option key={o.v} value={o.v}>{o.label}</option>
+            ))}
+          </select>
+          <span style={{ fontSize: 11, color: "#94a3b8" }}>(주간·월간 보고서 지연원인 집계에 사용)</span>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
           <span style={{ fontSize: 13, color: "#475569" }}>완료 {doneCount} / 전체 {plan.items.length}</span>
           <button
             onClick={onGenerate}

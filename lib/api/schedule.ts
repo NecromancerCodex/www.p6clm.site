@@ -312,6 +312,7 @@ export async function analyzeSchedule(
   projectName?: string,
   targetDate?: string,
   statusMap?: Record<string, string>, // {activity_code: pending|active|done} → 실적 기반 공사일보
+  delayReason?: string,               // weather|material|equipment|labor|inspection|other → 주간/월간 집계용
 ): Promise<ScheduleAnalyzeResult> {
   const form = new FormData();
   form.append("file", file);
@@ -319,6 +320,7 @@ export async function analyzeSchedule(
   if (projectName?.trim()) form.append("project_name", projectName.trim());
   if (targetDate?.trim()) form.append("target_date", targetDate.trim());
   if (statusMap && Object.keys(statusMap).length) form.append("status_map", JSON.stringify(statusMap));
+  if (delayReason?.trim()) form.append("delay_reason", delayReason.trim());
 
   const res = await fetch(`${API_BASE}/schedule/analyze`, {
     method: "POST",
