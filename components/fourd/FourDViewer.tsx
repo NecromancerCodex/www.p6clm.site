@@ -159,6 +159,18 @@ interface Props {
   minDate: number;
   maxDate: number;
   activities?: { name: string; start: number; end: number }[];
+  codeToName?: Map<string, string>; // 4D 코드 → 실제 활동명 (툴팁에 표시)
+}
+
+/** 부재 PSet → 4D 활동코드 재구성 (pmisx ID 와 동일 형식). 예 502HGMOZB013607MDIN */
+function reconstructCode(el: ParsedElement): string | null {
+  if (!el.trade || !el.zone || !el.storey4d) return null;
+  const ph = el.phase ?? "IN";
+  if (el.trade === "MO") {
+    if (!el.mtype || !el.unit) return null;
+    return `502HGMO${el.zone}${el.storey4d}${el.mtype}${el.unit.padStart(2, "0")}MD${ph}`;
+  }
+  return `502HGST${el.zone}${el.storey4d}${el.wt ?? ""}${ph}`;
 }
 
 const DAY = 86400000;
@@ -167,12 +179,14 @@ function fmt(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] }: Props) {
+export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const hiliteViaRef = useRef<string | null>(null); // 현재 강조 중인 공정단위(via)
+  const hiliteViaRef = useRef<string | null>(null); // 현재 강조 키 (유닛=via / 객체=globalId)
+  const hiliteModeRef = useRef<"unit" | "object">("unit");
+  const [hiliteMode, setHiliteMode] = useState<"unit" | "object">("unit"); // 강조 단위 토글
   // 슬라이더는 정수 day-index(0..numDays)로 구동한다. epoch ms 격자로 돌리면
   // value↔step 불일치로 controlled input 이 onChange 무한 재발화(React #185)를 일으킨다.
   const tMin = useMemo(() => Math.floor(minDate / DAY) * DAY, [minDate]);
@@ -371,7 +385,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
     const raf = requestAnimationFrame(() => {
       const arr = attr.array as Float32Array;
       const realistic = realisticRef.current;
-      const via = hiliteViaRef.current;
+      const hk = hiliteViaRef.current;
+      const hmode = hiliteModeRef.current;
       const counts = { done: 0, active: 0, planned: 0, ghost: 0 };
       // 전체 재색칠 (정확성 우선 — 부분 업로드는 정합성 버그로 폐기)
       for (const el of parsed.elements) {
@@ -381,7 +396,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
         else if (st === 1) counts.active++;
         else if (st === 0) counts.planned++;
         else counts.ghost++;
-        if (via && mr?.via === via) paintElement(arr, el, C_HILITE, 1);
+        const isHi = hk != null && (hmode === "object" ? el.globalId === hk : mr?.via === hk);
+        if (isHi) paintElement(arr, el, C_HILITE, 1);
         else {
           const { c, a } = elemColor(el, st, realistic);
           paintElement(arr, el, c, a);
@@ -407,34 +423,41 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
     const attr = colorAttrRef.current;
     if (!attr) return;
     const arr = attr.array as Float32Array;
+    const mode = hiliteMode;
     const mr = hover ? ranges.get(hover.el.globalId) : undefined;
-    const newVia = mr?.range ? mr.via : null;
-    if (newVia === hiliteViaRef.current) return; // 같은 그룹 → 변화 없음
+    // 유닛 모드 = via 그룹 강조 / 객체 모드 = 그 부재 1개만 강조
+    const newKey = !hover ? null : mode === "object" ? hover.el.globalId : mr?.range ? mr.via : null;
+    const prevKey = hiliteViaRef.current;
+    const prevMode = hiliteModeRef.current;
+    if (newKey === prevKey && mode === prevMode) return; // 변화 없음
 
-    let count = 0;
     const realistic = realisticRef.current;
-    // 1) 이전 강조 그룹 → 원래 색·투명도 복원
-    const prevVia = hiliteViaRef.current;
-    if (prevVia) {
+    const matches = (el: ParsedElement, key: string, m: "unit" | "object") =>
+      m === "object" ? el.globalId === key : ranges.get(el.globalId)?.via === key;
+
+    // 1) 이전 강조 → 원래 색·투명도 복원
+    if (prevKey) {
       for (const el of parsed.elements) {
-        if (ranges.get(el.globalId)?.via !== prevVia) continue;
+        if (!matches(el, prevKey, prevMode)) continue;
         const st = statusAt(dateMs, ranges.get(el.globalId)?.range ?? null);
         const { c, a } = elemColor(el, st, realistic);
         paintElement(arr, el, c, a);
       }
     }
-    // 2) 새 그룹 → 황색 강조 (항상 보이게)
-    if (newVia) {
+    // 2) 새 강조 → 황색 (항상 보이게)
+    let count = 0;
+    if (newKey) {
       for (const el of parsed.elements) {
-        if (ranges.get(el.globalId)?.via !== newVia) continue;
+        if (!matches(el, newKey, mode)) continue;
         paintElement(arr, el, C_HILITE, 1);
         count++;
       }
     }
-    hiliteViaRef.current = newVia;
+    hiliteViaRef.current = newKey;
+    hiliteModeRef.current = mode;
     attr.needsUpdate = true;
     setHiliteCount(count);
-  }, [hover, parsed, ranges, dateMs]);
+  }, [hover, parsed, ranges, dateMs, hiliteMode]);
 
   const pct = Math.round((dayIdx / numDays) * 100);
 
@@ -450,6 +473,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
             const mr = ranges.get(hover.el.globalId);
             const range = mr?.range ?? null;
             const st = statusAt(dateMs, range);
+            const code4d = reconstructCode(hover.el); // 4D 활동코드 (pmisx ID 형식)
+            const actName = code4d ? codeToName?.get(code4d) : undefined; // 실제 활동명
             const stMeta =
               st === 2
                 ? { t: "완료", c: "#10b981" }
@@ -486,7 +511,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
                 </div>
                 {range && mr ? (
                   <>
-                    <div>공정: {procLabel(hover.el, mr.via)}</div>
+                    <div>공정: {actName || procLabel(hover.el, mr.via)}</div>
+                    {code4d && (
+                      <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace" }}>ID: {code4d}</div>
+                    )}
                     {hover.el.recalibrated && (
                       <div style={{ color: "#fbbf24", fontSize: 11 }}>
                         ⚙ BIM PT태그 → 높이로 {storeyDisplay(hover.el)} 보정 (시공순서 정합)
@@ -514,7 +542,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
                     </div>
                     {hiliteCount > 0 && (
                       <div style={{ color: "#fbbf24" }}>
-                        이 공정단위 부재 {hiliteCount.toLocaleString()}개 강조 중
+                        {hiliteMode === "object"
+                          ? "이 부재 1개 강조 (객체 모드)"
+                          : `이 공정단위 부재 ${hiliteCount.toLocaleString()}개 강조 중`}
                       </div>
                     )}
                     <div style={{ color: "#94a3b8" }}>
@@ -539,9 +569,25 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [] 
         <span style={{ color: "#60a5fa" }}>● 미착수 {kpi.planned.toLocaleString()}</span>
         <span style={{ color: "#6b7280" }}>● 미매칭 {kpi.ghost.toLocaleString()}</span>
         <button
-          onClick={() => setFly((v) => !v)}
+          onClick={() => setHiliteMode((v) => (v === "unit" ? "object" : "unit"))}
           style={{
             marginLeft: "auto",
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: "1px solid " + (hiliteMode === "object" ? "#f59e0b" : "#475569"),
+            background: hiliteMode === "object" ? "#f59e0b" : "transparent",
+            color: hiliteMode === "object" ? "#fff" : "#94a3b8",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+          title="유닛 = 같은 공정단위 전체 강조 / 객체 = 호버한 부재 1개만 강조"
+        >
+          {hiliteMode === "object" ? "🔍 객체로 보기" : "📦 유닛으로 보기"}
+        </button>
+        <button
+          onClick={() => setFly((v) => !v)}
+          style={{
             padding: "6px 12px",
             borderRadius: 999,
             border: "1px solid " + (fly ? "#3b82f6" : "#475569"),

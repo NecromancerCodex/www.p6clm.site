@@ -625,6 +625,7 @@ export default function FourDPage() {
               ranges={ready.ranges}
               minDate={ready.minDate}
               maxDate={ready.maxDate}
+              codeToName={new Map(ready.tasks.map((t) => [t.code, t.name ?? t.code]))}
               activities={
                 ready.codeIndex
                   ? [...ready.codeIndex.byKey.entries()].map(([k, r]) => ({
