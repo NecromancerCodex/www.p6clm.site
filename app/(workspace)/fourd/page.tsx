@@ -781,6 +781,7 @@ function WorkPackageModal({
 }) {
   const [saving, setSaving] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [view, setView] = useState<"bim" | "activity">("bim");
+  const [expanded, setExpanded] = useState<number | null>(null);
   const totalRule = packages.reduce((s, p) => s + p.bim_count_rule, 0);
   const totalAi = packages.reduce((s, p) => s + p.bim_count_ai, 0);
   const totalStorey = packages.reduce((s, p) => s + p.bim_count_storey, 0);
@@ -883,13 +884,42 @@ function WorkPackageModal({
               모든 공정 활동을 BIM 연결 상태로 (PT 포함). pmisx 스타일 — 활동마다 WS시그니처 + 매칭 부재 + 상태.
             </div>
             {activities.map((a, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12, padding: "2px 0", borderBottom: "1px solid #f1f5f9" }}>
-                <span style={{ width: 14 }}>{a.status === "연결완료" ? "✅" : "✗"}</span>
-                <span style={{ flex: 1, color: "#334155" }}>{a.name}</span>
-                <span style={{ width: 110, color: "#94a3b8", fontFamily: "monospace", fontSize: 11 }}>{a.ws}</span>
-                <span style={{ width: 70, textAlign: "right", color: a.matched > 0 ? "#0d9488" : "#dc2626", fontWeight: 600 }}>
-                  {a.matched > 0 ? `${a.matched}개${a.ai > 0 ? `(AI${a.ai})` : ""}` : a.reason}
-                </span>
+              <div key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <div
+                  onClick={() => setExpanded(expanded === i ? null : i)}
+                  style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12, padding: "3px 0", cursor: "pointer" }}
+                >
+                  <span style={{ width: 14 }}>{a.status === "연결완료" ? "✅" : "✗"}</span>
+                  <span style={{ width: 10, color: "#cbd5e1" }}>{expanded === i ? "▾" : "▸"}</span>
+                  <span style={{ flex: 1, color: "#334155" }}>{a.name}</span>
+                  <span style={{ width: 110, color: "#94a3b8", fontFamily: "monospace", fontSize: 11 }}>{a.ws}</span>
+                  <span style={{ width: 70, textAlign: "right", color: a.matched > 0 ? "#0d9488" : "#dc2626", fontWeight: 600 }}>
+                    {a.matched > 0 ? `${a.matched}개${a.ai > 0 ? `(AI${a.ai})` : ""}` : a.reason}
+                  </span>
+                </div>
+                {expanded === i && (
+                  <div style={{ background: "#f8fafc", borderRadius: 6, padding: "8px 12px", margin: "2px 0 6px 24px", fontSize: 12, lineHeight: 1.7, color: "#475569" }}>
+                    <div style={{ fontWeight: 600, color: "#7c3aed", marginBottom: 2 }}>
+                      근거 (공정표·BIM 실측 — 지어내지 않음)
+                    </div>
+                    <div>· BIM 객체 수: {a.matched.toLocaleString()}개{a.ai > 0 && ` (규칙 ${a.rule} + AI ${a.ai})`}</div>
+                    <div>· 공정표 기간: {a.durationDays > 0 ? `${a.durationDays}일` : "—"}{a.start && ` (${a.start} ~ ${a.end})`}</div>
+                    <div>
+                      · 함의 생산성:{" "}
+                      {a.impliedRate != null ? (
+                        <strong>{a.impliedRate}개/일 ({a.matched} ÷ {a.durationDays}, 역산)</strong>
+                      ) : (
+                        "— (매칭/기간 없음)"
+                      )}
+                    </div>
+                    <div>· 선행: {a.preds.length ? a.preds.slice(0, 5).join(", ") + (a.preds.length > 5 ? ` 외 ${a.preds.length - 5}` : "") : "—"}</div>
+                    <div>· 후행: {a.succs.length ? a.succs.slice(0, 5).join(", ") + (a.succs.length > 5 ? ` 외 ${a.succs.length - 5}` : "") : "—"}</div>
+                    {a.status === "미연결" && <div style={{ color: "#dc2626" }}>· 미연결 사유: {a.reason}</div>}
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>
+                      ※ 생산성 &quot;기준&quot;(품셈)은 미보유 — 위 생산성은 공정표 기간에서 역산한 값입니다.
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

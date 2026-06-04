@@ -18,6 +18,8 @@ export interface ScheduleTask {
   start?: string | null; // ISO date
   end?: string | null;
   progress?: number;
+  preds?: string[]; // 선행 활동명 (XER TASKPRED)
+  succs?: string[]; // 후행 활동명
 }
 
 export type Trade = "ST" | "MO";

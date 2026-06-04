@@ -190,6 +190,12 @@ export interface ActivityUnit {
   ai: number;
   status: "연결완료" | "미연결";
   reason: string; // 미연결 사유
+  start: string | null;
+  end: string | null;
+  durationDays: number; // 공정표 기간(일)
+  impliedRate: number | null; // 역산 생산성 = matched ÷ durationDays (개/일)
+  preds: string[]; // 선행 활동명
+  succs: string[]; // 후행 활동명
 }
 
 /** 공종/phase → WorkSignature 등가 (pmisx WORKTYPE_WS_HINT 미러). 형틀(FM)은 항상 FORM. */
@@ -259,6 +265,10 @@ export function deriveActivityUnits(
           : "구역 키 불일치"
         : "해당 위치 BIM 없음";
     }
+    const sMs = t.start ? Date.parse(t.start) : NaN;
+    const eMs = t.end ? Date.parse(t.end) : NaN;
+    const durationDays =
+      Number.isNaN(sMs) || Number.isNaN(eMs) ? 0 : Math.max(1, Math.round((eMs - sMs) / 86400000));
     out.push({
       code: t.code,
       name: t.name ?? t.code,
@@ -273,6 +283,12 @@ export function deriveActivityUnits(
       ai: c.ai,
       status: matched > 0 ? "연결완료" : "미연결",
       reason,
+      start: t.start ?? null,
+      end: t.end ?? null,
+      durationDays,
+      impliedRate: matched > 0 && durationDays > 0 ? Math.round((matched / durationDays) * 10) / 10 : null,
+      preds: t.preds ?? [],
+      succs: t.succs ?? [],
     });
   }
   return out;

@@ -93,8 +93,29 @@ export function parseXerTasks(text: string): ScheduleTask[] {
   if (!task) return [];
 
   const udfMap = buildUdfMap(tables, find4dUdfTypeId(tables));
-  const out: ScheduleTask[] = [];
 
+  // task_id → 활동명 (선후행 표시용 — 프론트는 EUC-KR 디코드라 한글 정상)
+  const idToName = new Map<string, string>();
+  for (const row of task.rows) {
+    idToName.set(get(row, task.cols, "task_id"), get(row, task.cols, "task_name") || "");
+  }
+  // TASKPRED → 선행(pred_task_id) / 후행(task_id) 관계 채굴
+  const predsOf = new Map<string, string[]>();
+  const succsOf = new Map<string, string[]>();
+  const tp = tables.get("TASKPRED");
+  if (tp) {
+    for (const row of tp.rows) {
+      const tid = get(row, tp.cols, "task_id"); // 후행(이 활동)
+      const pid = get(row, tp.cols, "pred_task_id"); // 선행
+      if (!tid || !pid) continue;
+      (predsOf.get(tid) ?? predsOf.set(tid, []).get(tid)!).push(pid);
+      (succsOf.get(pid) ?? succsOf.set(pid, []).get(pid)!).push(tid);
+    }
+  }
+  const names = (ids: string[] | undefined) =>
+    [...new Set(ids ?? [])].map((id) => idToName.get(id) || id).filter(Boolean);
+
+  const out: ScheduleTask[] = [];
   for (const row of task.rows) {
     const taskId = get(row, task.cols, "task_id");
     // UDF 4D 코드 우선(원본 XER), 없으면 task_code(ActID수정 XER 는 task_code 자체가 4D 코드)
@@ -109,7 +130,14 @@ export function parseXerTasks(text: string): ScheduleTask[] {
       toIso(get(row, task.cols, "target_end_date")) ||
       toIso(get(row, task.cols, "early_end_date"));
 
-    out.push({ code, name: get(row, task.cols, "task_name") || undefined, start, end });
+    out.push({
+      code,
+      name: get(row, task.cols, "task_name") || undefined,
+      start,
+      end,
+      preds: names(predsOf.get(taskId)),
+      succs: names(succsOf.get(taskId)),
+    });
   }
   return out;
 }
