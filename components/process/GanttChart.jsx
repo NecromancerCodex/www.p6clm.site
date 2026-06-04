@@ -555,7 +555,7 @@ const applyTaskInfoWidthToGantt = (gantt, taskInfoWidth = TASK_INFO_WIDTH, codeC
   realignTodayMarker(gantt);
 };
 
-export default function GanttChart({ tasks = [], height = 400, viewMode = "Month", focusId = null, markerDate = null }) {
+export default function GanttChart({ tasks = [], height = 400, viewMode = "Month", focusId = null, markerDate = null, fillWidth = false }) {
   const ganttRef = useRef(null);
   const ganttInstanceRef = useRef(null);
   const markerDateRef = useRef(markerDate);
@@ -600,8 +600,28 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
       ? String(focusTask.start).slice(0, 10)
       : "start";
 
+    // fillWidth: 타임라인이 가용 폭을 정확히 채우도록 컬럼 폭 산정(빈 공간 0).
+    //   컬럼 수가 적으면 늘려서 꽉 채우고, 많으면 최소 가독폭 유지(내용>폭 → 가로 스크롤).
+    let fillColWidth;
+    if (fillWidth) {
+      const avail = Math.max(0, (ganttRef.current.clientWidth || 0) - taskInfoWidth);
+      const times = tasks
+        .flatMap((t) => [t.start, t.end])
+        .filter(Boolean)
+        .map((d) => new Date(String(d).slice(0, 10)).getTime())
+        .filter((n) => Number.isFinite(n));
+      if (avail > 0 && times.length) {
+        const spanDays = Math.max(1, (Math.max(...times) - Math.min(...times)) / 86400000);
+        const unitDays = viewMode === "Day" ? 1 : viewMode === "Week" ? 7 : 30;
+        const cols = Math.max(1, Math.ceil(spanDays / unitDays) + 1); // +1 헤더 패딩
+        const minW = viewMode === "Day" ? 28 : viewMode === "Week" ? 56 : 80;
+        fillColWidth = Math.max(minW, Math.floor(avail / cols));
+      }
+    }
+
     const gantt = new window.Gantt(ganttRef.current, tasks, {
       view_mode: viewMode,
+      ...(fillColWidth ? { column_width: fillColWidth } : {}),
       wbs_row_height: 22,
       activity_row_height: 26,
       bar_height: 16,
@@ -686,7 +706,7 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
       hoverCleanup?.();
       scrollCleanup?.();
     };
-  }, [tasks, viewMode, focusId, height, taskInfoWidth]);
+  }, [tasks, viewMode, focusId, height, taskInfoWidth, fillWidth]);
 
   // 슬라이더 날짜 변경 → 세로선만 다시 그림(간트 재생성 없이).
   // 자동 스크롤은 하지 않는다 — 마커(예: 오늘)로 점프하면 그 시점에 막대 없는 행만 보여

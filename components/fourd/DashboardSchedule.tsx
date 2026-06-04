@@ -18,6 +18,7 @@ const GanttChart = GanttChartRaw as unknown as FC<{
   viewMode?: string;
   focusId?: string | null;
   markerDate?: string | null;
+  fillWidth?: boolean;
 }>;
 
 /** 포크 frappe-gantt(umd) + css 1회 로드. GanttView 와 동일 자산 — 회귀 회피 위해 독립 복제. */
@@ -146,7 +147,7 @@ export function DashboardSchedule({
         <div className="sch-hint">날짜가 있는 공정 활동이 없습니다.</div>
       )}
       {ready && ganttTasks.length > 0 && (
-        <GanttChart tasks={ganttTasks} height={ganttHeight} viewMode={viewMode} markerDate={marker} />
+        <GanttChart tasks={ganttTasks} height={ganttHeight} viewMode={viewMode} markerDate={marker} fillWidth />
       )}
     </div>
   );
