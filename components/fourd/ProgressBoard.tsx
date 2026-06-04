@@ -68,8 +68,9 @@ export function ProgressBoard() {
     return { total, done, active, pending, pct };
   }, [units]);
 
-  // 패키지(구역·층)별 그룹
+  // 패키지(구역·층)별 그룹 — 간트와 동일하게 '시작일순'(기초→골조→모듈)으로 정렬.
   const groups = useMemo(() => {
+    const ms = (s: string | null) => (s ? new Date(String(s).slice(0, 10)).getTime() : Infinity);
     const m = new Map<string, ProgressUnit[]>();
     for (const u of units) {
       const k = u.package_key || `${u.zone ?? "-"}|${u.storey ?? "-"}`;
@@ -77,7 +78,11 @@ export function ProgressBoard() {
       if (arr) arr.push(u);
       else m.set(k, [u]);
     }
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    // 그룹 내부: 시작일순
+    for (const arr of m.values()) arr.sort((a, b) => ms(a.start) - ms(b.start));
+    // 그룹 간: 그룹 최소 시작일순
+    const minStart = (us: ProgressUnit[]) => Math.min(...us.map((u) => ms(u.start)));
+    return [...m.entries()].sort((a, b) => minStart(a[1]) - minStart(b[1]));
   }, [units]);
 
   const groupLabel = (us: ProgressUnit[]) => {

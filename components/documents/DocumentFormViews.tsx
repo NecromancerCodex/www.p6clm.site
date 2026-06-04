@@ -696,7 +696,7 @@ export function ScheduleFormView({
         {doc.doc_type === "proc_daily" && (
           <div className="sir-section">
             <div className="sir-section-title">
-              금일({doc.reference_date}) 진행 공정 — 일정 기준
+              금일({doc.reference_date}) 작업 — {actualBased ? "현장 실적" : "일정 기준"}
               <span className="sir-summary-badge">
                 <strong>{doc.active_today.length}</strong>건
               </span>
@@ -720,7 +720,12 @@ export function ScheduleFormView({
                         {t.planned_start} ~ {t.planned_finish}
                       </td>
                       {actualBased ? (
-                        <td className="sir-pf-cell" style={{ color: "#0891b2", fontWeight: 600 }}>진행중</td>
+                        <td
+                          className="sir-pf-cell"
+                          style={{ color: t.status === "done" ? "#10b981" : t.status === "active" ? "#0891b2" : "#94a3b8", fontWeight: 600 }}
+                        >
+                          {t.status === "done" ? "✅ 완료" : t.status === "active" ? "🔵 진행중" : "⬜ 대기"}
+                        </td>
                       ) : simulated ? (
                         <td className="sir-pf-cell">
                           {t.percent_complete >= 100

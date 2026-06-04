@@ -107,6 +107,7 @@ export interface ScheduleReportDoc {
     planned_finish: string;
     percent_complete: number;
     is_critical: boolean;
+    status?: string | null; // 실적 모드: pending|active|done (완료 포함 금일 작업 표시)
   }[];
   narrative: string;
   grounding: string;
