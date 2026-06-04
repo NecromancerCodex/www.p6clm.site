@@ -90,7 +90,7 @@ function findElementByVertex(els: ParsedElement[], vIdx: number): ParsedElement 
 /** 미매칭 사유 → 정확한 한글 설명 (via + 공간 층이름 기반). */
 function unmatchedReason(via: string, storeyName: string | null): string {
   if (storeyName && storeyName.includes("주차장"))
-    return "주차장지붕(별도/포디움 구조) — 공정표에 전용 일정 없음 (정책 매칭 대상)";
+    return "주차장지붕(별도/포디움 구조) — 타워 공정과 분리, 매칭 제외(회색 유지)";
   if (via === "no_meta") return "BIM 공정 속성·층 정보 없음";
   if (via === "no_storey") return "층 인식 불가 (GL·기계실 등 비시공 레벨)";
   if (via.includes("PT")) return "기초(PT)층 — 공정표에 해당 공종 일정 없음";
