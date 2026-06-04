@@ -242,6 +242,32 @@ export async function getSnapshot(id: number): Promise<SnapshotFull> {
   return (await res.json()) as SnapshotFull;
 }
 
+/** 공정 보고서(일/주/월) 작성 현황 1행. */
+export interface ScheduleReportMeta {
+  id: number;
+  doc_type: ScheduleDocType;
+  date: string | null;       // reference_date(공사일보 금일) 또는 report/data_date
+  title: string | null;
+  document_number: string | null;
+  created_at: string | null;
+}
+
+/** 소유자의 공정 보고서(일/주/월) 작성 현황 목록. */
+export async function listScheduleReports(): Promise<ScheduleReportMeta[]> {
+  const res = await fetch(`${API_BASE}/schedule/reports`);
+  if (!res.ok) throw new ScheduleApiError(res.status, `${res.status} ${res.statusText}`);
+  const j = await res.json();
+  return (j.reports ?? []) as ScheduleReportMeta[];
+}
+
+/** 단건 공정 보고서 — raw_document(ScheduleReportDoc) 반환 → ScheduleFormView 렌더. */
+export async function getScheduleReport(id: number): Promise<ScheduleReportDoc | null> {
+  const res = await fetch(`${API_BASE}/schedule/reports/${id}`);
+  if (!res.ok) throw new ScheduleApiError(res.status, `${res.status} ${res.statusText}`);
+  const j = await res.json();
+  return (j.document ?? null) as ScheduleReportDoc | null;
+}
+
 /** PMXML 파일 업로드 → 공정표(Gantt) task + 진도 요약 (stateless, 저장 X). */
 export async function parseSchedule(
   file: File,

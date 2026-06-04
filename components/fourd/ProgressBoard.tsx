@@ -15,6 +15,24 @@ import {
   type ProgressUnit,
   type UnitStatus,
 } from "../../lib/api/fourdProgress";
+import {
+  listScheduleReports,
+  getScheduleReport,
+  type ScheduleReportMeta,
+  type ScheduleReportDoc,
+} from "../../lib/api/schedule";
+import { ScheduleFormView } from "../documents/DocumentFormViews";
+
+const REPORT_KO: Record<string, string> = {
+  proc_daily: "공사일보",
+  proc_weekly: "주간 공정현황",
+  proc_monthly: "월간 공정현황",
+};
+/** today as "YYYY.MM.DD" (백엔드 reference_date 포맷과 일치). */
+function todayDot(): string {
+  const d = new Date();
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+}
 
 const STATUS_META: Record<UnitStatus, { label: string; bg: string; fg: string }> = {
   pending: { label: "대기", bg: "#e2e8f0", fg: "#475569" },
@@ -31,6 +49,9 @@ export function ProgressBoard() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // 보고서 작성 현황 (일/주/월)
+  const [reports, setReports] = useState<ScheduleReportMeta[]>([]);
+  const [openedDoc, setOpenedDoc] = useState<ScheduleReportDoc | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -38,9 +59,21 @@ export function ProgressBoard() {
       .then((u) => alive && setUnits(u))
       .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => alive && setLoading(false));
+    listScheduleReports()
+      .then((r) => alive && setReports(r))
+      .catch(() => {/* 보고서 없으면 무시 */});
     return () => {
       alive = false;
     };
+  }, []);
+
+  const openReport = useCallback(async (id: number) => {
+    try {
+      const doc = await getScheduleReport(id);
+      if (doc) setOpenedDoc(doc);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "보고서 열기 실패");
+    }
   }, []);
 
   // 상태 변경 — 낙관적 업데이트 + 단건 저장.
@@ -97,6 +130,50 @@ export function ProgressBoard() {
         <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
           워크유닛별로 대기·진행·완료를 체크해 실적을 관리합니다. (대시보드에서 분석·저장한 공정 기준)
         </p>
+      </div>
+
+      {/* 보고서 작성 현황 (공사일보/주간/월간) */}
+      <div style={{ padding: "12px 16px", background: "#eff6ff", borderRadius: 10, border: "1px solid #bfdbfe" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <strong style={{ fontSize: 14, color: "#1e3a8a" }}>📄 보고서 작성 현황</strong>
+          {(() => {
+            const t = todayDot();
+            const hasToday = reports.some((r) => r.doc_type === "proc_daily" && r.date === t);
+            return (
+              <span style={{ fontSize: 13, fontWeight: 600, color: hasToday ? "#10b981" : "#dc2626" }}>
+                오늘({t}) 공사일보 {hasToday ? "✅ 작성됨" : "⬜ 미작성"}
+              </span>
+            );
+          })()}
+        </div>
+        {reports.length === 0 ? (
+          <div style={{ fontSize: 13, color: "#64748b" }}>
+            작성된 보고서가 없습니다. 대시보드에서 <strong>이 날짜 공사일보</strong>로 작성하세요.
+          </div>
+        ) : (
+          (["proc_daily", "proc_weekly", "proc_monthly"] as const).map((dt) => {
+            const rs = reports.filter((r) => r.doc_type === dt);
+            if (!rs.length) return null;
+            return (
+              <div key={dt} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#334155", minWidth: 88 }}>
+                  {REPORT_KO[dt]} ({rs.length})
+                </span>
+                {rs.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => openReport(r.id)}
+                    title={r.title ?? ""}
+                    style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid #bfdbfe", background: "#fff", color: "#1d4ed8", fontSize: 12, cursor: "pointer" }}
+                  >
+                    {r.date ?? r.created_at?.slice(0, 10) ?? `#${r.id}`}
+                  </button>
+                ))}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {loading && <div style={{ color: "#64748b", fontSize: 14 }}>불러오는 중…</div>}
@@ -188,6 +265,21 @@ export function ProgressBoard() {
             })}
           </div>
         </>
+      )}
+
+      {openedDoc && (
+        <div
+          onClick={() => setOpenedDoc(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 3000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, overflow: "auto" }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, padding: 20, maxWidth: 880, width: "100%", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>{REPORT_KO[openedDoc.doc_type] ?? "보고서"} — {openedDoc.reference_date || openedDoc.data_date}</h2>
+              <button onClick={() => setOpenedDoc(null)} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>닫기</button>
+            </div>
+            <ScheduleFormView doc={openedDoc} showPipeline={false} />
+          </div>
+        </div>
       )}
     </div>
   );
