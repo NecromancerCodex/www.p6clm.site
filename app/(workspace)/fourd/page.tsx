@@ -327,8 +327,14 @@ export default function FourDPage() {
         string,
         { els: ParsedElement[]; types: Set<string>; storey: string | null; zone: string | null; cat: string; reason: string }
       >();
+      // 비공정 구조(주차장지붕·포디움·페데스탈·데이텀) — 타워 공정 밖. 이름/위치로 식별해 AI 매칭서 제외(미매칭 유지).
+      // (그룹 payload엔 부재명이 안 실려 AI가 못 거르므로 프론트 룰로 차단 — 의미추론은 그 외에서 유지)
+      const NONSCHED_KW = /주차장|포디움|페데스탈|데이텀|pedestal|podium|datum|parking/i;
+      const isNonSched = (el: ParsedElement) =>
+        NONSCHED_KW.test(el.name ?? "") || NONSCHED_KW.test(el.storeyName ?? "");
       for (const el of ready.parsed.elements) {
         if (ready.ranges.get(el.globalId)?.range) continue; // 이미 매칭됨
+        if (isNonSched(el)) continue; // 비공정 구조 → AI 추론 대상 아님(회색 유지)
         const storey = el.storey4d ?? normStorey(el.storeyName);
         const cat = classifyIfcType(el.ifcType);
         const zone = el.zone ?? null;
