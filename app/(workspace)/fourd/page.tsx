@@ -29,7 +29,7 @@ import {
   type ScheduleTask,
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
-import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, type Cause } from "../../../lib/fourd/diagnose";
+import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
 
 interface Ready {
@@ -55,7 +55,16 @@ interface ReportData {
   matched: number;
   unmatched: number;
   activityTotal: number;
-  noBim: { key: string; name: string }[]; // 공정 활동 있는데 BIM 부재 없음
+  // 공정 활동 있는데 BIM 부재 없음 — 원인(A 재연결가능 / B 모델누락 / C 보류)별 그룹
+  noBim: {
+    cause: string;
+    title: string;
+    color: string;
+    explain: string;
+    recommend: string;
+    total: number;
+    items: string[];
+  }[];
   // BIM 부재 있는데 공정 없음 — 원인(C1~C4)별 그룹 + 설명·추천
   noSchedule: {
     cause: string;
@@ -383,14 +392,44 @@ export default function FourDPage() {
       return { cause: c, ...cg, items: cg.items.sort((a, b) => b.count - a.count) };
     });
 
-    // ② 공정 활동 있는데 BIM 없음 (매칭된 부재가 0인 후보 활동)
-    // 4~12층은 BIM에 실제 부재가 없음(GRID만) → "BIM 없음"으로 알려주는 게 정확(미시공/모델누락)
+    // ② 공정 활동 있는데 BIM 없음 (매칭된 부재가 0인 후보 활동) → 원인 A/B/C 분류
     const covered = new Set<string>();
     for (const el of parsed.elements) {
       const k = viaToActivity(ranges.get(el.globalId)?.via);
       if (k) covered.add(k);
     }
-    const noBim = candidates.filter((c) => !covered.has(c.key)).map((c) => ({ key: c.key, name: c.name }));
+    // BIM 부재의 (공종|층) 존재 인덱스 — A(구역만 불일치) vs B(아예 없음) 판별용
+    const OP_OF_CAT: Record<string, string> = { CORE: "CR", MOD: "MD", FOOT: "FT" };
+    const bimPresence = new Set<string>();
+    const bimZonesAt = new Map<string, Set<string>>();
+    for (const el of parsed.elements) {
+      const op = OP_OF_CAT[classifyIfcType(el.ifcType)];
+      const st = el.storey4d ?? normStorey(el.storeyName);
+      if (!op || !st) continue;
+      const bk = `${op}|${st}`;
+      bimPresence.add(bk);
+      if (el.zone) {
+        let s = bimZonesAt.get(bk);
+        if (!s) {
+          s = new Set();
+          bimZonesAt.set(bk, s);
+        }
+        s.add(el.zone);
+      }
+    }
+    const noBimMap = new Map<string, { title: string; color: string; explain: string; recommend: string; total: number; items: string[] }>();
+    for (const c of candidates) {
+      if (covered.has(c.key)) continue;
+      const meta = classifyNoBim(c.key, bimPresence, bimZonesAt);
+      let cg = noBimMap.get(meta.cause);
+      if (!cg) {
+        cg = { title: meta.title, color: meta.color, explain: meta.explain, recommend: meta.recommend, total: 0, items: [] };
+        noBimMap.set(meta.cause, cg);
+      }
+      cg.total++;
+      cg.items.push(`${c.name} [${c.key}]`);
+    }
+    const noBim = NOBIM_ORDER.filter((c) => noBimMap.has(c)).map((c) => ({ cause: c, ...noBimMap.get(c)! }));
 
     // ③ 타임라인 순서 검토 + ④ 4D Clash — codeIndex 날짜로 검증
     const FR = (s: string) => (s === "PT" ? 0 : s === "RF" ? 13 : parseInt(s, 10) || 0);
@@ -645,9 +684,29 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
           )}
         </div>
 
-        <Section title="② 공정 있는데 BIM 없음 (모델 누락/미시공 의심)" color="#ea580c"
-          empty="모든 공정활동에 BIM 부재 연결됨"
-          items={report.noBim.map((a) => `${a.name} [${a.key}]`)} />
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, color: "#ea580c", marginBottom: 6 }}>
+            ② 공정 있는데 BIM 없음 — 원인별 분석 ({report.noBim.reduce((s, g) => s + g.total, 0).toLocaleString()})
+          </div>
+          {report.noBim.length === 0 ? (
+            <div style={{ color: "#10b981", fontSize: 13 }}>✓ 모든 공정활동에 BIM 부재 연결됨</div>
+          ) : (
+            report.noBim.map((cg) => (
+              <div key={cg.cause} style={{ borderLeft: `3px solid ${cg.color}`, paddingLeft: 10, marginBottom: 10 }}>
+                <div style={{ fontWeight: 600, color: cg.color, fontSize: 13 }}>
+                  [{cg.cause}] {cg.title} — {cg.total.toLocaleString()}건
+                </div>
+                <div style={{ fontSize: 12, color: "#475569", margin: "2px 0" }}>· 왜: {cg.explain}</div>
+                <div style={{ fontSize: 12, color: "#0f766e", margin: "2px 0" }}>· 권장: {cg.recommend}</div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.5, color: "#64748b", maxHeight: 90, overflow: "auto" }}>
+                  {cg.items.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
+        </div>
 
         <Section title="③ 타임라인 순서 위반 (아래→위, 공종 순서)" color="#d97706"
           empty="공정 순서 정합 — 층·공종 순서 정상"

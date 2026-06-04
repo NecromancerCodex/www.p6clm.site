@@ -91,3 +91,56 @@ export function classifyUnmatched(
 }
 
 export const CAUSE_ORDER: Cause[] = ["C3", "C2", "C1", "C4"]; // 조치 우선순위(해결가능 → 정상 → 대상외 → 미상)
+
+// ── ② 공정 있는데 BIM 없음 — 활동 관점 원인 분류 ────────────────────────────
+// A 재연결가능(구역만 불일치, BIM은 그 위치에 있음) / B 모델누락·미시공(BIM 실제 0) / C 판단보류
+
+export interface NoBimCause {
+  cause: "A" | "B" | "C";
+  title: string;
+  color: string;
+  explain: string;
+  recommend: string;
+}
+
+export const NOBIM_ORDER: ("A" | "B" | "C")[] = ["A", "B", "C"];
+
+/** BIM 부재의 (공종|층) 존재 여부. PR(파라펫)은 BIM에서 CORE/MOD 로 모델링되므로 그쪽 존재로 판단. */
+function bimHas(presence: Set<string>, op: string, storey: string): boolean {
+  if (op === "PR") return presence.has(`CR|${storey}`) || presence.has(`MD|${storey}`);
+  return presence.has(`${op}|${storey}`);
+}
+
+/**
+ * 미매칭 공정활동(BIM 부재 0건)의 원인 분류.
+ * @param presence BIM 부재의 "(op|storey)" 집합 (op: CR/MD/FT)
+ * @param zonesAt  "(op|storey)" → BIM 구역 집합 (A 의 불일치 구역 안내용)
+ */
+export function classifyNoBim(
+  key: string,
+  presence: Set<string>,
+  zonesAt: Map<string, Set<string>>,
+): NoBimCause {
+  const p = key.split("|"); // ST|zone|storey|wt | MO|zone|storey|MD
+  const op = p[0] === "MO" ? "MD" : p[3];
+  const storey = p[2];
+  const zone = p[1];
+
+  if (!bimHas(presence, op, storey)) {
+    return {
+      cause: "B",
+      title: "BIM 모델 누락 / 미시공",
+      color: "#ea580c",
+      explain: `${storey}층·${op} 위치에 BIM 부재가 실제로 없습니다 (모델 미작성 또는 아직 미시공).`,
+      recommend: "BIM 모델에서 누락됐는지, 아니면 시공 전 단계인지 확인하세요 (지어내지 않음).",
+    };
+  }
+  const others = [...(zonesAt.get(`${op === "PR" ? "CR" : op}|${storey}`) ?? [])].filter((z) => z && z !== zone);
+  return {
+    cause: "A",
+    title: "구역 불일치 (재연결 가능)",
+    color: "#0891b2",
+    explain: `${storey}층에 BIM 부재는 있으나, 공정 구역명('${zone}')과 BIM 구역명${others.length ? `('${others.join(", ")}')` : ""}이 달라 자동 연결이 안 됩니다 (미시공 아님, 이름 매핑 문제).`,
+    recommend: "정책(AI) 매칭으로 구역 매핑을 적용하면 연결됩니다.",
+  };
+}
