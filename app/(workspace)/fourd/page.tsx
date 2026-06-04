@@ -9,9 +9,10 @@
  *  3. 매칭  → buildScheduleIndex + matchAll (pmisx auto_allocate 이식)
  *  4. 4D    → three.js 타임라인 색칠
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FourDViewer } from "../../../components/fourd/FourDViewer";
+import { DashboardSchedule } from "../../../components/fourd/DashboardSchedule";
 import { ScheduleFormView } from "../../../components/documents/DocumentFormViews";
 import { analyzeSchedule, uploadSchedule, type ScheduleReportDoc } from "../../../lib/api/schedule";
 import {
@@ -30,6 +31,7 @@ import {
   type ScheduleTask,
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
+import { saveFourdFiles, loadFourdFiles, clearFourdFiles, type CachedFourd } from "../../../lib/fourd/fileCache";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
 import { deriveWorkPackages, deriveActivityUnits, type DerivedPackage, type ActivityUnit } from "../../../lib/fourd/workpackage";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
@@ -151,9 +153,19 @@ export default function FourDPage() {
   const [progress, setProgress] = useState<{ p: number; msg: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState<Ready | null>(null);
+  // 이전 방문에서 IndexedDB에 기억된 파일 (있으면 '이어서 열기' 배너 노출)
+  const [cached, setCached] = useState<CachedFourd | null>(null);
 
-  const run = useCallback(async () => {
-    if (!scheduleFile || !ifcFile) return;
+  /** mount 시 캐시된 파일 확인 (1회) */
+  useEffect(() => {
+    void loadFourdFiles().then(setCached);
+  }, []);
+
+  const run = useCallback(async (sFile?: File, iFile?: File) => {
+    // 명시 인자(복원 시) 우선, 없으면 state. setState 는 비동기라 복원 직후 호출에 인자 전달.
+    const sf = sFile ?? scheduleFile;
+    const inf = iFile ?? ifcFile;
+    if (!sf || !inf) return;
     setBusy(true);
     setError(null);
     setReady(null);
@@ -163,11 +175,11 @@ export default function FourDPage() {
       //    .xml(PMXML) 은 기존 백엔드 업로드 경로 유지.
       setProgress({ p: 0.05, msg: "공정표 파싱 중…" });
       let tasks: ScheduleTask[];
-      if (/\.xer$/i.test(scheduleFile.name)) {
+      if (/\.xer$/i.test(sf.name)) {
         const { parseXerTasks } = await import("../../../lib/fourd/xer");
         // XER 는 CP949(EUC-KR) — UTF-8 로 읽으면 한글 활동명이 깨진다(정책매칭 LLM 신호 손상).
         // 코드·날짜는 ASCII 라 EUC-KR 디코드해도 안전.
-        const bytes = await scheduleFile.arrayBuffer();
+        const bytes = await sf.arrayBuffer();
         let text: string;
         try {
           text = new TextDecoder("euc-kr").decode(bytes);
@@ -176,7 +188,7 @@ export default function FourDPage() {
         }
         tasks = parseXerTasks(text);
       } else {
-        const snap = await uploadSchedule(scheduleFile);
+        const snap = await uploadSchedule(sf);
         const rawTasks = (snap.tasks ?? []) as unknown as Array<Record<string, unknown>>;
         tasks = rawTasks.map((t) => ({
           code: String(t.activity_code ?? t.code ?? t.id ?? ""),
@@ -196,7 +208,7 @@ export default function FourDPage() {
 
       // 2) IFC 파싱 (브라우저 web-ifc, 동적 import — SSR 회피)
       const { parseIfc } = await import("../../../lib/fourd/ifc");
-      const buf = await ifcFile.arrayBuffer();
+      const buf = await inf.arrayBuffer();
       const parsed = await parseIfc(buf, (p, msg) => setProgress({ p, msg }));
 
       // 3) 매칭 — 공정 PSet(REV) 있으면 코드매칭(zone 정확), 없으면 층근사 폴백
@@ -246,6 +258,8 @@ export default function FourDPage() {
           typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `run-${tasks.length}`,
         diag: { procCount, topVia },
       });
+      // 분석 성공 → 원본 파일을 IndexedDB에 기억(다음 방문 시 재업로드 불필요).
+      void saveFourdFiles(sf, inf);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -253,6 +267,21 @@ export default function FourDPage() {
       setProgress(null);
     }
   }, [scheduleFile, ifcFile]);
+
+  /** 캐시된 파일로 이어서 분석 — state 세팅 + 명시 인자로 즉시 run. */
+  const restoreCached = useCallback(() => {
+    if (!cached) return;
+    setScheduleFile(cached.schedule);
+    setIfcFile(cached.ifc);
+    setCached(null);
+    void run(cached.schedule, cached.ifc);
+  }, [cached, run]);
+
+  /** 기억된 파일 삭제 + 배너 숨김. */
+  const clearCached = useCallback(() => {
+    void clearFourdFiles();
+    setCached(null);
+  }, []);
 
   // ── 정책기반 AI 매칭 — 규칙 미매칭 그룹을 gpt-5-mini 로 후보활동에 연결 ──
   const [policyBusy, setPolicyBusy] = useState(false);
@@ -529,12 +558,43 @@ export default function FourDPage() {
 
       {!ready && (
         <>
+          {cached && !busy && (
+            <div
+              style={{
+                display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                padding: "12px 16px", borderRadius: 10, border: "1px solid #bfdbfe", background: "#eff6ff",
+              }}
+            >
+              <span style={{ fontSize: 20 }}>🗂️</span>
+              <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: "#1e3a8a" }}>
+                <strong>최근 파일이 기억되어 있습니다</strong>
+                <div style={{ color: "#475569", marginTop: 2 }}>
+                  {cached.schedule.name} · {cached.ifc.name} ({Math.round(cached.ifc.size / 1024 / 1024)}MB)
+                </div>
+                <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }}>
+                  {new Date(cached.savedAt).toLocaleString("ko-KR")} 저장 · 이 브라우저에만
+                </div>
+              </div>
+              <button
+                onClick={restoreCached}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                이어서 열기
+              </button>
+              <button
+                onClick={clearCached}
+                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                지우기
+              </button>
+            </div>
+          )}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <Dropzone label="① 공정표 (.xer / .xml)" accept=".xer,.xml" file={scheduleFile} onFile={setScheduleFile} />
             <Dropzone label="② BIM (.ifc)" accept=".ifc" file={ifcFile} onFile={setIfcFile} />
           </div>
           <button
-            onClick={run}
+            onClick={() => run()}
             disabled={!scheduleFile || !ifcFile || busy}
             style={{
               padding: "12px 20px",
@@ -665,6 +725,8 @@ export default function FourDPage() {
               }
             />
           </div>
+          {/* 하단 공정표 — 이전 공정표 조회와 동일한 frappe-gantt 스타일 */}
+          <DashboardSchedule tasks={ready.tasks} />
         </>
       )}
 
