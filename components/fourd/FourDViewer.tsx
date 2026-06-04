@@ -292,29 +292,33 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     renderer.domElement.addEventListener("click", onCanvasClick);
 
     // 충돌체(bool 0/1): 진행 방향에 벽이 buffer 안이면 true(차단). BVH 가속 레이캐스트 재사용.
-    const COLLIDE = Math.max((parsed.radius || 50) * 0.008, 0.2); // 플레이어 반경(벽과 유지 간격) — 더 슬림
-    // 통과 가능 부재 — 문·창문·커튼월은 워크스루 진입 위해 충돌 무시(닫혀 있어도 지나감).
-    const PASSABLE = new Set(["IfcDoor", "IfcWindow", "IfcCurtainWall", "IfcPlate"]);
+    const COLLIDE = Math.max((parsed.radius || 50) * 0.003, 0.1); // 플레이어 반경 — 아주 작게(벽에 거의 붙음)
+    // 범용 충돌 — '구조 부재'만 막는다(IFC 표준 클래스 기준). 그 외(문·창·커튼월·난간·
+    // 설비·가구·마감 등)는 모두 통과. 블록리스트 방식이라 미지 비구조 부재는 통과가 기본값
+    // → 특정 건물에 종속되지 않고 어떤 IFC 모델에도 재사용 가능.
+    const BLOCKING = new Set([
+      "IfcWall", "IfcWallStandardCase", "IfcColumn", "IfcSlab", "IfcBeam",
+      "IfcFooting", "IfcRoof", "IfcStair", "IfcStairFlight", "IfcRamp",
+      "IfcRampFlight", "IfcBuildingElementProxy", // 모듈러 프리캐스트 본체
+    ]);
     const collRay = new THREE.Raycaster();
-    collRay.far = COLLIDE;
     const UP = new THREE.Vector3(0, 1, 0);
-    const axisDir = new THREE.Vector3();
-    const blocked = (origin: THREE.Vector3, sx: number, sz: number): boolean => {
-      axisDir.set(sx, 0, sz);
-      if (axisDir.lengthSq() === 0) return false;
-      axisDir.normalize();
-      collRay.set(origin, axisDir);
-      // 가까운 순 히트 검사 — 문(통과형)은 건너뛰고, 실제 벽이 buffer 안이면 차단.
+    // origin→dir, maxDist 내 '구조 부재' 최초 히트(없으면 null). 비구조 히트는 건너뜀.
+    const firstBlockingHit = (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number) => {
+      collRay.set(origin, dir);
+      collRay.far = maxDist;
       const hits = collRay.intersectObject(mesh, false);
       for (const h of hits) {
-        if (h.distance >= COLLIDE) break;
         const vp = h.face ? h.face.a : (h.faceIndex ?? 0) * 3;
         const el = findElementByVertex(parsed.elements, vp);
-        if (el && PASSABLE.has(el.ifcType)) continue; // 문 → 통과
-        return true; // 실제 벽 → 차단
+        if (el && !BLOCKING.has(el.ifcType)) continue; // 비구조 → 통과
+        return h; // 구조 → 이 면이 막음
       }
-      return false;
+      return null;
     };
+    const moveDir = new THREE.Vector3();
+    const slideDir = new THREE.Vector3();
+    const slideN = new THREE.Vector3();
     const CENTER = new THREE.Vector2(0, 0); // 크로스헤어(화면 중앙) NDC
 
     // ── 중력/접지 (관리자 워크 = 접지형 FPS) ── 전부 건물 스케일에 비례 → 단위 무관.
@@ -417,9 +421,34 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         if (hLen > 0) {
           dx = (dx / hLen) * spd;
           dz = (dz / hLen) * spd;
-          // 축별 충돌: 벽이 막은 축만 0, 나머지 축은 진행 → 벽 타고 미끄러짐
-          if (!blocked(camera.position, Math.sign(dx), 0)) camera.position.x += dx;
-          if (!blocked(camera.position, 0, Math.sign(dz))) camera.position.z += dz;
+          // 범용 충돌 — 이동 방향으로 캐스트. 막히면 벽 앞 COLLIDE 까지 전진 후 면 법선으로
+          // 잔여 이동을 투영해 벽을 타고 미끄러짐(축 분해 X → 어떤 각도 벽도 정확).
+          const wishLen = Math.hypot(dx, dz);
+          moveDir.set(dx, 0, dz).normalize();
+          const hit = firstBlockingHit(camera.position, moveDir, wishLen + COLLIDE);
+          if (!hit) {
+            camera.position.x += dx;
+            camera.position.z += dz;
+          } else {
+            const adv = Math.max(0, hit.distance - COLLIDE);
+            camera.position.addScaledVector(moveDir, adv); // 벽 앞까지 전진
+            const fn = hit.face?.normal;
+            if (fn) {
+              slideN.copy(fn);
+              slideN.y = 0;
+              if (slideN.lengthSq() > 1e-9) {
+                slideN.normalize();
+                const remaining = wishLen - adv;
+                slideDir.copy(moveDir).addScaledVector(slideN, -moveDir.dot(slideN)); // 벽면 투영
+                slideDir.y = 0;
+                if (slideDir.lengthSq() > 1e-9 && remaining > 1e-9) {
+                  slideDir.normalize();
+                  const sh = firstBlockingHit(camera.position, slideDir, remaining + COLLIDE);
+                  camera.position.addScaledVector(slideDir, sh ? Math.max(0, sh.distance - COLLIDE) : remaining);
+                }
+              }
+            }
+          }
         }
         // 중력 + 접지: 매 프레임 낙하 가속 → 아래 바닥(없으면 그리드 지면) 위 EYE 에 스냅.
         vy -= GRAV * dt;
