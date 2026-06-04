@@ -104,6 +104,9 @@ const C_ACTIVE = [0.133, 0.827, 0.933]; // cyan
 const C_PLANNED = [0.376, 0.647, 0.98]; // blue
 const C_GHOST = [0.32, 0.34, 0.4]; // 미매칭 (어두운 회색)
 const C_HILITE = [1.0, 0.85, 0.2]; // hover 공정단위 강조 (황색)
+// AI 정책매칭 = '추정'(확정 아님). 확정(녹/청)과 구분되게 보라 계열로 칠해 환각 가시화.
+const C_EST_DONE = [0.62, 0.40, 0.95]; // 추정 완료 (진보라)
+const C_EST_ACTIVE = [0.78, 0.66, 0.99]; // 추정 진행 (연보라)
 
 function colorFor(status: number): number[] {
   if (status === 2) return C_DONE;
@@ -141,6 +144,20 @@ function elemColor(el: ParsedElement, status: number, realistic: boolean): { c: 
     return { c: materialColor(el.ifcType), a: status === 2 ? 1 : 0 }; // 완료=재질, 미완성=투명
   }
   return { c: colorFor(status), a: 1 };
+}
+
+/** 요소 표시 색 — AI 추정(policy 매칭) 완료/진행은 보라(확정과 구분), 그 외는 elemColor. */
+function colorForElement(
+  el: ParsedElement,
+  via: string | undefined,
+  status: number,
+  realistic: boolean,
+): { c: number[]; a: number } {
+  const isEst = (via ?? "").startsWith("policy|");
+  if (isEst && !realistic && (status === 2 || status === 1)) {
+    return { c: status === 2 ? C_EST_DONE : C_EST_ACTIVE, a: 1 };
+  }
+  return elemColor(el, status, realistic);
 }
 
 /** 요소 정점 범위에 RGBA 채우기. */
@@ -209,7 +226,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   useEffect(() => {
     onDateChange?.(dateMs);
   }, [dateMs, onDateChange]);
-  const [kpi, setKpi] = useState({ done: 0, active: 0, planned: 0, ghost: 0 });
+  const [kpi, setKpi] = useState({ done: 0, active: 0, planned: 0, ghost: 0, estimate: 0 });
   // 마우스 오버한 요소 (툴팁) — 화면 좌표 + 요소
   const [hover, setHover] = useState<{ x: number; y: number; el: ParsedElement } | null>(null);
   // 실사 모드 (재질색 + 미완성 투명) — ref 로 효과에서 즉시 참조
@@ -331,7 +348,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const R = parsed.radius || 50;
     const EYE = Math.max(R * 0.03, 1.0);   // 눈높이(바닥 위) — ~150cm 체감(이전 0.05=거인)
     const GRAV = R * 0.9;                   // 중력 가속(units/s²)
-    const JUMP = R * 0.28;                   // 점프 초기 상승속도
+    const JUMP = R * 0.5;                    // 점프 초기 상승속도 (강화)
     let vy = 0;                              // 수직 속도
     let grounded = false;                    // 접지 여부(점프 가능 조건)
     const downRay = new THREE.Raycaster();
@@ -412,7 +429,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       const dt = clock.getDelta();
       // ── 관리자 워크(FPS) — 수평 WASD + 벽 충돌(축별 bool) + 상하 자유 ──
       if (walkRef.current && fp.isLocked) {
-        const spd = (parsed.radius || 50) * 0.15 * dt; // 보행 속도 (대폭 하향)
+        const spd = (parsed.radius || 50) * 0.06 * dt; // 보행 속도 (아주 느리게)
         camera.getWorldDirection(fwd);
         fwd.y = 0;
         if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1);
@@ -611,19 +628,23 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       const realistic = realisticRef.current;
       const hk = hiliteViaRef.current;
       const hmode = hiliteModeRef.current;
-      const counts = { done: 0, active: 0, planned: 0, ghost: 0 };
+      const counts = { done: 0, active: 0, planned: 0, ghost: 0, estimate: 0 };
       // 전체 재색칠 (정확성 우선 — 부분 업로드는 정합성 버그로 폐기)
       for (const el of parsed.elements) {
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
-        if (st === 2) counts.done++;
-        else if (st === 1) counts.active++;
-        else if (st === 0) counts.planned++;
+        // AI 정책매칭 = 추정. 확정(규칙)과 분리 집계·색칠.
+        const isEst = (mr?.via ?? "").startsWith("policy|");
+        if (st === 2 || st === 1) {
+          if (isEst) counts.estimate++;
+          else if (st === 2) counts.done++;
+          else counts.active++;
+        } else if (st === 0) counts.planned++;
         else counts.ghost++;
         const isHi = hk != null && (hmode === "object" ? el.globalId === hk : mr?.via === hk);
         if (isHi) paintElement(arr, el, C_HILITE, 1);
         else {
-          const { c, a } = elemColor(el, st, realistic);
+          const { c, a } = colorForElement(el, mr?.via, st, realistic);
           paintElement(arr, el, c, a);
         }
       }
@@ -632,7 +653,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         prevK.done === counts.done &&
         prevK.active === counts.active &&
         prevK.planned === counts.planned &&
-        prevK.ghost === counts.ghost
+        prevK.ghost === counts.ghost &&
+        prevK.estimate === counts.estimate
           ? prevK
           : counts,
       );
@@ -663,8 +685,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     if (prevKey) {
       for (const el of parsed.elements) {
         if (!matches(el, prevKey, prevMode)) continue;
-        const st = statusAt(dateMs, ranges.get(el.globalId)?.range ?? null);
-        const { c, a } = elemColor(el, st, realistic);
+        const mr2 = ranges.get(el.globalId);
+        const st = statusAt(dateMs, mr2?.range ?? null);
+        const { c, a } = colorForElement(el, mr2?.via, st, realistic);
         paintElement(arr, el, c, a);
       }
     }
@@ -836,6 +859,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
         <span style={{ color: "#10b981" }}>● 완료 {kpi.done.toLocaleString()}</span>
         <span style={{ color: "#22d3ee" }}>● 진행중 {kpi.active.toLocaleString()}</span>
+        <span style={{ color: "#a78bfa" }} title="규칙 확정이 아닌 AI 추론 연결 — 검증 필요">◆ 추정(AI) {kpi.estimate.toLocaleString()}</span>
         <span style={{ color: "#60a5fa" }}>● 미착수 {kpi.planned.toLocaleString()}</span>
         <span style={{ color: "#6b7280" }}>● 미매칭 {kpi.ghost.toLocaleString()}</span>
         <button
