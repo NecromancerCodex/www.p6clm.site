@@ -42,6 +42,7 @@ export function classifyUnmatched(
   via: string | undefined,
   zone: string | undefined,
   schedOpStorey: Map<string, Set<string>>,
+  aiAttempted = false, // 정책(AI) 매칭을 이미 돌린 뒤면 권장문구를 '미해결'로 전환
 ): CauseMeta {
   // C1 — zone/층 태그 없음: 비구조·데이텀·주차장(또는 BIM 공정태그 누락)
   if (!zone || via === "no_storey") {
@@ -68,7 +69,9 @@ export function classifyUnmatched(
         title: "zone 스킴 불일치",
         color: "#0891b2",
         explain: `BIM은 '${p[1]}' 구역으로 태그됐으나, 공정표의 같은 공종·층 활동은 '${others.join(", ")}' 구역명으로 코딩돼 있어 자동 매칭이 안 됩니다 (미시공이 아니라 이름 매핑 문제).`,
-        recommend: `정책(AI) 매칭으로 ${p[1]}→${others.join("/")} 구역 매핑을 적용하면 연결됩니다.`,
+        recommend: aiAttempted
+          ? `AI 매칭으로도 미해결 — '${p[1]}'↔'${others.join("/")}' 구역 스킴을 수동 매핑하거나 공정표 구역 중복(통합↔분리)을 정리하세요.`
+          : `정책(AI) 매칭으로 ${p[1]}→${others.join("/")} 구역 매핑을 적용하면 연결됩니다.`,
       };
     }
     return {
@@ -120,6 +123,7 @@ export function classifyNoBim(
   key: string,
   presence: Set<string>,
   zonesAt: Map<string, Set<string>>,
+  aiAttempted = false, // 정책(AI) 매칭 후면 권장문구를 '미해결'로 전환
 ): NoBimCause {
   const p = key.split("|"); // ST|zone|storey|wt | MO|zone|storey|MD
   const op = p[0] === "MO" ? "MD" : p[3];
@@ -141,6 +145,8 @@ export function classifyNoBim(
     title: "구역 불일치 (재연결 가능)",
     color: "#0891b2",
     explain: `${storey}층에 BIM 부재는 있으나, 공정 구역명('${zone}')과 BIM 구역명${others.length ? `('${others.join(", ")}')` : ""}이 달라 자동 연결이 안 됩니다 (미시공 아님, 이름 매핑 문제).`,
-    recommend: "정책(AI) 매칭으로 구역 매핑을 적용하면 연결됩니다.",
+    recommend: aiAttempted
+      ? "AI 매칭으로도 미해결 — 구역명 수동 매핑 또는 공정표 구역 중복(통합 'AB' ↔ 분리 'ZA/ZB') 정리가 필요합니다. (단, 통합활동은 분리활동과 중복일 수 있음)"
+      : "정책(AI) 매칭으로 구역 매핑을 적용하면 연결됩니다.",
   };
 }

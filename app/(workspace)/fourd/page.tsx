@@ -502,6 +502,8 @@ export default function FourDPage() {
   const buildReport = useCallback(() => {
     if (!ready) return;
     const { ranges, parsed, candidates } = ready;
+    // 정책(AI) 매칭을 이미 돌린 뒤면 C3/A 권장문구를 '미해결'로 전환(이미 시도→또 권하는 모순 방지)
+    const aiAttempted = ready.policyCount > 0 || (ready.policyResolved?.length ?? 0) > 0;
     const KO_CAT: Record<string, string> = { CORE: "벽·기둥", FOOT: "기초", MOD: "슬래브·보·모듈" };
     const koStorey = (s: string | null) =>
       !s ? "?" : s === "PT" ? "기초(PT)" : s === "RF" ? "지붕(RF)" : `${Number(s)}층`;
@@ -540,7 +542,7 @@ export default function FourDPage() {
     // 원인별 묶기 (대표 via/zone 으로 규칙 분류)
     const causeMap = new Map<Cause, { title: string; color: string; explain: string; recommend: string; total: number; items: { label: string; count: number }[] }>();
     for (const g of noSched.values()) {
-      const meta = classifyUnmatched(g.via, g.zone, schedOpStorey);
+      const meta = classifyUnmatched(g.via, g.zone, schedOpStorey, aiAttempted);
       let cg = causeMap.get(meta.cause);
       if (!cg) {
         cg = { title: meta.title, color: meta.color, explain: meta.explain, recommend: meta.recommend, total: 0, items: [] };
@@ -582,7 +584,7 @@ export default function FourDPage() {
     const noBimMap = new Map<string, { title: string; color: string; explain: string; recommend: string; total: number; items: string[] }>();
     for (const c of candidates) {
       if (covered.has(c.key)) continue;
-      const meta = classifyNoBim(c.key, bimPresence, bimZonesAt);
+      const meta = classifyNoBim(c.key, bimPresence, bimZonesAt, aiAttempted);
       let cg = noBimMap.get(meta.cause);
       if (!cg) {
         cg = { title: meta.title, color: meta.color, explain: meta.explain, recommend: meta.recommend, total: 0, items: [] };
