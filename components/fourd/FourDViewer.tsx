@@ -104,9 +104,10 @@ const C_ACTIVE = [0.133, 0.827, 0.933]; // cyan
 const C_PLANNED = [0.376, 0.647, 0.98]; // blue
 const C_GHOST = [0.32, 0.34, 0.4]; // 미매칭 (어두운 회색)
 const C_HILITE = [1.0, 0.85, 0.2]; // hover 공정단위 강조 (황색)
-// AI 정책매칭 = '추정'(확정 아님). 확정(녹/청)과 구분되게 보라 계열로 칠해 환각 가시화.
-const C_EST_DONE = [0.62, 0.40, 0.95]; // 추정 완료 (진보라)
-const C_EST_ACTIVE = [0.78, 0.66, 0.99]; // 추정 진행 (연보라)
+// AI 정책매칭 = '추정'(확정 아님). 상태 무관하게 보라 계열(명도로 완료>진행>미착수 구분) → "AI=보라" 일관.
+const C_EST_DONE = [0.55, 0.30, 0.88]; // 추정 완료 (진보라)
+const C_EST_ACTIVE = [0.70, 0.50, 0.95]; // 추정 진행 (중보라)
+const C_EST_PLANNED = [0.80, 0.74, 0.93]; // 추정 미착수 (연보라/라벤더)
 
 function colorFor(status: number): number[] {
   if (status === 2) return C_DONE;
@@ -154,8 +155,9 @@ function colorForElement(
   realistic: boolean,
 ): { c: number[]; a: number } {
   const isEst = (via ?? "").startsWith("policy|");
-  if (isEst && !realistic && (status === 2 || status === 1)) {
-    return { c: status === 2 ? C_EST_DONE : C_EST_ACTIVE, a: 1 };
+  // 추정 매칭(미매칭 아님)은 상태 무관 보라 계열 — "AI=보라" 일관. 명도로 완료>진행>미착수.
+  if (isEst && !realistic && status !== -1) {
+    return { c: status === 2 ? C_EST_DONE : status === 1 ? C_EST_ACTIVE : C_EST_PLANNED, a: 1 };
   }
   return elemColor(el, status, realistic);
 }
@@ -633,14 +635,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       for (const el of parsed.elements) {
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
-        // AI 정책매칭 = 추정. 확정(규칙)과 분리 집계·색칠.
+        // AI 정책매칭 = 추정. 확정(규칙)과 분리 집계·색칠. 추정은 상태 무관 estimate 로.
         const isEst = (mr?.via ?? "").startsWith("policy|");
-        if (st === 2 || st === 1) {
-          if (isEst) counts.estimate++;
-          else if (st === 2) counts.done++;
-          else counts.active++;
-        } else if (st === 0) counts.planned++;
-        else counts.ghost++;
+        if (st === -1) counts.ghost++;
+        else if (isEst) counts.estimate++;
+        else if (st === 2) counts.done++;
+        else if (st === 1) counts.active++;
+        else counts.planned++;
         const isHi = hk != null && (hmode === "object" ? el.globalId === hk : mr?.via === hk);
         if (isHi) paintElement(arr, el, C_HILITE, 1);
         else {
