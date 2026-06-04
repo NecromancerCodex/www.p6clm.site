@@ -467,7 +467,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
           controls.target.add(move);
         }
       }
-      controls.update();
+      // 워크 모드(PointerLock)일 땐 OrbitControls.update() 금지 — enabled=false 여도 update()는
+      // 저장된 궤도 방향으로 카메라를 되돌려 마우스룩을 매 프레임 덮어쓴다(시점 고정 버그).
+      if (!walkRef.current) controls.update();
       renderer.render(scene, camera);
       raf = requestAnimationFrame(animate);
     };
