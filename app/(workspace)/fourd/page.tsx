@@ -30,6 +30,7 @@ import {
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
+import { deriveWorkPackages, type DerivedPackage } from "../../../lib/fourd/workpackage";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
 
 interface Ready {
@@ -44,6 +45,8 @@ interface Ready {
   codeIndex: CodeIndex | null; // 정책매칭 적용 시 활동키→날짜 조회용
   candidates: Candidate[]; // 정책매칭 후보 활동
   policyCount: number; // 정책(AI)으로 추가 매칭된 부재 수
+  tasks: ScheduleTask[]; // 워크패키지 재도출용 (정책매칭 후 갱신)
+  sessionId: string; // 분석 run id (Neon 저장 키)
   diag: {
     procCount: number; // 공정 PSet 보유 요소 수
     topVia: string; // byVia 상위 요약
@@ -237,6 +240,9 @@ export default function FourDPage() {
         codeIndex,
         candidates: codeIndex ? buildCandidates(tasks) : [],
         policyCount: 0,
+        tasks,
+        sessionId:
+          typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `run-${tasks.length}`,
         diag: { procCount, topVia },
       });
     } catch (e) {
@@ -337,6 +343,9 @@ export default function FourDPage() {
 
   // ── 시뮬레이션 보고서 — 공정표↔BIM 양방향 정합성 진단 ──
   const [report, setReport] = useState<ReportData | null>(null);
+
+  // ── 워크패키지 — BIM 메타(호·타입·부재종류)로 세분, Neon 영속화 ──
+  const [wpOpen, setWpOpen] = useState(false);
   const buildReport = useCallback(() => {
     if (!ready) return;
     const { ranges, parsed, candidates } = ready;
@@ -587,6 +596,20 @@ export default function FourDPage() {
               >
                 📋 시뮬레이션 보고서
               </button>
+              <button
+                onClick={() => setWpOpen(true)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #7c3aed",
+                  background: "#7c3aed",
+                  color: "#fff",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                🧩 워크패키지
+              </button>
             </div>
           )}
           <details style={{ fontSize: 12, color: "#64748b" }}>
@@ -617,6 +640,13 @@ export default function FourDPage() {
       )}
 
       {report && <ReportModal report={report} onClose={() => setReport(null)} />}
+      {wpOpen && ready && (
+        <WorkPackageModal
+          sessionId={ready.sessionId}
+          packages={deriveWorkPackages(ready.tasks, ready.parsed.elements, ready.ranges)}
+          onClose={() => setWpOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -724,6 +754,108 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
 
         <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, borderTop: "1px solid #e2e8f0", paddingTop: 8 }}>
           ※ 3D Clash(형상 겹침)는 형상 간섭 계산이 필요해 별도 — 추후 추가. 본 보고서는 공정표↔BIM 정합·시간축 기준.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function wpLabel(p: DerivedPackage): string {
+  if (p.trade === "MO") {
+    return `${p.zone ?? "?"} ${p.storey ?? "?"}층 ${p.module_unit ?? "?"}호${p.mtype ? ` ${p.mtype}타입` : ""}`;
+  }
+  return `${p.zone ?? "?"} ${p.storey ?? "?"}층 ${p.worktype ?? "?"}`;
+}
+
+function WorkPackageModal({
+  sessionId,
+  packages,
+  onClose,
+}: {
+  sessionId: string;
+  packages: DerivedPackage[];
+  onClose: () => void;
+}) {
+  const [saving, setSaving] = useState<"idle" | "saving" | "done" | "error">("idle");
+  const totalRule = packages.reduce((s, p) => s + p.bim_count_rule, 0);
+  const totalAi = packages.reduce((s, p) => s + p.bim_count_ai, 0);
+  const totalStorey = packages.reduce((s, p) => s + p.bim_count_storey, 0);
+
+  const save = async () => {
+    setSaving("saving");
+    try {
+      const res = await fetch("/api/clm/fourd/work-packages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, packages }),
+      });
+      setSaving(res.ok ? "done" : "error");
+    } catch {
+      setSaving("error");
+    }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 12, padding: 24, maxWidth: 760, width: "100%", maxHeight: "85vh", overflow: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>🧩 워크패키지 (BIM 물리단위 · 모듈·악세사리별)</h2>
+          <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+            닫기
+          </button>
+        </div>
+        <div style={{ fontSize: 13, color: "#475569", marginBottom: 12, padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
+          패키지 <strong>{packages.length.toLocaleString()}</strong>개 · 부재 매칭 출처{" "}
+          <span style={{ color: "#0d9488" }}>규칙 {totalRule.toLocaleString()}</span> +{" "}
+          <span style={{ color: "#7c3aed" }}>AI {totalAi.toLocaleString()}</span> +{" "}
+          <span style={{ color: "#64748b" }}>층근사 {totalStorey.toLocaleString()}</span>
+          <span style={{ marginLeft: 8, fontSize: 11, color: "#94a3b8" }}>(pmisx 정밀 + AI 보강)</span>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button
+            onClick={save}
+            disabled={saving === "saving" || saving === "done"}
+            style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: saving === "done" ? "#10b981" : "#7c3aed", color: "#fff", fontWeight: 600, cursor: saving === "saving" ? "default" : "pointer" }}
+          >
+            {saving === "idle" && "💾 Neon에 저장"}
+            {saving === "saving" && "저장 중…"}
+            {saving === "done" && "✓ 저장됨"}
+            {saving === "error" && "⚠ 저장 실패 — 재시도"}
+          </button>
+          <span style={{ fontSize: 11, color: "#94a3b8", alignSelf: "center" }}>session: {sessionId.slice(0, 8)}</span>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {packages.slice(0, 400).map((p) => (
+            <div key={p.key} style={{ borderLeft: `3px solid ${p.bim_count_ai > 0 ? "#7c3aed" : "#0d9488"}`, paddingLeft: 10, paddingBottom: 4 }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>
+                {wpLabel(p)}{" "}
+                <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>
+                  부재 {(p.bim_count_rule + p.bim_count_ai + p.bim_count_storey).toLocaleString()}
+                  {p.bim_count_ai > 0 && <span style={{ color: "#7c3aed" }}> (AI {p.bim_count_ai})</span>}
+                  {p.bim_count_storey > 0 && <span style={{ color: "#94a3b8" }}> (층근사 {p.bim_count_storey})</span>}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", margin: "1px 0" }}>
+                악세사리: {p.accessories.map((a) => `${a.type} ${a.count}`).join(" · ") || "—"}
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b" }}>
+                공정활동: {p.units.length === 0 ? "(연결 없음)" : p.units.map((u) => `${u.name ?? u.activity_code}${u.phase ? `[${u.phase}]` : ""}`).slice(0, 4).join(", ")}
+                {p.units.length > 4 && ` 외 ${p.units.length - 4}`}
+                {p.start && <span style={{ marginLeft: 6, color: "#94a3b8" }}>{p.start}~{p.end}</span>}
+              </div>
+            </div>
+          ))}
+          {packages.length > 400 && (
+            <div style={{ fontSize: 11, color: "#94a3b8" }}>… 외 {(packages.length - 400).toLocaleString()}개 (저장은 전체 포함)</div>
+          )}
         </div>
       </div>
     </div>
