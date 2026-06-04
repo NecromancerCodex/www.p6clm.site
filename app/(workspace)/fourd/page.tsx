@@ -829,7 +829,9 @@ function WorkPackageModal({
             {saving === "done" && "✓ 저장됨"}
             {saving === "error" && "⚠ 저장 실패 — 재시도"}
           </button>
-          <span style={{ fontSize: 11, color: "#94a3b8", alignSelf: "center" }}>session: {sessionId.slice(0, 8)}</span>
+          <span style={{ fontSize: 11, color: "#94a3b8", alignSelf: "center" }}>
+            저장 시 이전 분석은 대체됩니다 (최신만 유지) · {sessionId.slice(0, 8)}
+          </span>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
