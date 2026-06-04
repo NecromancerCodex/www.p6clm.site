@@ -63,6 +63,7 @@ export interface ScheduleReportDoc {
   schedule_variance: number | null; // 베이스라인 미설정 시 null (N/A)
   baseline_valid?: boolean;
   simulated?: boolean;              // 4D 시뮬레이션 — 진행현황이 계획 날짜 기준(실적 아님)
+  actual_based?: boolean;           // 실적 기반 — 워크유닛 수동 상태(완료/진행/대기)
   critical_unscheduled?: boolean;   // 전 활동 임계=CPM 미실행 → 임계공정 '미산정'
   activity_count: number;
   milestone_count: number;
@@ -267,12 +268,14 @@ export async function analyzeSchedule(
   docType: ScheduleDocType,
   projectName?: string,
   targetDate?: string,
+  statusMap?: Record<string, string>, // {activity_code: pending|active|done} → 실적 기반 공사일보
 ): Promise<ScheduleAnalyzeResult> {
   const form = new FormData();
   form.append("file", file);
   form.append("doc_type", docType);
   if (projectName?.trim()) form.append("project_name", projectName.trim());
   if (targetDate?.trim()) form.append("target_date", targetDate.trim());
+  if (statusMap && Object.keys(statusMap).length) form.append("status_map", JSON.stringify(statusMap));
 
   const res = await fetch(`${API_BASE}/schedule/analyze`, {
     method: "POST",

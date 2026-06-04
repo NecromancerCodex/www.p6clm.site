@@ -514,17 +514,24 @@ export function ScheduleFormView({
 }) {
   // 진도 편차에 따른 상태 배지 색 (안전점검 risk 배지 클래스 재사용).
   const statusClass = doc.status_level === "지연" ? "sir-risk-high" : "sir-risk-low";
-  // 4D 시뮬레이션 — 진행현황이 '계획 날짜' 기준(실적 아님). 실적/편차 개념 없음.
+  // 진행현황 산출 기준: 실적(수동상태) > 시뮬레이션(계획날짜) > 일반(실적%/베이스라인)
+  const actualBased = !!doc.actual_based;
   const simulated = !!doc.simulated;
   // 베이스라인 미설정 시 계획 진도·편차 N/A — 근거 없는 수치 방지
   const hasBaseline = doc.planned_percent != null && doc.schedule_variance != null;
-  const plannedStr = simulated
+  const plannedStr = actualBased
+    ? "N/A (실적 기반)"
+    : simulated
     ? "N/A (시뮬레이션)"
     : hasBaseline ? `${doc.planned_percent}%` : "N/A (베이스라인 미설정)";
-  const varianceStr = simulated
+  const varianceStr = actualBased
+    ? "N/A (실적 기반)"
+    : simulated
     ? "N/A (시뮬레이션)"
     : hasBaseline ? `${doc.schedule_variance! > 0 ? "+" : ""}${doc.schedule_variance}%p` : "N/A (베이스라인 미설정)";
-  const progressLabel = simulated ? "시뮬레이션 진도(계획 기준)" : "실적 진도율";
+  const progressLabel = actualBased
+    ? "실적 진도율(현장 입력)"
+    : simulated ? "시뮬레이션 진도(계획 기준)" : "실적 진도율";
   // 전 활동 임계(CPM 미실행)면 임계공정 미산정
   const criticalStr = doc.critical_unscheduled ? "미산정 (CPM 미실행)" : `${doc.critical_count}개`;
   // CPM 미실행(전부 임계)이면 개별 활동 '임계' 배지도 무의미 → 숨김.
@@ -630,7 +637,9 @@ export function ScheduleFormView({
           <div className="sir-section-title">
             2. 공정 현황 요약
             <span className="sir-summary-badge">
-              {simulated ? (
+              {actualBased ? (
+                <>실적 진도 <strong>{doc.overall_percent}%</strong> &nbsp;·&nbsp; <strong>{doc.reference_date}</strong> · 현장 입력</>
+              ) : simulated ? (
                 <>시뮬레이션 진도 <strong>{doc.overall_percent}%</strong> &nbsp;·&nbsp; <strong>{doc.reference_date}</strong> 기준</>
               ) : (
                 <>
@@ -641,6 +650,12 @@ export function ScheduleFormView({
               )}
             </span>
           </div>
+          {actualBased && (
+            <div className="sch-hint" style={{ marginBottom: 8 }}>
+              ※ 현장 실적 기반 — 워크유닛별 <strong>완료/진행/대기</strong> 수동 입력으로 산출(공정 진도율과 동기).
+              진도율 = (완료 + 0.5×진행) ÷ 전체.
+            </div>
+          )}
           {simulated && (
             <div className="sch-hint" style={{ marginBottom: 8 }}>
               ※ 시뮬레이션 — 기준일({doc.reference_date})까지 <strong>계획대로 진행됐다는 가정</strong>의 수치입니다(실적 데이터 아님).
@@ -693,7 +708,7 @@ export function ScheduleFormView({
                     <th style={{ width: "30%" }}>공정명</th>
                     <th style={{ width: "28%" }}>WBS 경로</th>
                     <th style={{ width: "22%" }}>공정 기간</th>
-                    <th>{simulated ? "진척(계획상)" : "구분"}</th>
+                    <th>{actualBased ? "상태" : simulated ? "진척(계획상)" : "구분"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -704,7 +719,9 @@ export function ScheduleFormView({
                       <td>
                         {t.planned_start} ~ {t.planned_finish}
                       </td>
-                      {simulated ? (
+                      {actualBased ? (
+                        <td className="sir-pf-cell" style={{ color: "#0891b2", fontWeight: 600 }}>진행중</td>
+                      ) : simulated ? (
                         <td className="sir-pf-cell">
                           {t.percent_complete >= 100
                             ? "금일 완료 예정"

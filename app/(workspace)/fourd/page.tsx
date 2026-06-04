@@ -15,6 +15,7 @@ import { FourDViewer } from "../../../components/fourd/FourDViewer";
 import { DashboardSchedule } from "../../../components/fourd/DashboardSchedule";
 import { ScheduleFormView } from "../../../components/documents/DocumentFormViews";
 import { analyzeSchedule, uploadSchedule, type ScheduleReportDoc } from "../../../lib/api/schedule";
+import { getUnitProgress, saveUnitProgress, type UnitStatus } from "../../../lib/api/fourdProgress";
 import {
   buildCandidates,
   buildCodeIndex,
@@ -65,6 +66,16 @@ interface PolicyResolvedItem {
   count: number;         // 연결된 부재 수
   reason: string;        // AI 근거 (시공순서/구역매핑 등)
   confidence: number;    // 0~1
+}
+
+const DAY_MS = 86400000;
+
+/** 공사일보 작성 플랜 — 해당일 작업 목록 + 완료 체크 (생성 전 단계). */
+interface DailyPlan {
+  dateMs: number;
+  iso: string;
+  base: Record<string, UnitStatus>; // 기존 저장된 실적 상태 (code→status)
+  items: { code: string; name: string; period: string; done: boolean }[];
 }
 
 interface ReportData {
@@ -406,26 +417,83 @@ export default function FourDPage() {
   const [dailyBusy, setDailyBusy] = useState(false);
   const [dailyDoc, setDailyDoc] = useState<ScheduleReportDoc | null>(null);
   const [dailyErr, setDailyErr] = useState<string | null>(null);
-  const runDaily = useCallback(
+  // 공사일보 작성 플랜 — 해당일 작업 목록 + 완료 체크 (생성 전 단계)
+  const [dailyPlan, setDailyPlan] = useState<DailyPlan | null>(null);
+
+  const isoOf = (dateMs: number) => {
+    const d = new Date(dateMs);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  // "이 날짜 공사일보" 클릭 → 즉시 생성 X → 해당일 작업 목록 + 완료 체크 모달 오픈
+  const openDaily = useCallback(
     async (dateMs: number) => {
-      if (!scheduleFile) return;
-      // 로컬 날짜 그대로 YYYY-MM-DD (UTC 변환 시 하루 밀림 방지)
-      const d = new Date(dateMs);
-      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (!ready || !scheduleFile) return;
       setDailyBusy(true);
       setDailyErr(null);
       try {
-        const res = await analyzeSchedule(scheduleFile, "proc_daily", undefined, iso);
-        if (!res.document) throw new Error("보고서 본문이 비어 있습니다.");
-        setDailyDoc(res.document);
+        // 해당일 진행 작업 = 계획 구간이 그날을 포함하는 활동
+        const items = ready.tasks
+          .filter((t) => {
+            if (!t.start || !t.end) return false;
+            const s = new Date(String(t.start).slice(0, 10)).getTime();
+            const e = new Date(String(t.end).slice(0, 10)).getTime();
+            return s <= dateMs && dateMs <= e + DAY_MS;
+          })
+          .map((t) => ({ code: t.code, name: t.name ?? t.code, period: `${String(t.start).slice(0, 10)} ~ ${String(t.end).slice(0, 10)}` }));
+        // 기존 실적 상태 로드 (재방문/이전 입력 반영)
+        let base: Record<string, UnitStatus> = {};
+        try {
+          const units = await getUnitProgress();
+          base = Object.fromEntries(units.filter((u) => u.activity_code).map((u) => [u.activity_code as string, u.status]));
+        } catch {
+          /* 보드 비어있으면 무시 */
+        }
+        setDailyPlan({
+          dateMs,
+          iso: isoOf(dateMs),
+          base,
+          items: items.map((it) => ({ ...it, done: base[it.code] === "done" })),
+        });
       } catch (e) {
-        setDailyErr(e instanceof Error ? e.message : "공사일보 생성 실패");
+        setDailyErr(e instanceof Error ? e.message : "작업 목록 로드 실패");
       } finally {
         setDailyBusy(false);
       }
     },
-    [scheduleFile],
+    [ready, scheduleFile],
   );
+
+  const toggleDailyItem = useCallback((code: string) => {
+    setDailyPlan((p) => (p ? { ...p, items: p.items.map((it) => (it.code === code ? { ...it, done: !it.done } : it)) } : p));
+  }, []);
+
+  // 모달의 완료 선택 → 실적 저장 + 실적 기반 공사일보 생성
+  const generateDaily = useCallback(async () => {
+    if (!scheduleFile || !dailyPlan) return;
+    setDailyBusy(true);
+    setDailyErr(null);
+    try {
+      // 그날 항목: 완료=done, 그 외(진행 중)=active. 보드에 저장(activity_code 키).
+      const changes = dailyPlan.items.map((it) => ({ activity_code: it.code, status: (it.done ? "done" : "active") as UnitStatus }));
+      try {
+        await saveUnitProgress(changes);
+      } catch {
+        /* 저장 실패해도 보고서는 생성 (아래 map 으로) */
+      }
+      // 전체 상태맵 = 기존 + 오늘 변경 → 보고서가 누적 실적 반영
+      const fullMap: Record<string, string> = { ...dailyPlan.base };
+      for (const c of changes) fullMap[c.activity_code] = c.status;
+      const res = await analyzeSchedule(scheduleFile, "proc_daily", undefined, dailyPlan.iso, fullMap);
+      if (!res.document) throw new Error("보고서 본문이 비어 있습니다.");
+      setDailyPlan(null);
+      setDailyDoc(res.document);
+    } catch (e) {
+      setDailyErr(e instanceof Error ? e.message : "공사일보 생성 실패");
+    } finally {
+      setDailyBusy(false);
+    }
+  }, [scheduleFile, dailyPlan]);
   const buildReport = useCallback(() => {
     if (!ready) return;
     const { ranges, parsed, candidates } = ready;
@@ -738,7 +806,7 @@ export default function FourDPage() {
               minDate={ready.minDate}
               maxDate={ready.maxDate}
               codeToName={new Map(ready.tasks.map((t) => [t.code, t.name ?? t.code]))}
-              onGenerateDaily={scheduleFile ? runDaily : undefined}
+              onGenerateDaily={scheduleFile ? openDaily : undefined}
               dailyBusy={dailyBusy}
               onDateChange={setViewerDateMs}
               activities={
@@ -765,6 +833,15 @@ export default function FourDPage() {
           ⚠ 공사일보 생성 실패: {dailyErr} (클릭하여 닫기)
         </div>
       )}
+      {dailyPlan && (
+        <DailyPlanModal
+          plan={dailyPlan}
+          busy={dailyBusy}
+          onToggle={toggleDailyItem}
+          onGenerate={generateDaily}
+          onClose={() => setDailyPlan(null)}
+        />
+      )}
       {dailyDoc && <DailyReportModal doc={dailyDoc} onClose={() => setDailyDoc(null)} />}
       {report && <ReportModal report={report} onClose={() => setReport(null)} />}
       {wpOpen && ready && (
@@ -775,6 +852,78 @@ export default function FourDPage() {
           onClose={() => setWpOpen(false)}
         />
       )}
+    </div>
+  );
+}
+
+/** 공사일보 작성 전 — 해당일 작업 목록에서 완료한 업무를 체크박스로 선택. */
+function DailyPlanModal({
+  plan,
+  busy,
+  onToggle,
+  onGenerate,
+  onClose,
+}: {
+  plan: DailyPlan;
+  busy: boolean;
+  onToggle: (code: string) => void;
+  onGenerate: () => void;
+  onClose: () => void;
+}) {
+  const doneCount = plan.items.filter((i) => i.done).length;
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "#fff", borderRadius: 12, padding: 20, maxWidth: 640, width: "100%", maxHeight: "85vh", overflow: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>📄 공사일보 작성 — {plan.iso}</h2>
+          <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>닫기</button>
+        </div>
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "#64748b" }}>
+          해당일 작업 목록입니다. <strong>완료한 업무에 체크</strong>하세요. 체크 안 한 항목은 진행중으로 기록됩니다.
+          (선택은 공정 진도율에도 반영)
+        </p>
+
+        {plan.items.length === 0 ? (
+          <div style={{ padding: 16, background: "#f8fafc", borderRadius: 8, color: "#475569", fontSize: 14 }}>
+            이 날짜에 계획상 진행되는 공정이 없습니다.
+          </div>
+        ) : (
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+            {plan.items.map((it) => (
+              <label
+                key={it.code}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderTop: "1px solid #f1f5f9", cursor: "pointer", background: it.done ? "#f0fdf4" : "#fff" }}
+              >
+                <input type="checkbox" checked={it.done} onChange={() => onToggle(it.code)} style={{ width: 17, height: 17, accentColor: "#10b981" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: "#1e293b" }}>{it.name}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{it.code} · {it.period}</div>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: it.done ? "#10b981" : "#0891b2" }}>
+                  {it.done ? "완료" : "진행중"}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+          <span style={{ fontSize: 13, color: "#475569" }}>완료 {doneCount} / 전체 {plan.items.length}</span>
+          <button
+            onClick={onGenerate}
+            disabled={busy}
+            style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: busy ? "#94a3b8" : "#2563eb", color: "#fff", fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer" }}
+          >
+            {busy ? "생성 중…" : "공사일보 생성"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
