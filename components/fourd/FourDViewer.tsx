@@ -412,7 +412,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       const dt = clock.getDelta();
       // ── 관리자 워크(FPS) — 수평 WASD + 벽 충돌(축별 bool) + 상하 자유 ──
       if (walkRef.current && fp.isLocked) {
-        const spd = (parsed.radius || 50) * 0.5 * dt; // 보행 속도
+        const spd = (parsed.radius || 50) * 0.15 * dt; // 보행 속도 (대폭 하향)
         camera.getWorldDirection(fwd);
         fwd.y = 0;
         if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1);
