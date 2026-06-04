@@ -163,6 +163,8 @@ interface Props {
   /** '이 날짜 공사일보 생성' — 현재 슬라이더 날짜(ms)를 부모에 전달. 부모가 보유한 XER로 생성. */
   onGenerateDaily?: (dateMs: number) => void;
   dailyBusy?: boolean; // 공사일보 생성 진행 중
+  /** 슬라이더 날짜 변경 통지 — 하단 공정표(간트) 세로선 동기용. */
+  onDateChange?: (dateMs: number) => void;
 }
 
 /** 부재 PSet → 4D 활동코드 재구성 (pmisx ID 와 동일 형식). 예 502HGMOZB013607MDIN */
@@ -182,7 +184,7 @@ function fmt(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName, onGenerateDaily, dailyBusy = false }: Props) {
+export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName, onGenerateDaily, dailyBusy = false, onDateChange }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -202,6 +204,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     Math.min(Math.max(Math.round((Date.now() - tMin) / DAY), 0), numDays),
   );
   const dateMs = tMin + dayIdx * DAY;
+  // 슬라이더 날짜를 부모로 통지 → 하단 공정표 세로선 동기
+  useEffect(() => {
+    onDateChange?.(dateMs);
+  }, [dateMs, onDateChange]);
   const [kpi, setKpi] = useState({ done: 0, active: 0, planned: 0, ghost: 0 });
   // 마우스 오버한 요소 (툴팁) — 화면 좌표 + 요소
   const [hover, setHover] = useState<{ x: number; y: number; el: ParsedElement } | null>(null);

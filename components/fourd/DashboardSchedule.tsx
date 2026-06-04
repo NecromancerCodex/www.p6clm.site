@@ -17,6 +17,7 @@ const GanttChart = GanttChartRaw as unknown as FC<{
   height?: number;
   viewMode?: string;
   focusId?: string | null;
+  markerDate?: string | null;
 }>;
 
 /** 포크 frappe-gantt(umd) + css 1회 로드. GanttView 와 동일 자산 — 회귀 회피 위해 독립 복제. */
@@ -90,7 +91,20 @@ function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
     });
 }
 
-export function DashboardSchedule({ tasks }: { tasks: ScheduleTask[] }) {
+/** dateMs(epoch) → "YYYY-MM-DD" 로컬 (간트 마커용). */
+const msToDate10 = (ms?: number): string | null => {
+  if (ms == null) return null;
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+export function DashboardSchedule({
+  tasks,
+  markerDate,
+}: {
+  tasks: ScheduleTask[];
+  markerDate?: number; // 4D 슬라이더 날짜(epoch ms) — 간트에 세로선으로 표시
+}) {
   const [viewMode, setViewMode] = useState<ViewMode>("Month");
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -100,6 +114,9 @@ export function DashboardSchedule({ tasks }: { tasks: ScheduleTask[] }) {
   }, []);
 
   const ganttTasks = useMemo(() => toGanttTasks(tasks), [tasks]);
+  const marker = msToDate10(markerDate);
+  // 공간 활용 — 활동 수에 비례해 높이 확대(최소 420, 최대 720). 좁은 영역 낭비 해소.
+  const ganttHeight = Math.min(720, Math.max(420, ganttTasks.length * 24 + 120));
 
   return (
     <div className="ws-inner-pad" style={{ marginTop: 12 }}>
@@ -127,7 +144,7 @@ export function DashboardSchedule({ tasks }: { tasks: ScheduleTask[] }) {
         <div className="sch-hint">날짜가 있는 공정 활동이 없습니다.</div>
       )}
       {ready && ganttTasks.length > 0 && (
-        <GanttChart tasks={ganttTasks} height={360} viewMode={viewMode} />
+        <GanttChart tasks={ganttTasks} height={ganttHeight} viewMode={viewMode} markerDate={marker} />
       )}
     </div>
   );

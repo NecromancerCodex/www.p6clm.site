@@ -48,6 +48,7 @@ interface Ready {
   codeIndex: CodeIndex | null; // 정책매칭 적용 시 활동키→날짜 조회용
   candidates: Candidate[]; // 정책매칭 후보 활동
   policyCount: number; // 정책(AI)으로 추가 매칭된 부재 수
+  policyResolved?: PolicyResolvedItem[]; // 정책(AI)이 연결한 그룹→활동 상세 (보고서 별도 섹션용)
   tasks: ScheduleTask[]; // 워크패키지 재도출용 (정책매칭 후 갱신)
   sessionId: string; // 분석 run id (Neon 저장 키)
   diag: {
@@ -56,11 +57,23 @@ interface Ready {
   };
 }
 
+/** 정책(AI) 매칭이 연결한 미매칭 그룹 → 공정활동 1건. 보고서 'AI 해결' 섹션용. */
+interface PolicyResolvedItem {
+  group_label: string;   // 미매칭 BIM 그룹 라벨 (예: "ABC 기초(PT) 슬래브·보·모듈")
+  activity_key: string;  // 연결된 활동 키
+  activity_name: string; // 활동 한글명
+  count: number;         // 연결된 부재 수
+  reason: string;        // AI 근거 (시공순서/구역매핑 등)
+  confidence: number;    // 0~1
+}
+
 interface ReportData {
   total: number;
   matched: number;
   unmatched: number;
   activityTotal: number;
+  // 🤖 정책(AI) 매칭으로 해결된 연결 — 문제 목록과 분리해 별도 표시
+  aiResolved: PolicyResolvedItem[];
   // 공정 활동 있는데 BIM 부재 없음 — 원인(A 재연결가능 / B 모델누락 / C 보류)별 그룹
   noBim: {
     cause: string;
@@ -155,6 +168,8 @@ export default function FourDPage() {
   const [ready, setReady] = useState<Ready | null>(null);
   // 이전 방문에서 IndexedDB에 기억된 파일 (있으면 '이어서 열기' 배너 노출)
   const [cached, setCached] = useState<CachedFourd | null>(null);
+  // 4D 슬라이더 현재 날짜(epoch ms) — 하단 공정표 세로선 동기
+  const [viewerDateMs, setViewerDateMs] = useState<number | undefined>(undefined);
 
   /** mount 시 캐시된 파일 확인 (1회) */
   useEffect(() => {
@@ -344,6 +359,7 @@ export default function FourDPage() {
 
       // 3) 적용 — activity_key 있고 confidence≥0.6 인 것만 (없으면 회색 유지)
       const newRanges = new Map(ready.ranges);
+      const resolved: PolicyResolvedItem[] = [];
       let applied = 0;
       for (const a of assignments) {
         if (!a.activity_key || a.confidence < 0.6) continue;
@@ -354,6 +370,14 @@ export default function FourDPage() {
           newRanges.set(el.globalId, { range, via: `policy|${a.activity_key}` });
           applied++;
         }
+        resolved.push({
+          group_label: `${g.zone ? g.zone + " " : ""}${koStorey(g.storey)} ${KO_CAT[g.cat] ?? g.cat}`,
+          activity_key: a.activity_key,
+          activity_name: ready.candidates.find((c) => c.key === a.activity_key)?.name ?? a.activity_key,
+          count: g.els.length,
+          reason: a.reason,
+          confidence: a.confidence,
+        });
       }
 
       const byVia = { ...ready.summary.byVia, "정책(AI)": applied };
@@ -362,6 +386,7 @@ export default function FourDPage() {
         ranges: newRanges,
         summary: { ...ready.summary, matched: ready.summary.matched + applied, byVia },
         policyCount: applied,
+        policyResolved: resolved,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -540,6 +565,7 @@ export default function FourDPage() {
       matched: parsed.elements.length - unmatched,
       unmatched,
       activityTotal: candidates.length,
+      aiResolved: ready.policyResolved ?? [],
       noBim,
       noSchedule,
       seqViolations: seqViolations.slice(0, 30),
@@ -714,6 +740,7 @@ export default function FourDPage() {
               codeToName={new Map(ready.tasks.map((t) => [t.code, t.name ?? t.code]))}
               onGenerateDaily={scheduleFile ? runDaily : undefined}
               dailyBusy={dailyBusy}
+              onDateChange={setViewerDateMs}
               activities={
                 ready.codeIndex
                   ? [...ready.codeIndex.byKey.entries()].map(([k, r]) => ({
@@ -725,14 +752,14 @@ export default function FourDPage() {
               }
             />
           </div>
-          {/* 하단 공정표 — 이전 공정표 조회와 동일한 frappe-gantt 스타일 */}
-          <DashboardSchedule tasks={ready.tasks} />
+          {/* 하단 공정표 — 이전 공정표 조회와 동일한 frappe-gantt 스타일 + 슬라이더 날짜 세로선 */}
+          <DashboardSchedule tasks={ready.tasks} markerDate={viewerDateMs} />
         </>
       )}
 
       {dailyErr && (
         <div
-          style={{ position: "fixed", bottom: 16, right: 16, zIndex: 60, background: "#fee2e2", color: "#991b1b", padding: "10px 14px", borderRadius: 8, fontSize: 13, boxShadow: "0 4px 12px rgba(0,0,0,.15)" }}
+          style={{ position: "fixed", bottom: 16, right: 16, zIndex: 3000, background: "#fee2e2", color: "#991b1b", padding: "10px 14px", borderRadius: 8, fontSize: 13, boxShadow: "0 4px 12px rgba(0,0,0,.15)" }}
           onClick={() => setDailyErr(null)}
         >
           ⚠ 공사일보 생성 실패: {dailyErr} (클릭하여 닫기)
@@ -757,7 +784,7 @@ function DailyReportModal({ doc, onClose }: { doc: ScheduleReportDoc; onClose: (
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, overflow: "auto" }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 3000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 24, overflow: "auto" }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -798,7 +825,7 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -812,11 +839,34 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
         </div>
         <div style={{ fontSize: 13, color: "#475569", marginBottom: 16, padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
           요소 {report.total.toLocaleString()}개 중 <strong style={{ color: "#10b981" }}>{report.matched.toLocaleString()}개 매칭 ({rate}%)</strong> · 공정활동 {report.activityTotal}종 · 미매칭 {report.unmatched.toLocaleString()}개
+          {report.aiResolved.length > 0 && (
+            <> · <strong style={{ color: "#7c3aed" }}>AI 해결 {report.aiResolved.reduce((s, r) => s + r.count, 0).toLocaleString()}개</strong></>
+          )}
         </div>
+
+        {report.aiResolved.length > 0 && (
+          <div style={{ marginBottom: 16, padding: "10px 12px", background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8 }}>
+            <div style={{ fontWeight: 700, color: "#7c3aed", marginBottom: 6 }}>
+              🤖 AI 매칭으로 해결됨 ({report.aiResolved.reduce((s, r) => s + r.count, 0).toLocaleString()}개 · {report.aiResolved.length}건)
+            </div>
+            <div style={{ fontSize: 12, color: "#6b21a8", marginBottom: 8 }}>
+              아래는 규칙으로 못 잡았지만 정책(AI) 매칭이 공정활동에 연결한 부재입니다. (아래 ①②는 이를 제외한 <strong>미해결</strong>만 표시)
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, lineHeight: 1.7, color: "#475569", maxHeight: 160, overflow: "auto" }}>
+              {report.aiResolved.map((r, i) => (
+                <li key={i}>
+                  <strong>{r.group_label}</strong> → {r.activity_name}{" "}
+                  <span style={{ color: "#7c3aed" }}>({r.count.toLocaleString()}개, 확신 {Math.round(r.confidence * 100)}%)</span>
+                  {r.reason ? <div style={{ color: "#94a3b8" }}>· {r.reason}</div> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontWeight: 700, color: "#dc2626", marginBottom: 6 }}>
-            ① BIM 있는데 공정 없음 — 원인별 분석 ({report.unmatched.toLocaleString()})
+            ① BIM 있는데 공정 없음 — <span style={{ color: "#dc2626" }}>미해결</span> 원인별 분석 ({report.unmatched.toLocaleString()})
           </div>
           {report.noSchedule.length === 0 ? (
             <div style={{ color: "#10b981", fontSize: 13 }}>✓ 모든 부재가 공정에 연결됨</div>
@@ -842,7 +892,7 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
 
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontWeight: 700, color: "#ea580c", marginBottom: 6 }}>
-            ② 공정 있는데 BIM 없음 — 원인별 분석 ({report.noBim.reduce((s, g) => s + g.total, 0).toLocaleString()})
+            ② 공정 있는데 BIM 없음 — <span style={{ color: "#ea580c" }}>미해결</span> 원인별 분석 ({report.noBim.reduce((s, g) => s + g.total, 0).toLocaleString()})
           </div>
           {report.noBim.length === 0 ? (
             <div style={{ color: "#10b981", fontSize: 13 }}>✓ 모든 공정활동에 BIM 부재 연결됨</div>
@@ -929,7 +979,7 @@ function WorkPackageModal({
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
     >
       <div
         onClick={(e) => e.stopPropagation()}

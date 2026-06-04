@@ -475,6 +475,43 @@ const realignTodayMarker = (gantt) => {
   gantt.$current_highlight = marker;
 };
 
+// 외부 타임라인(예: 4D 슬라이더) 날짜를 가리키는 세로선을 SVG 내부에 그린다.
+// realignTodayMarker 와 동일한 날짜→x 공식. SVG 내부 좌표라 marginLeft 는 제외
+// ((index+progress)*columnWidth). 막대 위에 그려지도록 SVG 마지막 자식으로 append.
+const SLIDER_MARKER_CLASS = "clm-slider-marker";
+const drawSliderMarker = (gantt, date) => {
+  const svg = gantt?.$svg;
+  if (!svg) return;
+  svg.querySelector(`.${SLIDER_MARKER_CLASS}`)?.remove();
+  if (date == null) return;
+  const target = date instanceof Date ? date : parseLocalDate(String(date).slice(0, 10));
+  const dates = gantt.dates;
+  if (!target || !Array.isArray(dates) || dates.length < 2) return;
+
+  const columnWidth = Number(gantt.config?.column_width) || 45;
+  let index = -1;
+  for (let i = 0; i < dates.length - 1; i += 1) {
+    if (target >= dates[i] && target < dates[i + 1]) { index = i; break; }
+  }
+  if (index < 0) index = target < dates[0] ? 0 : dates.length - 2;
+  const span = dates[index + 1] - dates[index];
+  const progress = span > 0 ? Math.max(0, Math.min(1, (target - dates[index]) / span)) : 0;
+  const x = (index + progress) * columnWidth;
+  const h = parseFloat(svg.getAttribute("height")) || svg.getBoundingClientRect().height || 0;
+
+  const line = document.createElementNS(SVG_NS, "line");
+  line.setAttribute("x1", String(x));
+  line.setAttribute("x2", String(x));
+  line.setAttribute("y1", "0");
+  line.setAttribute("y2", String(h));
+  line.setAttribute("class", SLIDER_MARKER_CLASS);
+  line.setAttribute("stroke", "#2563eb");
+  line.setAttribute("stroke-width", "2");
+  line.setAttribute("stroke-dasharray", "4 3");
+  line.setAttribute("pointer-events", "none");
+  svg.appendChild(line);
+};
+
 const applyTaskInfoWidthToGantt = (gantt, taskInfoWidth = TASK_INFO_WIDTH, codeColWidth = 98) => {
   if (!gantt) return;
 
@@ -518,9 +555,11 @@ const applyTaskInfoWidthToGantt = (gantt, taskInfoWidth = TASK_INFO_WIDTH, codeC
   realignTodayMarker(gantt);
 };
 
-export default function GanttChart({ tasks = [], height = 400, viewMode = "Month", focusId = null }) {
+export default function GanttChart({ tasks = [], height = 400, viewMode = "Month", focusId = null, markerDate = null }) {
   const ganttRef = useRef(null);
   const ganttInstanceRef = useRef(null);
+  const markerDateRef = useRef(markerDate);
+  markerDateRef.current = markerDate;
   const customScrollbarRef = useRef(null);
   const customScrollbarInnerRef = useRef(null);
   const [ganttHeaderHeight, setGanttHeaderHeight] = useState(56);
@@ -595,6 +634,8 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
     applyTaskInfoWidthToGantt(gantt, taskInfoWidth, codeColWidth);
     drawBaselineBars(gantt, tasks);
     decorateArrows(gantt, tasks, focusId);
+    // 외부 타임라인 마커(4D 슬라이더) — ref 로 읽어 재생성 deps 에서 제외(슬라이더 이동마다 재생성 방지)
+    if (markerDateRef.current != null) drawSliderMarker(gantt, markerDateRef.current);
     const hoverCleanup = wireHoverDelegation(gantt, ganttRef.current);
 
     const hh = gantt.$header?.offsetHeight;
@@ -646,6 +687,28 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
       scrollCleanup?.();
     };
   }, [tasks, viewMode, focusId, height, taskInfoWidth]);
+
+  // 슬라이더 날짜 변경 → 세로선만 다시 그림(간트 재생성 없이). 화면 밖이면 가로 스크롤로 보이게.
+  useEffect(() => {
+    const gantt = ganttInstanceRef.current;
+    if (!gantt) return;
+    drawSliderMarker(gantt, markerDate);
+    if (markerDate == null) return;
+    const svg = gantt.$svg;
+    const scrollEl = ganttRef.current?.querySelector(".gantt-container, .scroll-container, .gantt-body");
+    const markerLine = svg?.querySelector(`.${SLIDER_MARKER_CLASS}`);
+    if (!svg || !scrollEl || !markerLine) return;
+    const marginLeft = parseFloat(svg.style?.marginLeft || "0") || 0;
+    const absX = marginLeft + (parseFloat(markerLine.getAttribute("x1")) || 0);
+    const left = scrollEl.scrollLeft;
+    const view = scrollEl.clientWidth;
+    // 마커가 보이는 타임라인 영역([marginLeft, view]) 밖이면 중앙으로 스크롤
+    if (absX - left < marginLeft || absX - left > view) {
+      const next = Math.max(0, absX - view / 2);
+      scrollEl.scrollLeft = next;
+      if (customScrollbarRef.current) customScrollbarRef.current.scrollLeft = next;
+    }
+  }, [markerDate]);
 
   return (
     <div>
