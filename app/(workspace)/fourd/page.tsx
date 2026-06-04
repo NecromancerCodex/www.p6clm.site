@@ -642,7 +642,7 @@ export default function FourDPage() {
   }, [ready]);
 
   return (
-    <div style={{ padding: 20, height: "100%", display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ padding: 20, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <h1 style={{ margin: 0, fontSize: 20 }}>대시보드</h1>
         <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
@@ -799,7 +799,8 @@ export default function FourDPage() {
               <div>byVia: {ready.diag.topVia}</div>
             </div>
           </details>
-          <div style={{ flex: 1, minHeight: 400 }}>
+          {/* 4D 뷰어 — 고정 높이(자식). 페이지를 내리면 위로 스크롤되며 공정표(부모)가 커짐 */}
+          <div style={{ height: 460, flexShrink: 0 }}>
             <FourDViewer
               parsed={ready.parsed}
               ranges={ready.ranges}

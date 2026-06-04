@@ -118,11 +118,11 @@ export function DashboardSchedule({
 
   const ganttTasks = useMemo(() => toGanttTasks(tasks), [tasks]);
   const marker = msToDate10(markerDate);
-  // 높이는 고정(460) — 너무 키우면 하단 가로 스크롤바가 화면 밖으로 밀려 불편.
-  const ganttHeight = 460;
+  // 페이지가 스크롤되므로 넉넉히(560). 가로 스크롤바도 페이지 스크롤로 도달 가능.
+  const ganttHeight = 560;
 
   return (
-    <div className="ws-inner-pad" style={{ marginTop: 12 }}>
+    <div style={{ marginTop: 12, width: "100%", flexShrink: 0 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>
           공정표 ({ganttTasks.length}개 활동)
