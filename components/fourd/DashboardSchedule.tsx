@@ -105,7 +105,9 @@ export function DashboardSchedule({
   tasks: ScheduleTask[];
   markerDate?: number; // 4D 슬라이더 날짜(epoch ms) — 간트에 세로선으로 표시
 }) {
-  const [viewMode, setViewMode] = useState<ViewMode>("Month");
+  // 기본 '주' 뷰 — 다개월 공정표는 월 뷰면 컬럼이 폭을 못 채워 오른쪽이 비고 가로 스크롤이 사라진다.
+  // 주 뷰는 폭을 채우면서 가로 스크롤도 생긴다(밀도·가독성 ↑).
+  const [viewMode, setViewMode] = useState<ViewMode>("Week");
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -115,8 +117,8 @@ export function DashboardSchedule({
 
   const ganttTasks = useMemo(() => toGanttTasks(tasks), [tasks]);
   const marker = msToDate10(markerDate);
-  // 공간 활용 — 활동 수에 비례해 높이 확대(최소 420, 최대 720). 좁은 영역 낭비 해소.
-  const ganttHeight = Math.min(720, Math.max(420, ganttTasks.length * 24 + 120));
+  // 높이는 고정(460) — 너무 키우면 하단 가로 스크롤바가 화면 밖으로 밀려 불편.
+  const ganttHeight = 460;
 
   return (
     <div className="ws-inner-pad" style={{ marginTop: 12 }}>
