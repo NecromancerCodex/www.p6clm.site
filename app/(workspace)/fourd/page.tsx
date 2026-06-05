@@ -325,7 +325,7 @@ export default function FourDPage() {
       // 1) 미매칭 요소 그룹핑 (zone|storey|category|reason)
       const groups = new Map<
         string,
-        { els: ParsedElement[]; types: Set<string>; storey: string | null; zone: string | null; cat: string; reason: string }
+        { els: ParsedElement[]; types: Set<string>; names: Set<string>; storey: string | null; zone: string | null; cat: string; reason: string }
       >();
       for (const el of ready.parsed.elements) {
         if (ready.ranges.get(el.globalId)?.range) continue; // 이미 매칭됨
@@ -336,11 +336,16 @@ export default function FourDPage() {
         const gkey = `${reason}|${zone ?? "-"}|${storey ?? "-"}|${cat}`;
         let g = groups.get(gkey);
         if (!g) {
-          g = { els: [], types: new Set(), storey, zone, cat, reason };
+          g = { els: [], types: new Set(), names: new Set(), storey, zone, cat, reason };
           groups.set(gkey, g);
         }
         g.els.push(el);
         g.types.add(el.ifcType);
+        // 대표 부재명(Revit) 수집 — AI가 별도/부속 구조를 추론하는 신호 (storeyName도 합침)
+        if (g.names.size < 4) {
+          const nm = el.name || el.storeyName;
+          if (nm) g.names.add(nm);
+        }
       }
       if (groups.size === 0) {
         setPolicyBusy(false);
@@ -352,6 +357,7 @@ export default function FourDPage() {
         label: `${g.zone ? g.zone + " " : ""}${koStorey(g.storey)} ${KO_CAT[g.cat] ?? g.cat}`,
         count: g.els.length,
         ifc_types: [...g.types],
+        names: [...g.names],
         storey: g.storey,
         zone: g.zone,
         reason: g.reason,

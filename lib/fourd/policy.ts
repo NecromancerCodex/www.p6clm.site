@@ -12,6 +12,7 @@ export interface UnmatchedGroup {
   label: string;
   count: number;
   ifc_types: string[];
+  names?: string[]; // 대표 부재명 — AI 별도/부속 구조 추론 신호
   storey: string | null;
   zone: string | null;
   reason: string;
