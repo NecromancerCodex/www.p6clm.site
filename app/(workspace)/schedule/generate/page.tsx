@@ -90,6 +90,7 @@ export default function ScheduleGeneratePage() {
 
   // ── 결과 ──
   const [busy, setBusy] = useState(false);
+  const [genElapsed, setGenElapsed] = useState(0);
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<GenerateScheduleResult | null>(null);
   const [ganttReady, setGanttReady] = useState(false);
@@ -151,6 +152,7 @@ export default function ScheduleGeneratePage() {
 
   const onGenerate = async () => {
     setBusy(true);
+    setGenElapsed(0);
     setErr(null);
     setResult(null);
     setGanttReady(false);
@@ -167,7 +169,7 @@ export default function ScheduleGeneratePage() {
         duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw,
         constraints: constraints.trim() || undefined,
-      });
+      }, setGenElapsed);
       setResult(res);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -306,7 +308,7 @@ export default function ScheduleGeneratePage() {
 
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <button type="button" className="gen-btn" disabled={!canSubmit} onClick={onGenerate}>
-          {busy ? "생성 중… (GPT-5.4 추론)" : "공정표 생성"}
+          {busy ? `생성 중… ${genElapsed}초 (gpt-5.4 온톨로지 탐색, 1~3분)` : "공정표 생성"}
         </button>
         {err && <span style={{ color: "#dc2626", fontSize: 13 }}>{err}</span>}
       </div>

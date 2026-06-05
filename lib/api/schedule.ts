@@ -385,9 +385,15 @@ export interface GenerateScheduleResult {
   tool_log: string[];
 }
 
+/**
+ * 공정표 생성 — 비동기 잡: POST 로 job_id 받고 폴링.
+ * gpt-5.4 에이전틱 생성이 2~3분 걸려 동기 요청은 게이트웨이 타임아웃(502) → 잡 패턴.
+ */
 export async function generateSchedule(
   req: GenerateScheduleRequest,
+  onTick?: (elapsedSec: number) => void,
 ): Promise<GenerateScheduleResult> {
+  // 1) 잡 생성 (즉시 반환)
   const res = await fetch(`${API_BASE}/schedule/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -398,5 +404,19 @@ export async function generateSchedule(
     const detail = (body && (body.detail ?? body.error)) || `${res.status} ${res.statusText}`;
     throw new ScheduleApiError(res.status, String(detail));
   }
-  return (await res.json()) as GenerateScheduleResult;
+  const { job_id } = (await res.json()) as { job_id: string };
+
+  // 2) 폴링 (3초 간격, 최대 6분)
+  const started = Date.now();
+  const deadline = started + 6 * 60 * 1000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 3000));
+    onTick?.(Math.round((Date.now() - started) / 1000));
+    const s = await fetch(`${API_BASE}/schedule/generate-status/${job_id}`);
+    if (!s.ok) continue;
+    const data = (await s.json()) as { status: string; result?: GenerateScheduleResult; error?: string };
+    if (data.status === "done" && data.result) return data.result;
+    if (data.status === "error") throw new ScheduleApiError(500, data.error || "생성 실패");
+  }
+  throw new ScheduleApiError(504, "생성 시간 초과 (6분) — 다시 시도해주세요.");
 }
