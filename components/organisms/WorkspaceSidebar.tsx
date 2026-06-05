@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut, Phone } from "lucide-react";
+import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut, Phone, Mountain } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -31,6 +31,7 @@ const PROCESS_GROUP = {
 
 // 공정관리 그룹 뒤 — 문서 저장소 → (전화내역, admin) → 소개 순.
 const NAV_DOCS = { path: "/progress", label: "문서 저장소", icon: BarChart2 };
+const NAV_EARTHWORK = { path: "/earthwork", label: "토공 / 지반", icon: Mountain }; // 시추 3D 지층·물량
 const NAV_CALLS_ADMIN = { path: "/calls", label: "전화내역", icon: Phone }; // admin 전용
 const NAV_ABOUT = { path: "/about", label: "소개", icon: Info };
 
@@ -233,6 +234,7 @@ export function WorkspaceSidebar() {
 
           {/* 문서 저장소 → (전화내역, admin) → 소개 */}
           {renderFlat(NAV_DOCS)}
+          {renderFlat(NAV_EARTHWORK)}
           {isAdmin && renderFlat(NAV_CALLS_ADMIN)}
           {renderFlat(NAV_ABOUT)}
         </nav>
