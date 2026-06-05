@@ -24,8 +24,8 @@ const PROCESS_GROUP = {
   items: [
     { path: "/fourd",             label: "대시보드" },
     { path: "/schedule/progress", label: "공정 진도율" },
-    { path: "/schedule/resource", label: "자원 계획",   soon: true },
-  ],
+    { path: "/schedule/resource", label: "자원 계획" },
+  ] as { path: string; label: string; soon?: boolean }[],
 };
 
 // 공정관리 그룹 뒤 — 문서 저장소 → (전화내역, admin) → 소개 순.
