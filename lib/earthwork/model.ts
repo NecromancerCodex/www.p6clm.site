@@ -84,6 +84,88 @@ function idw(px: number, py: number, samples: { x: number; y: number; v: number 
   return den ? num / den : 0;
 }
 
+/** 보간용 전처리본 — 시추공 경계표고 미리 계산. */
+export interface BoreSet {
+  boreholes: Borehole[];
+  ifs: { x: number; y: number; gwlEl: number; e: number[] }[];
+}
+
+/** 시추공 배열 → BoreSet(경계표고 1회 계산). */
+export function prepare(boreholes: Borehole[]): BoreSet {
+  return {
+    boreholes,
+    ifs: boreholes.map((b) => ({ x: b.x, y: b.y, gwlEl: b.el - b.gwl, e: interfaceElevations(b) })),
+  };
+}
+
+/** 기본 샘플(시추 11공) 전처리본. */
+export const SAMPLE_SET = prepare(BOREHOLES);
+
+/** 임의 (x,y) 의 층 경계 표고 [지표,…9하단] — IDW(power2) + 단조 보정. */
+export function interfaceAt(set: BoreSet, x: number, y: number): number[] {
+  const ni = LAYERS.length + 1;
+  const num = new Array(ni).fill(0);
+  let den = 0;
+  for (const b of set.ifs) {
+    const dx = x - b.x, dy = y - b.y, d2 = dx * dx + dy * dy;
+    if (d2 < 1e-6) return b.e.slice();
+    const w = 1 / d2;
+    den += w;
+    for (let m = 0; m < ni; m++) num[m] += w * b.e[m];
+  }
+  const res = num.map((v) => (den ? v / den : 0));
+  for (let m = 1; m < ni; m++) if (res[m] > res[m - 1]) res[m] = res[m - 1];
+  return res;
+}
+
+/** 임의 (x,y) 의 지하수위 표고(EL) — IDW. */
+export function gwlElAt(set: BoreSet, x: number, y: number): number {
+  let num = 0, den = 0;
+  for (const b of set.ifs) {
+    const dx = x - b.x, dy = y - b.y, d2 = dx * dx + dy * dy;
+    if (d2 < 1e-6) return b.gwlEl;
+    const w = 1 / d2;
+    num += w * b.gwlEl;
+    den += w;
+  }
+  return den ? num / den : 0;
+}
+
+const _orZero = (v: number) => (Number.isFinite(v) ? v : 0);
+
+/**
+ * boreholes.csv 형식 파싱 → 시추공 배열. 좌표(X,Y) 없는 행은 제외(3D 배치 불가).
+ * 헤더: borehole,X,Y,surface_EL,drill_depth,gwl_GL,fill,clay,sand,gravel,wsoil,wrock,srock,mrock,hrock
+ */
+export function parseBoreholeCsv(text: string): Borehole[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return [];
+  const header = lines[0].split(",").map((h) => h.trim());
+  const idx: Record<string, number> = {};
+  header.forEach((h, i) => (idx[h] = i));
+  const num = (c: string[], k: string) => {
+    const i = idx[k];
+    return i != null ? parseFloat((c[i] ?? "").trim()) : NaN;
+  };
+  const out: Borehole[] = [];
+  for (let r = 1; r < lines.length; r++) {
+    const c = lines[r].split(",");
+    const id = (c[idx["borehole"]] ?? "").trim();
+    const x = num(c, "X"), y = num(c, "Y");
+    if (!id || !Number.isFinite(x) || !Number.isFinite(y)) continue; // 좌표 없는 행 스킵
+    const t: Record<string, number> = {};
+    for (const L of LAYERS) t[L.key] = _orZero(num(c, L.key));
+    out.push({
+      id, x, y,
+      el: _orZero(num(c, "surface_EL")),
+      depth: _orZero(num(c, "drill_depth")),
+      gwl: _orZero(num(c, "gwl_GL")),
+      t,
+    });
+  }
+  return out;
+}
+
 export interface GridModel {
   nx: number;
   ny: number;
@@ -98,12 +180,12 @@ export interface GridModel {
   ifaces: number[][][]; // [m=0..LAYERS.length][iy][ix] = 경계 표고(EL)
 }
 
-/** 부지 격자 + 각 층 경계 표고 IDW 보간. spacing(m). */
-export function buildGridModel(spacing = 2): GridModel {
-  const minX = Math.min(...BOREHOLES.map((b) => b.x));
-  const maxX = Math.max(...BOREHOLES.map((b) => b.x));
-  const minY = Math.min(...BOREHOLES.map((b) => b.y));
-  const maxY = Math.max(...BOREHOLES.map((b) => b.y));
+/** 부지 격자 + 각 층 경계 표고 IDW 보간. boreholes 기반. spacing(m). */
+export function buildGridModel(boreholes: Borehole[], spacing = 2): GridModel {
+  const minX = Math.min(...boreholes.map((b) => b.x));
+  const maxX = Math.max(...boreholes.map((b) => b.x));
+  const minY = Math.min(...boreholes.map((b) => b.y));
+  const maxY = Math.max(...boreholes.map((b) => b.y));
   const width = maxX - minX;
   const depthY = maxY - minY;
   const nx = Math.max(2, Math.ceil(width / spacing) + 1);
@@ -112,7 +194,7 @@ export function buildGridModel(spacing = 2): GridModel {
   const ly = Array.from({ length: ny }, (_, j) => (j / (ny - 1)) * depthY);
 
   // 시추공별 경계 표고 미리 계산.
-  const bIf = BOREHOLES.map((b) => ({ x: b.x - minX, y: b.y - minY, e: interfaceElevations(b) }));
+  const bIf = boreholes.map((b) => ({ x: b.x - minX, y: b.y - minY, e: interfaceElevations(b) }));
   const nIf = LAYERS.length + 1;
   const ifaces: number[][][] = [];
   for (let m = 0; m < nIf; m++) {

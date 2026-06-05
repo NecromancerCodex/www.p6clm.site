@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import { BOREHOLES, LAYERS, interfaceElevations, type GridModel } from "../../lib/earthwork/model";
+import { LAYERS, type Borehole, type GridModel } from "../../lib/earthwork/model";
 
 /** 한 층(top/bot 표고격자) → 닫힌 슬랩 BufferGeometry (상면+하면+측벽). */
 function buildSlab(g: GridModel, m: number): THREE.BufferGeometry {
@@ -52,9 +52,10 @@ function buildSlab(g: GridModel, m: number): THREE.BufferGeometry {
 interface Props {
   model: GridModel;
   visible: Record<string, boolean>; // 층key → 표시 여부
+  boreholes: Borehole[];
 }
 
-export function EarthworkViewer({ model, visible }: Props) {
+export function EarthworkViewer({ model, visible, boreholes }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const meshesRef = useRef<Record<string, THREE.Mesh>>({});
 
@@ -115,10 +116,9 @@ export function EarthworkViewer({ model, visible }: Props) {
 
     // 시추공 기둥 (지표→굴진심도) + 상단 점
     const boreGroup = new THREE.Group();
-    for (const b of BOREHOLES) {
+    for (const b of boreholes) {
       const px = b.x - model.minX;
       const pz = b.y - model.minY;
-      const eIf = interfaceElevations(b);
       const topE = b.el;
       const botE = b.el - b.depth;
       const lineGeo = new THREE.BufferGeometry().setFromPoints([
@@ -132,7 +132,6 @@ export function EarthworkViewer({ model, visible }: Props) {
       );
       dot.position.set(px, topE, pz);
       boreGroup.add(dot);
-      void eIf;
     }
     scene.add(boreGroup);
 
@@ -165,7 +164,7 @@ export function EarthworkViewer({ model, visible }: Props) {
       renderer.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
-  }, [model, bounds]);
+  }, [model, bounds, boreholes]);
 
   // 층 표시 토글 (메시 visible 만 갱신)
   useEffect(() => {
