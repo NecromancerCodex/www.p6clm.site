@@ -49,6 +49,44 @@ function buildSlab(g: GridModel, m: number): THREE.BufferGeometry {
   return geo;
 }
 
+/** 공번 텍스트 → 빌보드 스프라이트 (캔버스 텍스처). span 으로 월드 크기 스케일. */
+function makeTextSprite(text: string, span: number): THREE.Sprite {
+  const fs = 48;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  ctx.font = `bold ${fs}px sans-serif`;
+  const tw = Math.ceil(ctx.measureText(text).width);
+  canvas.width = tw + 24;
+  canvas.height = fs + 18;
+  ctx.font = `bold ${fs}px sans-serif`; // 리사이즈로 초기화 → 재설정
+  ctx.fillStyle = "rgba(15,17,22,0.72)";
+  roundRect(ctx, 0, 0, canvas.width, canvas.height, 10);
+  ctx.fillStyle = "#ffffff";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 12, canvas.height / 2 + 1);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }),
+  );
+  sprite.renderOrder = 999; // 솔리드 위에 그림
+  const h = span * 0.06;
+  sprite.scale.set(h * (canvas.width / canvas.height), h, 1);
+  return sprite;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+  ctx.fill();
+}
+
 interface Props {
   model: GridModel;
   visible: Record<string, boolean>; // 층key → 표시 여부
@@ -132,6 +170,10 @@ export function EarthworkViewer({ model, visible, boreholes }: Props) {
       );
       dot.position.set(px, topE, pz);
       boreGroup.add(dot);
+      // 공번 라벨 (캔버스 스프라이트 — 카메라 향함, 가려지지 않음)
+      const label = makeTextSprite(b.id, span);
+      label.position.set(px, topE + span * 0.04, pz);
+      boreGroup.add(label);
     }
     scene.add(boreGroup);
 
@@ -161,6 +203,15 @@ export function EarthworkViewer({ model, visible, boreholes }: Props) {
       window.removeEventListener("resize", onResize);
       controls.dispose();
       Object.values(meshes).forEach((m) => m.geometry.dispose());
+      // 라벨 스프라이트 텍스처/재질 정리 (CSV 재업로드 시 누수 방지)
+      boreGroup.traverse((o) => {
+        const sp = o as THREE.Sprite;
+        if (sp.isSprite) {
+          const mat = sp.material as THREE.SpriteMaterial;
+          mat.map?.dispose();
+          mat.dispose();
+        }
+      });
       renderer.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
