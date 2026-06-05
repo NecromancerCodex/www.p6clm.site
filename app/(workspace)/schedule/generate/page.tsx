@@ -53,6 +53,18 @@ function loadFrappeGantt(): Promise<void> {
 const splitList = (s: string): string[] =>
   s.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
 
+// IFC 클래스 → 공종(discipline) 범용 매핑 — BIM 부재로 '유력 공법' 추천.
+const IFC_DISCIPLINE: Record<string, string> = {
+  IfcFooting: "FOUNDATION", IfcPile: "FOUNDATION",
+  IfcWall: "STRUCTURE", IfcWallStandardCase: "STRUCTURE", IfcColumn: "STRUCTURE",
+  IfcBeam: "STRUCTURE", IfcSlab: "STRUCTURE", IfcMember: "STRUCTURE", IfcPlate: "STRUCTURE",
+  IfcStair: "STRUCTURE", IfcStairFlight: "STRUCTURE", IfcRailing: "STRUCTURE",
+  IfcCurtainWall: "FACADE", IfcWindow: "FACADE", IfcDoor: "FACADE",
+  IfcCovering: "FINISH", IfcRoof: "WATERPROOF",
+  IfcPipeSegment: "MEP", IfcPipeFitting: "MEP", IfcDuctSegment: "MEP", IfcDuctFitting: "MEP",
+  IfcFlowTerminal: "MEP", IfcCableCarrierSegment: "MEP", IfcSanitaryTerminal: "MEP",
+};
+
 export default function ScheduleGeneratePage() {
   // ── 폼 상태 (6하원칙) ──
   const [buildingType, setBuildingType] = useState("");
@@ -68,6 +80,7 @@ export default function ScheduleGeneratePage() {
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [bimName, setBimName] = useState<string | null>(null);
   const [bimBusy, setBimBusy] = useState(false);
+  const [recommendedDisc, setRecommendedDisc] = useState<Set<string>>(new Set());
 
   // ── 공법 목록 ──
   const [methodGroups, setMethodGroups] = useState<MethodGroup[]>([]);
@@ -100,19 +113,23 @@ export default function ScheduleGeneratePage() {
       const agg = new Map<string, GenWorkUnit>();
       const zoneSet = new Set<string>();
       const storeySet = new Set<string>();
+      const discSet = new Set<string>();
       for (const el of parsed.elements) {
         const zone = el.zone ?? "-";
         const storey = el.storey4d ?? el.storeyName ?? "-";
         const cat = classifyIfcType(el.ifcType);
         if (el.zone) zoneSet.add(el.zone);
         if (storey !== "-") storeySet.add(storey);
+        const disc = IFC_DISCIPLINE[el.ifcType];
+        if (disc) discSet.add(disc);
         const key = `${zone}|${storey}|${cat}`;
         const u = agg.get(key) ?? { zone, storey, element_type: cat, count: 0 };
         u.count = (u.count ?? 0) + 1;
         agg.set(key, u);
       }
       setWorkUnits([...agg.values()]);
-      setBimName(`${file.name} (${parsed.elements.length}부재 → ${agg.size}유형)`);
+      setRecommendedDisc(discSet);
+      setBimName(`${file.name} (${parsed.elements.length}부재 → ${agg.size}유형, 유력공종 ${discSet.size})`);
       if (!zones && zoneSet.size) setZones([...zoneSet].join(", "));
       if (!storeys && storeySet.size) setStoreys([...storeySet].sort().join(", "));
     } catch (e) {
@@ -241,18 +258,27 @@ export default function ScheduleGeneratePage() {
       </div>
 
       <Field label={`④ 어떤 방식 — 공법 선택 (${methods.length}개 선택)`}>
+        {recommendedDisc.size > 0 && (
+          <div style={{ fontSize: 11, color: "#7c3aed", marginBottom: -2 }}>
+            ◆ BIM 분석 결과 <b>연보라 = 유력 공법</b> (부재 유형 기반 추천)
+          </div>
+        )}
         <div className="gen-methods">
           {methodGroups.map((g) => (
             <div key={g.key} className="gen-mgroup">
               <div className="gen-mcat">{g.category}</div>
               <div className="gen-mlist">
-                {g.methods.map((m) => (
-                  <button key={m.key} type="button"
-                    className={`gen-mchip${methods.includes(m.key) ? " on" : ""}`}
-                    onClick={() => toggleMethod(m.key)} title={m.key}>
-                    {m.name}
-                  </button>
-                ))}
+                {g.methods.map((m) => {
+                  const sel = methods.includes(m.key);
+                  const rec = !sel && recommendedDisc.has(m.discipline);
+                  return (
+                    <button key={m.key} type="button"
+                      className={`gen-mchip${sel ? " on" : rec ? " rec" : ""}`}
+                      onClick={() => toggleMethod(m.key)} title={m.key}>
+                      {m.name}{rec && <span className="gen-rec">유력!</span>}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -320,6 +346,8 @@ export default function ScheduleGeneratePage() {
         .gen-mlist { display: flex; flex-wrap: wrap; gap: 5px; }
         .gen-mchip { padding: 3px 9px; border: 1px solid #cbd5e1; border-radius: 14px; font-size: 12px; background: #fff; cursor: pointer; color: #334155; }
         .gen-mchip.on { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .gen-mchip.rec { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
+        .gen-rec { font-size: 9px; font-weight: 700; color: #7c3aed; margin-left: 4px; vertical-align: top; }
         .gen-btn { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .gen-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
       `}</style>
