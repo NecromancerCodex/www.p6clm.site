@@ -247,9 +247,10 @@ export default function FourDPage() {
       let minDate: number;
       let maxDate: number;
       const sidx = buildScheduleIndex(tasks);
-      let codeIndex: CodeIndex | null = null;
-      if (useCode) {
-        codeIndex = buildCodeIndex(tasks);
+      // 공정PSet 있으면 hybrid(zone정확). 없어도 공정표에 4D 코드(codeCount>0, 생성 공정표 등)가
+      // 있으면 codeIndex 를 만들어 둔다 — AI 매칭·보고서·워크패키지 버튼/기능 활성화용.
+      let codeIndex: CodeIndex | null = useCode || codeCount > 0 ? buildCodeIndex(tasks) : null;
+      if (useCode && codeIndex) {
         // 규칙은 "확정 매칭"만 — 실제 활동에 연결되는 것(유닛/단계/구역/층).
         // 활동이 없는 하드케이스(ZA/ZC 유닛불일치·PT구조·주차장)는 미매칭으로 두고
         // 온톨로지 grounding AI(정책 버튼)가 판단한다. (규칙이 추정으로 때우지 않음)
@@ -257,9 +258,10 @@ export default function FourDPage() {
         minDate = Math.min(codeIndex.minDate, sidx.minDate);
         maxDate = Math.max(codeIndex.maxDate, sidx.maxDate);
       } else {
+        // 층 근사 매칭 (PSet 없음). codeIndex 는 버튼/AI용으로만 보유(매칭엔 미사용).
         ({ ranges, summary } = matchAll(parsed.elements, sidx));
-        minDate = sidx.minDate;
-        maxDate = sidx.maxDate;
+        minDate = codeIndex ? Math.min(codeIndex.minDate, sidx.minDate) : sidx.minDate;
+        maxDate = codeIndex ? Math.max(codeIndex.maxDate, sidx.maxDate) : sidx.maxDate;
       }
 
       const topVia = Object.entries(summary.byVia)
