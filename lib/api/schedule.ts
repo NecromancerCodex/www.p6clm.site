@@ -335,3 +335,66 @@ export async function analyzeSchedule(
   }
   return (await res.json()) as ScheduleAnalyzeResult;
 }
+
+// ── 공정표 자동생성기 (6하원칙 → GPT-5.4 → P6 XML) ──────────────────────────
+
+export interface MethodItem { key: string; name: string; discipline: string }
+export interface MethodGroup { category: string; key: string; methods: MethodItem[] }
+
+export async function listScheduleMethods(): Promise<MethodGroup[]> {
+  const res = await fetch(`${API_BASE}/schedule/methods`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.groups ?? []) as MethodGroup[];
+}
+
+export interface GenWorkUnit {
+  zone?: string; storey?: string; element_type?: string;
+  count?: number; quantity?: number; unit?: string;
+}
+export interface GenerateScheduleRequest {
+  building_type: string;
+  scope?: string;
+  zones: string[];
+  storeys: string[];
+  work_units: GenWorkUnit[];
+  methods: string[];
+  start_date: string;          // YYYY-MM-DD
+  target_finish?: string;
+  duration_months?: number;
+  work_days_per_week: number;
+  constraints?: string;
+}
+export interface GenTask {
+  code: string; name: string; start: string; end: string;
+  wbs: string; discipline: string; method: string | null;
+  duration_days: number; milestone: boolean; predecessors: string[];
+}
+export interface GenerateScheduleResult {
+  project_name: string;
+  start_date: string;
+  end_date: string | null;
+  activity_count: number;
+  relationship_count: number;
+  tasks: GenTask[];
+  p6xml: string;
+  warnings: string[];
+  notes: string | null;
+  model: string;
+}
+
+export async function generateSchedule(
+  req: GenerateScheduleRequest,
+): Promise<GenerateScheduleResult> {
+  const res = await fetch(`${API_BASE}/schedule/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const detail = (body && (body.detail ?? body.error)) || `${res.status} ${res.statusText}`;
+    throw new ScheduleApiError(res.status, String(detail));
+  }
+  return (await res.json()) as GenerateScheduleResult;
+}

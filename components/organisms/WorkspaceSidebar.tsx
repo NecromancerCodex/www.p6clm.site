@@ -23,6 +23,7 @@ const PROCESS_GROUP = {
   basePaths: ["/fourd", "/schedule"], // 이 중 하나에 있으면 그룹 자동 펼침
   items: [
     { path: "/fourd",             label: "대시보드" },
+    { path: "/schedule/generate", label: "공정표 자동생성기" },
     { path: "/schedule/progress", label: "공정 진도율" },
     { path: "/schedule/resource", label: "자원 계획" },
   ] as { path: string; label: string; soon?: boolean }[],
