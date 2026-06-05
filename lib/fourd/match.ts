@@ -36,6 +36,12 @@ export interface DecodedCode {
 
 /** 502HG... 코드 디코드. 형식 불일치 시 null. */
 export function decodeActId(code: string): DecodedCode | null {
+  // 범용 4D 포맷 (생성기 산출): 4D.{ST|MO}.{zone}.{storey}.{op}.{phase}.{seq}
+  const clean = /^4D\.(ST|MO)\.([^.]+)\.([^.]+)\.([^.]+)\.([^.]*)/.exec(code.trim());
+  if (clean) {
+    const [, trade, zone, storey, op, phase] = clean;
+    return { trade: trade as Trade, zone, storey, worktype: op, mtype: op, phase: phase || "" };
+  }
   const m = /^502HG(ST|MO)(.+)$/.exec(code.trim());
   if (!m) return null;
   const trade = m[1] as Trade;
