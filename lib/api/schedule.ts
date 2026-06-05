@@ -381,6 +381,8 @@ export interface GenerateScheduleResult {
   warnings: string[];
   notes: string | null;
   model: string;
+  search_rounds: number;
+  tool_log: string[];
 }
 
 export async function generateSchedule(

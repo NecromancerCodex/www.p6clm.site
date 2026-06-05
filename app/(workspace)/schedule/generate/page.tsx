@@ -277,7 +277,9 @@ export default function ScheduleGeneratePage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>
               {result.project_name} — 활동 {result.activity_count} · 관계 {result.relationship_count} · {result.start_date} ~ {result.end_date ?? "?"}
-              <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 8 }}>({result.model})</span>
+              <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 8 }}>
+                ({result.model}{result.search_rounds ? ` · 온톨로지 ${result.search_rounds}라운드 탐색` : ""})
+              </span>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <div className="sch-viewmode">
