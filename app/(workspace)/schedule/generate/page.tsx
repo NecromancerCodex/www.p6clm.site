@@ -102,6 +102,14 @@ export default function ScheduleGeneratePage() {
   const toggleMethod = (key: string) =>
     setMethods((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
+  // BIM 추천(유력) 공법 = 추천 공종에 속한 모든 공법
+  const recommendedKeys = useMemo(
+    () => methodGroups.flatMap((g) => g.methods).filter((m) => recommendedDisc.has(m.discipline)).map((m) => m.key),
+    [methodGroups, recommendedDisc],
+  );
+  const selectAllRecommended = () =>
+    setMethods((prev) => [...new Set([...prev, ...recommendedKeys])]);
+
   // ── BIM 업로드 → 물량 집계 ──
   const onBim = async (file: File) => {
     setBimBusy(true);
@@ -259,8 +267,13 @@ export default function ScheduleGeneratePage() {
 
       <Field label={`④ 어떤 방식 — 공법 선택 (${methods.length}개 선택)`}>
         {recommendedDisc.size > 0 && (
-          <div style={{ fontSize: 11, color: "#7c3aed", marginBottom: -2 }}>
-            ◆ BIM 분석 결과 <b>연보라 = 유력 공법</b> (부재 유형 기반 추천)
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: -2, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: "#7c3aed" }}>
+              ◆ BIM 분석 결과 <b>연보라 = 유력 공법</b> (부재 유형 기반 추천)
+            </span>
+            <button type="button" className="gen-rec-all" onClick={selectAllRecommended}>
+              ◆ AI 추천 전체 선택 ({recommendedKeys.length})
+            </button>
           </div>
         )}
         <div className="gen-methods">
@@ -348,6 +361,8 @@ export default function ScheduleGeneratePage() {
         .gen-mchip.on { background: #2563eb; color: #fff; border-color: #2563eb; }
         .gen-mchip.rec { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
         .gen-rec { font-size: 9px; font-weight: 700; color: #7c3aed; margin-left: 4px; vertical-align: top; }
+        .gen-rec-all { padding: 3px 10px; background: #7c3aed; color: #fff; border: none; border-radius: 13px; font-size: 11px; font-weight: 600; cursor: pointer; }
+        .gen-rec-all:hover { background: #6d28d9; }
         .gen-btn { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .gen-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
       `}</style>
