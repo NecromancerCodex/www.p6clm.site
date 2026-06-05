@@ -363,6 +363,8 @@ export interface GenerateScheduleRequest {
   target_finish?: string;
   duration_months?: number;
   work_days_per_week: number;
+  tower_cranes: number;        // 타워크레인 수 — 동시 양중 한계(스태거)
+  work_crews: number;          // 작업조 수 — 동시 동일공종 한계
   constraints?: string;
 }
 export interface GenTask {

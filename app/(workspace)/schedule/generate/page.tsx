@@ -76,6 +76,8 @@ export default function ScheduleGeneratePage() {
   const [targetFinish, setTargetFinish] = useState("");
   const [durationMonths, setDurationMonths] = useState("");
   const [wdpw, setWdpw] = useState(6);
+  const [towerCranes, setTowerCranes] = useState(2);
+  const [workCrews, setWorkCrews] = useState(3);
   const [constraints, setConstraints] = useState("");
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [bimName, setBimName] = useState<string | null>(null);
@@ -168,6 +170,8 @@ export default function ScheduleGeneratePage() {
         target_finish: targetFinish || undefined,
         duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw,
+        tower_cranes: towerCranes,
+        work_crews: workCrews,
         constraints: constraints.trim() || undefined,
       }, setGenElapsed);
       setResult(res);
@@ -263,6 +267,15 @@ export default function ScheduleGeneratePage() {
                 <option value={7}>주 7일</option>
               </select>
             </label>
+            <label className="gen-sub" title="동시 양중(모듈/PC설치) 구역 한계 — 초과 시 스태거">🏗 타워크레인
+              <input type="number" min={1} className="gen-in" value={towerCranes} onChange={(e) => setTowerCranes(Math.max(1, Number(e.target.value)))} />
+            </label>
+            <label className="gen-sub" title="동시 동일공종 작업 한계">👷 작업조
+              <input type="number" min={1} className="gen-in" value={workCrews} onChange={(e) => setWorkCrews(Math.max(1, Number(e.target.value)))} />
+            </label>
+          </div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+            자원이 구역 수보다 적으면 AI가 자동 스태거(순차화). 예: 크레인 1대 → A→B→C 직렬
           </div>
         </Field>
       </div>
