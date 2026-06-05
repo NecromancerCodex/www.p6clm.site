@@ -188,7 +188,7 @@ export default function ScheduleGeneratePage() {
         <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>
           6가지 정보를 입력하면 GPT-5.4가 공정표 초안을 생성합니다. (날짜·P6 XML은 시스템이 결정론적으로 계산)
           <br />
-          ⚠️ 기간은 AI 추정(품셈 미반영) — <b>초안</b>이며 PM 검토·확정이 필요합니다.
+          ⚠️ 기간은 표준품셈(2,998항목) 기반 산정 — 품셈 없는 항목은 AI 추정. <b>초안</b>이며 PM 검토·확정 필요.
         </p>
       </div>
 
