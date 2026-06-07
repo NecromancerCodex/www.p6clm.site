@@ -16,7 +16,7 @@ import {
   type GenWorkUnit,
   type MethodGroup,
 } from "../../../../lib/api/schedule";
-import { classifyIfcType } from "../../../../lib/fourd/match";
+import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
 import GanttChartRaw from "../../../../components/process/GanttChart";
 
 const GanttChart = GanttChartRaw as unknown as FC<{
@@ -127,7 +127,8 @@ export default function ScheduleGeneratePage() {
       const discSet = new Set<string>();
       for (const el of parsed.elements) {
         const zone = el.zone ?? "-";
-        const storey = el.storey4d ?? el.storeyName ?? "-";
+        // 4D 매처와 동일한 storey 도출(normStorey) — 생성 코드와 BIM 매칭 표기 일치 보장.
+        const storey = el.storey4d ?? normStorey(el.storeyName) ?? "-";
         const cat = classifyIfcType(el.ifcType);
         if (el.zone) zoneSet.add(el.zone);
         if (storey !== "-") storeySet.add(storey);

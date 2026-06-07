@@ -92,7 +92,9 @@ export function normStorey(storeyName: string | null | undefined): string | null
     return "RF";
   if (u.includes("PIT") || s.includes("기초") || s.includes("지정") || s.includes("지하"))
     return "PT";
-  return null;
+  // 인식 못 한 층(예: 영문 "Level 1", 임의 표기)은 원본 보존 — 502동 외 범용 BIM 매칭용.
+  // (공정표 생성기도 같은 원본 storey 를 코드에 쓰므로 양쪽 표기가 일치 → 매칭됨)
+  return s.trim() || null;
 }
 
 interface DateRange {

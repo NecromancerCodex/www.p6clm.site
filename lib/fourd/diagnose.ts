@@ -44,14 +44,24 @@ export function classifyUnmatched(
   schedOpStorey: Map<string, Set<string>>,
   aiAttempted = false, // 정책(AI) 매칭을 이미 돌린 뒤면 권장문구를 '미해결'로 전환
 ): CauseMeta {
-  // C1 — zone/층 태그 없음: 비구조·데이텀·주차장(또는 BIM 공정태그 누락)
-  if (!zone || via === "no_storey") {
+  // C1-a — 층(storey) 인식 실패: BIM 층 이름이 공정표 층 표기와 안 맞음 (형식 불일치)
+  if (via === "no_storey") {
     return {
       cause: "C1",
-      title: "zone 태그 없음 (비구조·대상 외)",
+      title: "층(storey) 매칭 실패 — 표기 불일치",
       color: "#64748b",
-      explain: "zone/층 공정 태그가 없는 부재입니다 (데이텀·주차장지붕·비구조 요소 또는 BIM 공정태그 누락).",
-      recommend: "대부분 매칭 대상이 아니므로 회색으로 둡니다. 구조 부재인데 여기 있다면 BIM 공정태그 누락이니 확인하세요.",
+      explain: "BIM 부재의 층 이름을 공정표 층과 매칭하지 못했습니다 (예: BIM은 'Level 2', 공정표는 '02'/'2층' 등 표기가 다름).",
+      recommend: "BIM 층 이름과 공정표 층 표기를 같은 형식으로 맞추세요. (자동생성 공정표는 BIM 층을 그대로 쓰므로 보통 일치)",
+    };
+  }
+  // C1-b — zone 태그 없음: 비구조·데이텀·주차장(또는 단일동이라 zone 분할 없음)
+  if (!zone) {
+    return {
+      cause: "C1",
+      title: "zone 태그 없음 (비구조·단일동·대상 외)",
+      color: "#64748b",
+      explain: "구역(zone) 태그가 없는 부재입니다 (단일동이라 구역 분할이 없거나, 데이텀·비구조 요소, 또는 BIM 태그 누락).",
+      recommend: "단일동이면 층(storey)만으로 매칭됩니다 — 그래도 미매칭이면 층 표기 불일치 또는 공정표에 해당 층 활동이 없는지 확인하세요.",
     };
   }
 
