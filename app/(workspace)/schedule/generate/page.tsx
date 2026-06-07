@@ -184,21 +184,31 @@ export default function ScheduleGeneratePage() {
 
   const ganttTasks: GanttTask[] = useMemo(() => {
     if (!result) return [];
+    // 마일스톤/0일(start==end) → frappe-gantt 진행바 폭 -1 에러. 최소 1일로 보정.
+    const bumpEnd = (s: string, e: string): string => {
+      if (e > s) return e;
+      const d = new Date(s + "T00:00:00");
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    };
     return result.tasks
       .filter((t) => t.start && t.end)
-      .map((t) => ({
-        id: t.code,
-        activity_code: t.code,
-        name: t.name,
-        wbs_code: "",
-        start: t.start.slice(0, 10),
-        end: t.end.slice(0, 10),
-        progress: 0,
-        is_cp: false,
-        total_float_hr_cnt: null,
-        status: "",
-        dependencies: (t.predecessors ?? []).filter((p) => p !== t.code),
-      })) as GanttTask[];
+      .map((t) => {
+        const s = t.start.slice(0, 10);
+        return {
+          id: t.code,
+          activity_code: t.code,
+          name: t.name,
+          wbs_code: "",
+          start: s,
+          end: bumpEnd(s, t.end.slice(0, 10)),
+          progress: 0,
+          is_cp: false,
+          total_float_hr_cnt: null,
+          status: "",
+          dependencies: (t.predecessors ?? []).filter((p) => p !== t.code),
+        };
+      }) as GanttTask[];
   }, [result]);
 
   const downloadXml = () => {

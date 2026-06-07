@@ -58,6 +58,15 @@ const VIEW_LABEL: Record<ViewMode, string> = { Day: "일", Week: "주", Month: "
 /** ISO/날짜 문자열 → "YYYY-MM-DD" (frappe-gantt 파서 호환). */
 const date10 = (s?: string | null): string | undefined => (s ? String(s).slice(0, 10) : undefined);
 
+/** 마일스톤/0일(end<=start) → frappe-gantt 진행바 폭 -1 에러. 최소 1일로 보정. */
+const bumpEnd = (s?: string, e?: string): string | undefined => {
+  if (!s || !e) return e;
+  if (e > s) return e;
+  const d = new Date(s + "T00:00:00");
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
 /** ScheduleTask[] → GanttTask[]. 선행(활동명)은 유일할 때만 코드로 매핑해 화살표 연결. */
 function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
   const nameToCode = new Map<string, string>();
@@ -82,7 +91,7 @@ function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
         name: t.name ?? t.code,
         wbs_code: "",
         start: date10(t.start),
-        end: date10(t.end),
+        end: bumpEnd(date10(t.start), date10(t.end)),
         progress,
         is_cp: false,
         total_float_hr_cnt: null,
