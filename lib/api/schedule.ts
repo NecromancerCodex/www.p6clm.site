@@ -422,3 +422,15 @@ export async function generateSchedule(
   }
   throw new ScheduleApiError(504, "생성 시간 초과 (6분) — 다시 시도해주세요.");
 }
+
+export interface InferContextResult { building_type: string; scope: string; reason: string }
+export async function inferScheduleContext(req: {
+  storeys: string[]; zones: string[];
+  element_summary: { type: string; count: number }[]; total_count: number;
+}): Promise<InferContextResult> {
+  const res = await fetch(`${API_BASE}/schedule/infer-context`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),
+  });
+  if (!res.ok) return { building_type: "", scope: "", reason: "" };
+  return (await res.json()) as InferContextResult;
+}

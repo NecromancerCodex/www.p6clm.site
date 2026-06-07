@@ -10,6 +10,7 @@ import { type FC, useEffect, useMemo, useState } from "react";
 
 import {
   generateSchedule,
+  inferScheduleContext,
   listScheduleMethods,
   type GanttTask,
   type GenerateScheduleResult,
@@ -83,6 +84,7 @@ export default function ScheduleGeneratePage() {
   const [bimName, setBimName] = useState<string | null>(null);
   const [bimBusy, setBimBusy] = useState(false);
   const [recommendedDisc, setRecommendedDisc] = useState<Set<string>>(new Set());
+  const [inferReason, setInferReason] = useState<string | null>(null);
 
   // ── 공법 목록 ──
   const [methodGroups, setMethodGroups] = useState<MethodGroup[]>([]);
@@ -125,7 +127,9 @@ export default function ScheduleGeneratePage() {
       const zoneSet = new Set<string>();
       const storeySet = new Set<string>();
       const discSet = new Set<string>();
+      const typeCount = new Map<string, number>();
       for (const el of parsed.elements) {
+        typeCount.set(el.ifcType, (typeCount.get(el.ifcType) ?? 0) + 1);
         const zone = el.zone ?? "-";
         // 4D 매처와 동일한 storey 도출(normStorey) — 생성 코드와 BIM 매칭 표기 일치 보장.
         const storey = el.storey4d ?? normStorey(el.storeyName) ?? "-";
@@ -142,8 +146,23 @@ export default function ScheduleGeneratePage() {
       setWorkUnits([...agg.values()]);
       setRecommendedDisc(discSet);
       setBimName(`${file.name} (${parsed.elements.length}부재 → ${agg.size}유형, 유력공종 ${discSet.size})`);
-      if (!zones && zoneSet.size) setZones([...zoneSet].join(", "));
-      if (!storeys && storeySet.size) setStoreys([...storeySet].sort().join(", "));
+      const zoneList = [...zoneSet];
+      const storeyList = [...storeySet].sort();
+      if (!zones && zoneList.length) setZones(zoneList.join(", "));
+      if (!storeys && storeyList.length) setStoreys(storeyList.join(", "));
+
+      // ① 건물유형·범위 AI 추천 (비전문가 자동완성) — BIM 요약으로 추론
+      const elementSummary = [...typeCount.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([type, count]) => ({ type, count }));
+      void inferScheduleContext({
+        storeys: storeyList, zones: zoneList,
+        element_summary: elementSummary, total_count: parsed.elements.length,
+      }).then((ctx) => {
+        if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
+        if (ctx.scope && !scope) setScope(ctx.scope);
+        if (ctx.reason) setInferReason(ctx.reason);
+      });
     } catch (e) {
       setErr(`BIM 파싱 실패: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -240,6 +259,11 @@ export default function ScheduleGeneratePage() {
             placeholder="예: 모듈러 공동주택, 근린생활시설" />
           <input className="gen-in" value={scope} onChange={(e) => setScope(e.target.value)}
             placeholder="범위 (예: 골조까지 / 마감 포함)" style={{ marginTop: 6 }} />
+          {inferReason && (
+            <div style={{ fontSize: 11, color: "#7c3aed", marginTop: 4 }}>
+              ◆ AI 추천 (BIM 분석): {inferReason} — 수정 가능
+            </div>
+          )}
         </Field>
         <Field label="② 어디서 — 구역 / 층">
           <input className="gen-in" value={zones} onChange={(e) => setZones(e.target.value)}
