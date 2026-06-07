@@ -42,6 +42,7 @@ export default function EarthworkPage() {
     () => Object.fromEntries(LAYERS.map((L) => [L.key, true])),
   );
   const [[secA, secB], setSec] = useState<readonly [string, string]>(() => farthestPair(BOREHOLES));
+  const [showLabels, setShowLabels] = useState(true);
 
   const toggle = (key: string) => setVisible((v) => ({ ...v, [key]: !v[key] }));
   const bhA = boreholes.find((b) => b.id === secA) ?? boreholes[0];
@@ -100,7 +101,7 @@ export default function EarthworkPage() {
 
       {/* 3D 뷰어 */}
       <div style={{ position: "relative", height: "56vh", minHeight: 380, marginBottom: 12 }}>
-        <EarthworkViewer model={model} visible={visible} boreholes={boreholes} />
+        <EarthworkViewer model={model} visible={visible} boreholes={boreholes} showLabels={showLabels} />
       </div>
 
       {/* 지질 단면도 */}
@@ -123,6 +124,20 @@ export default function EarthworkPage() {
 
       {/* 범례 + 토글 */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+        <button
+          type="button"
+          onClick={() => setShowLabels((v) => !v)}
+          style={{
+            padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            border: "1px solid " + (showLabels ? "#2563eb" : "#cbd5e1"),
+            background: showLabels ? "#2563eb" : "#fff",
+            color: showLabels ? "#fff" : "#64748b",
+          }}
+          title="시추공 공번 라벨 표시/숨김"
+        >
+          🏷️ 공번 {showLabels ? "ON" : "OFF"}
+        </button>
+        <span style={{ width: 1, height: 18, background: "#e2e8f0" }} />
         <Layers size={15} strokeWidth={1.8} style={{ color: "#64748b" }} />
         {LAYERS.map((L) => (
           <button

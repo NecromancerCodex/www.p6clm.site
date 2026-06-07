@@ -91,11 +91,13 @@ interface Props {
   model: GridModel;
   visible: Record<string, boolean>; // 층key → 표시 여부
   boreholes: Borehole[];
+  showLabels: boolean; // 공번 라벨 표시
 }
 
-export function EarthworkViewer({ model, visible, boreholes }: Props) {
+export function EarthworkViewer({ model, visible, boreholes, showLabels }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const meshesRef = useRef<Record<string, THREE.Mesh>>({});
+  const labelsRef = useRef<THREE.Sprite[]>([]);
 
   // 표고 범위(카메라/타겟용)
   const bounds = useMemo(() => {
@@ -154,6 +156,7 @@ export function EarthworkViewer({ model, visible, boreholes }: Props) {
 
     // 시추공 기둥 (지표→굴진심도) + 상단 점
     const boreGroup = new THREE.Group();
+    const labels: THREE.Sprite[] = [];
     for (const b of boreholes) {
       const px = b.x - model.minX;
       const pz = b.y - model.minY;
@@ -174,7 +177,9 @@ export function EarthworkViewer({ model, visible, boreholes }: Props) {
       const label = makeTextSprite(b.id, span);
       label.position.set(px, topE + span * 0.04, pz);
       boreGroup.add(label);
+      labels.push(label);
     }
+    labelsRef.current = labels; // 표시여부는 아래 [showLabels] effect 가 동기
     scene.add(boreGroup);
 
     let raf = 0;
@@ -216,6 +221,15 @@ export function EarthworkViewer({ model, visible, boreholes }: Props) {
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
   }, [model, bounds, boreholes]);
+
+  // 공번 라벨 표시 토글
+  useEffect(() => {
+    const labels = labelsRef.current;
+    for (let i = 0; i < labels.length; i++) {
+      const sp = labels[i];
+      sp.visible = showLabels;
+    }
+  }, [showLabels]);
 
   // 층 표시 토글 (메시 visible 만 갱신)
   useEffect(() => {
