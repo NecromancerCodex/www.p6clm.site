@@ -6,7 +6,7 @@
  *  · 층별 체적(m³) = 격자 적분. 토사/풍화/암반 그룹 소계.
  */
 import { Layers, Mountain, Upload } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
 import { EarthworkSection } from "../../../components/earthwork/EarthworkSection";
@@ -14,6 +14,7 @@ import {
   BOREHOLES, LAYERS, buildGridModel, layerVolumes, parseBoreholeCsv, prepare,
   type Borehole,
 } from "../../../lib/earthwork/model";
+import { loadBoreholes, saveBoreholes } from "../../../lib/api/earthwork";
 
 /** 가장 멀리 떨어진 두 시추공 = 대표 단면 기본값. */
 function farthestPair(bores: Borehole[]): readonly [string, string] {
@@ -48,6 +49,17 @@ export default function EarthworkPage() {
   const bhA = boreholes.find((b) => b.id === secA) ?? boreholes[0];
   const bhB = boreholes.find((b) => b.id === secB) ?? boreholes[1];
 
+  // 마운트 시 저장된 시추공 로드 (있으면 샘플 대신 사용).
+  useEffect(() => {
+    void loadBoreholes().then((saved) => {
+      if (saved.length >= 2) {
+        setBoreholes(saved);
+        setSource(`저장됨 (시추 ${saved.length}공)`);
+        setSec(farthestPair(saved));
+      }
+    });
+  }, []);
+
   // CSV 업로드 → 그 데이터로 3D·물량·단면 전부 재구성.
   const onCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -59,8 +71,14 @@ export default function EarthworkPage() {
       return;
     }
     setBoreholes(parsed);
-    setSource(`${f.name} (시추 ${parsed.length}공)`);
     setSec(farthestPair(parsed));
+    // DB 저장 (기존 데이터 교체 = 최신만 유지). 백엔드 미가동이면 화면만 갱신.
+    try {
+      const n = await saveBoreholes(parsed);
+      setSource(`${f.name} (저장됨 ${n}공)`);
+    } catch {
+      setSource(`${f.name} (시추 ${parsed.length}공 · 저장 실패-화면만)`);
+    }
   };
 
   // 그룹 소계 + 총계
