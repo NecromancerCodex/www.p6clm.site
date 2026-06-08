@@ -141,8 +141,10 @@ export default function ScheduleGeneratePage() {
         const disc = IFC_DISCIPLINE[el.ifcType];
         if (disc) discSet.add(disc);
         const key = `${zone}|${storey}|${cat}`;
-        const u = agg.get(key) ?? { zone, storey, element_type: cat, count: 0 };
+        const u = agg.get(key) ?? { zone, storey, element_type: cat, count: 0, volume_m3: 0, area_m2: 0 };
         u.count = (u.count ?? 0) + 1;
+        if (el.volM3) u.volume_m3 = (u.volume_m3 ?? 0) + el.volM3;
+        if (el.areaM2) u.area_m2 = (u.area_m2 ?? 0) + el.areaM2;
         agg.set(key, u);
       }
       setWorkUnits([...agg.values()]);

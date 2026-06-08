@@ -351,6 +351,8 @@ export async function listScheduleMethods(): Promise<MethodGroup[]> {
 export interface GenWorkUnit {
   zone?: string; storey?: string; element_type?: string;
   count?: number; quantity?: number; unit?: string;
+  volume_m3?: number; // 정량물량 체적 ㎥ (콘크리트) — 품셈 정밀적용·자원계획용
+  area_m2?: number; // 정량물량 면적 ㎡ (거푸집)
 }
 export interface GenerateScheduleRequest {
   building_type: string;

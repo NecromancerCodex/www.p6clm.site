@@ -19,6 +19,9 @@ export interface ParsedElement extends IfcElementMeta {
   cx: number; // bbox 중심 X (월드)
   cy: number; // bbox 중심 Y (월드, 수직)
   cz: number; // bbox 중심 Z (월드)
+  // 정량물량(QTO) — IfcElementQuantity 추출(있으면), 없으면 bbox 체적 추정. 품셈 정밀적용·자원계획용.
+  volM3?: number; // 체적 ㎥ (콘크리트 물량)
+  areaM2?: number; // 면적 ㎡ (거푸집 물량)
   // 공정 PSet (REV IFC) — 없으면 undefined (구버전 IFC)
   trade?: string; // ST | MO
   zone?: string; // ZA | ZB | ZC | AB ...
@@ -168,6 +171,56 @@ function buildProcMap(api: IfcAPI, modelID: number): Map<number, ProcMeta> {
   return map;
 }
 
+/**
+ * 요소 expressID → 정량물량 {vol㎥, area㎡} (IfcElementQuantity).
+ * Revit 등이 내보낸 Qto_*BaseQuantities(NetVolume/NetArea)를 추출. 없으면 빈 맵 → bbox 폴백.
+ */
+function buildQtyMap(api: IfcAPI, modelID: number): Map<number, { vol?: number; area?: number }> {
+  const map = new Map<number, { vol?: number; area?: number }>();
+  const RELS = api.GetLineIDsWithType(modelID, IFCRELDEFINESBYPROPERTIES);
+  for (let i = 0; i < RELS.size(); i++) {
+    let rel: { RelatingPropertyDefinition?: { value: number }; RelatedObjects?: { value: number }[] };
+    try {
+      rel = api.GetLine(modelID, RELS.get(i));
+    } catch {
+      continue;
+    }
+    const pd = rel.RelatingPropertyDefinition;
+    if (!pd) continue;
+    let qset: { Quantities?: { value: number }[] };
+    try {
+      qset = api.GetLine(modelID, pd.value);
+    } catch {
+      continue;
+    }
+    if (!qset.Quantities) continue; // IfcElementQuantity 가 아니면(=PropertySet) 스킵
+    let vol: number | undefined;
+    let area: number | undefined;
+    for (const qh of qset.Quantities) {
+      let q: { Name?: { value: string }; VolumeValue?: { value: number }; AreaValue?: { value: number } };
+      try {
+        q = api.GetLine(modelID, qh.value);
+      } catch {
+        continue;
+      }
+      const nm = (q.Name?.value ?? "").toLowerCase();
+      if (q.VolumeValue != null) {
+        const val = Number(q.VolumeValue.value);
+        if (Number.isFinite(val) && (nm.includes("net") || vol == null)) vol = val; // Net 우선
+      } else if (q.AreaValue != null && !nm.includes("side") && !nm.includes("outer")) {
+        const val = Number(q.AreaValue.value);
+        if (Number.isFinite(val) && (nm.includes("net") || area == null)) area = val;
+      }
+    }
+    if (vol == null && area == null) continue;
+    for (const o of rel.RelatedObjects ?? []) {
+      const cur = map.get(o.value) ?? {};
+      map.set(o.value, { vol: vol ?? cur.vol, area: area ?? cur.area });
+    }
+  }
+  return map;
+}
+
 // 구조·모듈(매칭 대상) + 건축 디테일(유리창·문·계단 등 — pmisx 수준 시각 정교함)
 const WANTED_TYPES = new Set([
   "IFCWALL",
@@ -232,6 +285,8 @@ export async function parseIfc(
   const storeyMap = buildStoreyMap(api, modelID);
   onProgress?.(0.2, "공정 속성 분석 중…");
   const procMap = buildProcMap(api, modelID);
+  onProgress?.(0.22, "정량물량(체적·면적) 분석 중…");
+  const qtyMap = buildQtyMap(api, modelID);
 
   // 누적 버퍼
   const positions: number[] = [];
@@ -306,6 +361,9 @@ export async function parseIfc(
         if (z > mxz) mxz = z;
       }
       const pm = procMap.get(expressID);
+      // 정량물량: Qto 우선, 없으면 bbox 체적(㎥) 추정 (구조부재는 박스형이라 근사 양호)
+      const q = qtyMap.get(expressID);
+      const bboxVol = (mxx - mnx) * (mxy - mny) * (mxz - mnz);
       elements.push({
         globalId: m.globalId,
         expressID,
@@ -317,6 +375,8 @@ export async function parseIfc(
         cx: (mnx + mxx) / 2,
         cy: (mny + mxy) / 2,
         cz: (mnz + mxz) / 2,
+        volM3: q?.vol ?? (Number.isFinite(bboxVol) && bboxVol > 0 ? bboxVol : undefined),
+        areaM2: q?.area,
         trade: pm?.trade,
         zone: pm?.zone,
         storey4d: pm?.storey4d,
