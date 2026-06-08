@@ -637,10 +637,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const { group, width, depthY, maxEl } = build;
     parsed.geometry.computeBoundingBox();
     const groundY = parsed.geometry.boundingBox?.min.y ?? parsed.center.y - parsed.radius;
-    group.scale.setScalar(1000); // m → mm
-    group.position.x = parsed.center.x - (width / 2) * 1000; // XZ 중심 = BIM 중심
-    group.position.z = parsed.center.z - (depthY / 2) * 1000;
-    group.position.y = groundY - maxEl * 1000; // 지반 지표를 BIM 바닥 높이에 (건물은 슬라이더로 이동)
+    // 단위 무관 자동 맞춤 — 지반 최대변을 건물 반경의 ~2.5배(건물 footprint보다 살짝 큼)로.
+    const geoSpan = Math.max(width, depthY) || 1;
+    const fit = ((parsed.radius || 50) * 2.5) / geoSpan;
+    group.scale.setScalar(fit);
+    group.position.x = parsed.center.x - (width / 2) * fit; // XZ 중심 = BIM 중심
+    group.position.z = parsed.center.z - (depthY / 2) * fit;
+    group.position.y = groundY - maxEl * fit; // 지반 지표를 BIM 바닥 높이에 (건물은 슬라이더로 이동)
     scene.add(group);
     return () => {
       scene.remove(group);
@@ -648,11 +651,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     };
   }, [geoBoreholes, geoOn, parsed]);
 
-  // ── BIM 건물 정합 이동 (지반에 맞추기) ──
+  // ── BIM 건물 정합 이동 (지반에 맞추기) — 단위 무관: 슬라이더 = 건물 반경의 % ──
   useEffect(() => {
     const m = meshRef.current;
-    if (m) m.position.set(bimOffset.x * 1000, bimOffset.y * 1000, bimOffset.z * 1000);
-  }, [bimOffset]);
+    if (!m) return;
+    const u = (parsed.radius || 50) / 100; // 슬라이더 1 = 반경의 1%
+    m.position.set(bimOffset.x * u, bimOffset.y * u, bimOffset.z * u);
+  }, [bimOffset, parsed]);
 
   // 지반 ON 이면 BIM 자체 바닥 그리드·초원 숨김 (지반과 겹침 방지)
   useEffect(() => {
@@ -1022,7 +1027,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                 style={{ flex: 1, maxWidth: 300 }}
                 aria-label={`건물 ${label}`}
               />
-              <span style={{ minWidth: 50, textAlign: "right" }}>{bimOffset[axis] > 0 ? "+" : ""}{bimOffset[axis]} m</span>
+              <span style={{ minWidth: 44, textAlign: "right" }}>{bimOffset[axis] > 0 ? "+" : ""}{bimOffset[axis]}%</span>
             </div>
           ))}
           <button
