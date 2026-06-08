@@ -147,7 +147,15 @@ export default function ScheduleGeneratePage() {
       setRecommendedDisc(discSet);
       setBimName(`${file.name} (${parsed.elements.length}부재 → ${agg.size}유형, 유력공종 ${discSet.size})`);
       const zoneList = [...zoneSet];
-      const storeyList = [...storeySet].sort();
+      // 층 숫자 정렬 (PT 최하, RF 최상, "Level 2"/"02"→숫자). 문자열 정렬 시 Level 10이 Level 2 앞에 오는 버그 방지.
+      const storeyRank = (s: string): number => {
+        const u = s.toUpperCase();
+        if (u === "PT" || u.includes("PIT") || s.includes("기초")) return -1;
+        if (u === "RF" || s.includes("지붕")) return 9999;
+        const m = /\d+/.exec(s);
+        return m ? parseInt(m[0], 10) : 500;
+      };
+      const storeyList = [...storeySet].sort((a, b) => storeyRank(a) - storeyRank(b));
       if (!zones && zoneList.length) setZones(zoneList.join(", "));
       if (!storeys && storeyList.length) setStoreys(storeyList.join(", "));
 
