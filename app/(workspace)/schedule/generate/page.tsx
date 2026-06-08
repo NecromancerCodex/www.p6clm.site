@@ -70,6 +70,7 @@ export default function ScheduleGeneratePage() {
   // ── 폼 상태 (6하원칙) ──
   const [buildingType, setBuildingType] = useState("");
   const [scope, setScope] = useState("");
+  const [structureType, setStructureType] = useState("");
   const [zones, setZones] = useState("");
   const [storeys, setStoreys] = useState("");
   const [methods, setMethods] = useState<string[]>([]);
@@ -170,6 +171,7 @@ export default function ScheduleGeneratePage() {
       }).then((ctx) => {
         if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
         if (ctx.scope && !scope) setScope(ctx.scope);
+        if (ctx.structure_type) setStructureType(ctx.structure_type);
         if (ctx.reason) setInferReason(ctx.reason);
       });
     } catch (e) {
@@ -192,6 +194,7 @@ export default function ScheduleGeneratePage() {
       const res = await generateSchedule({
         building_type: buildingType.trim(),
         scope: scope.trim() || undefined,
+        structure_type: structureType.trim() || undefined,
         zones: splitList(zones),
         storeys: splitList(storeys),
         work_units: workUnits,
@@ -273,6 +276,18 @@ export default function ScheduleGeneratePage() {
             placeholder="예: 모듈러 공동주택, 근린생활시설" />
           <input className="gen-in" value={scope} onChange={(e) => setScope(e.target.value)}
             placeholder="범위 (예: 골조까지 / 마감 포함)" style={{ marginTop: 6 }} />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#334155", marginTop: 6 }}>
+            구조유형 (층 시공순서 결정):
+            <select className="gen-in" style={{ width: "auto", flex: 1 }}
+              value={structureType} onChange={(e) => setStructureType(e.target.value)}>
+              <option value="">미지정 (AI 판단)</option>
+              <option value="RC">RC (철근콘크리트)</option>
+              <option value="철골">철골</option>
+              <option value="SRC">SRC</option>
+              <option value="PC·모듈러">PC·모듈러</option>
+              <option value="혼합">혼합</option>
+            </select>
+          </label>
           {inferReason && (
             <div style={{ fontSize: 11, color: "#7c3aed", marginTop: 4 }}>
               ◆ AI 추천 (BIM 분석): {inferReason} — 수정 가능

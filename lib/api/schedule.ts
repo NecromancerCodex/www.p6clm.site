@@ -355,6 +355,7 @@ export interface GenWorkUnit {
 export interface GenerateScheduleRequest {
   building_type: string;
   scope?: string;
+  structure_type?: string;
   zones: string[];
   storeys: string[];
   work_units: GenWorkUnit[];
@@ -428,7 +429,7 @@ export async function generateSchedule(
   throw new ScheduleApiError(504, "생성 시간 초과 (10분) — 입력을 줄이거나 다시 시도해주세요.");
 }
 
-export interface InferContextResult { building_type: string; scope: string; reason: string }
+export interface InferContextResult { building_type: string; scope: string; structure_type: string; reason: string }
 export async function inferScheduleContext(req: {
   storeys: string[]; zones: string[];
   element_summary: { type: string; count: number }[]; total_count: number;
@@ -436,6 +437,6 @@ export async function inferScheduleContext(req: {
   const res = await fetch(`${API_BASE}/schedule/infer-context`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),
   });
-  if (!res.ok) return { building_type: "", scope: "", reason: "" };
+  if (!res.ok) return { building_type: "", scope: "", structure_type: "", reason: "" };
   return (await res.json()) as InferContextResult;
 }
