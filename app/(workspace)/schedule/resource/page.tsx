@@ -21,6 +21,7 @@ import {
   type Material,
   type MaterialKind,
 } from "../../../../lib/api/materials";
+import { EarthworkVolumePanel } from "../../../../components/earthwork/EarthworkVolumePanel";
 
 // IFC 클래스 → 자재명(한글). 같은 자재로 묶어 중복 행 방지(Wall 계열 → 벽체).
 const TYPE_KO_MAT: Record<string, string> = {
@@ -142,6 +143,9 @@ export default function ResourcePlanPage() {
       <p className="ws-section-desc">
         BIM(IFC)에서 필요 자재를 추출하고, 현장 보유 자재와 비교해 부족분을 관리합니다.
       </p>
+
+      {/* 토공 물량 (토공/지반 페이지 데이터 연계) */}
+      <EarthworkVolumePanel />
 
       {/* BIM 추출 */}
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", margin: "8px 0 16px" }}>
