@@ -12,6 +12,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FourDViewer } from "../../../components/fourd/FourDViewer";
+import { loadBoreholes } from "../../../lib/api/earthwork";
+import type { Borehole } from "../../../lib/earthwork/model";
 import { DashboardSchedule } from "../../../components/fourd/DashboardSchedule";
 import { ScheduleFormView } from "../../../components/documents/DocumentFormViews";
 import { analyzeSchedule, uploadSchedule, type ScheduleReportDoc } from "../../../lib/api/schedule";
@@ -182,6 +184,11 @@ export default function FourDPage() {
   const [cached, setCached] = useState<CachedFourd | null>(null);
   // 4D 슬라이더 현재 날짜(epoch ms) — 하단 공정표 세로선 동기
   const [viewerDateMs, setViewerDateMs] = useState<number | undefined>(undefined);
+  // 지반 이식용 시추공 (DB 저장된 토공 데이터) — 있으면 뷰어에 '지반' 토글 노출
+  const [geoBoreholes, setGeoBoreholes] = useState<Borehole[]>([]);
+  useEffect(() => {
+    void loadBoreholes().then((b) => { if (b.length >= 2) setGeoBoreholes(b); });
+  }, []);
 
   /** mount 시 캐시된 파일 확인 (1회) */
   useEffect(() => {
@@ -825,6 +832,7 @@ export default function FourDPage() {
               onGenerateDaily={scheduleFile ? openDaily : undefined}
               dailyBusy={dailyBusy}
               onDateChange={setViewerDateMs}
+              geoBoreholes={geoBoreholes}
               activities={
                 ready.codeIndex
                   ? [...ready.codeIndex.byKey.entries()].map(([k, r]) => ({

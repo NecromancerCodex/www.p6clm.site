@@ -18,6 +18,8 @@ type BvhGeom = THREE.BufferGeometry & { computeBoundsTree: () => void; disposeBo
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, type MatchResult } from "../../lib/fourd/match";
+import { buildGeologyGroup } from "../../lib/earthwork/geologyGroup";
+import type { Borehole } from "../../lib/earthwork/model";
 
 // IFC 타입 → 한글 부재명
 const TYPE_KO: Record<string, string> = {
@@ -185,6 +187,8 @@ interface Props {
   dailyBusy?: boolean; // 공사일보 생성 진행 중
   /** 슬라이더 날짜 변경 통지 — 하단 공정표(간트) 세로선 동기용. */
   onDateChange?: (dateMs: number) => void;
+  /** 지반(시추 지질) 이식용 시추공 — 있으면 '지반 표시' 토글 노출. */
+  geoBoreholes?: Borehole[];
 }
 
 /** 부재 PSet → 4D 활동코드 재구성 (pmisx ID 와 동일 형식). 예 502HGMOZB013607MDIN */
@@ -204,7 +208,7 @@ function fmt(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName, onGenerateDaily, dailyBusy = false, onDateChange }: Props) {
+export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName, onGenerateDaily, dailyBusy = false, onDateChange, geoBoreholes }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -244,6 +248,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const walkRef = useRef(false);
   walkRef.current = walk;
   const [walkLocked, setWalkLocked] = useState(false); // 포인터락 활성(=마우스룩 중) 여부
+  // 지반(시추 지질) 이식 — BIM 아래로 지층 표시 + 수직 정합 오프셋(m)
+  const [geoOn, setGeoOn] = useState(false);
+  const [geoOffset, setGeoOffset] = useState(0);
   const controlsRef = useRef<OrbitControls | null>(null);
   const fpRef = useRef<PointerLockControls | null>(null);
 
@@ -605,6 +612,31 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     };
   }, [parsed]);
 
+  // ── 지반(시추 지질) 이식 — BIM 씬에 지층 슬랩 추가 ──
+  // BIM 은 로컬 mm, 시추는 측량 m → ×1000 스케일 + XZ 중심정렬 + 수직 오프셋 슬라이더로 정합.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !geoOn || !geoBoreholes || geoBoreholes.length < 2) return;
+    let build;
+    try {
+      build = buildGeologyGroup(geoBoreholes);
+    } catch {
+      return;
+    }
+    const { group, width, depthY, maxEl } = build;
+    parsed.geometry.computeBoundingBox();
+    const groundY = parsed.geometry.boundingBox?.min.y ?? parsed.center.y - parsed.radius;
+    group.scale.setScalar(1000); // m → mm
+    group.position.x = parsed.center.x - (width / 2) * 1000; // XZ 중심 = BIM 중심
+    group.position.z = parsed.center.z - (depthY / 2) * 1000;
+    group.position.y = groundY + geoOffset * 1000 - maxEl * 1000; // 지표를 BIM 바닥+오프셋에
+    scene.add(group);
+    return () => {
+      scene.remove(group);
+      build.dispose();
+    };
+  }, [geoBoreholes, geoOn, geoOffset, parsed]);
+
   // ── 관리자 워크 토글: 궤도 조작 비활성 / 종료 시 포인터락 해제 ──
   useEffect(() => {
     const orbit = controlsRef.current;
@@ -928,7 +960,41 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         >
           {realistic ? "🏗 실사 모드 ON" : "실사 모드 OFF"}
         </button>
+        {geoBoreholes && geoBoreholes.length >= 2 && (
+          <button
+            onClick={() => setGeoOn((v) => !v)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 999,
+              border: "1px solid " + (geoOn ? "#b45309" : "#475569"),
+              background: geoOn ? "#b45309" : "transparent",
+              color: geoOn ? "#fff" : "#94a3b8",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="시추 지질(지반)을 BIM 아래로 이식 — 지하구조 × 지반 확인"
+          >
+            {geoOn ? "🏔 지반 ON" : "지반 OFF"}
+          </button>
+        )}
       </div>
+      {geoOn && geoBoreholes && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "#fcd34d", marginTop: -2 }}>
+          <span>🏔 지반 수직 정합</span>
+          <input
+            type="range"
+            min={-80}
+            max={80}
+            step={1}
+            value={geoOffset}
+            onChange={(e) => setGeoOffset(Number(e.target.value))}
+            style={{ flex: 1, maxWidth: 320 }}
+            aria-label="지반 수직 오프셋"
+          />
+          <span style={{ minWidth: 56, textAlign: "right" }}>{geoOffset > 0 ? "+" : ""}{geoOffset} m</span>
+        </div>
+      )}
       {fly && (
         <div style={{ fontSize: 11, color: "#93c5fd", marginTop: -4 }}>
           🎮 자유시점: W/A/S/D 이동 · Space·E 위 · Shift·Q 아래 · 마우스 드래그 시점 회전
