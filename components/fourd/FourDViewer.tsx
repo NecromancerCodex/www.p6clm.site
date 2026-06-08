@@ -17,7 +17,7 @@ type BvhGeom = THREE.BufferGeometry & { computeBoundsTree: () => void; disposeBo
 (THREE.Mesh.prototype as unknown as { raycast: unknown }).raycast = acceleratedRaycast;
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
-import { statusAt, type MatchResult } from "../../lib/fourd/match";
+import { statusAt, canonStorey, classifyIfcType, type MatchResult } from "../../lib/fourd/match";
 import { buildGeologyGroup } from "../../lib/earthwork/geologyGroup";
 import type { Borehole } from "../../lib/earthwork/model";
 
@@ -42,13 +42,43 @@ function cleanStorey(name: string | null): string {
   return name.replace(/^[A-Za-z0-9]+_/, "").replace(/\s+[A-Z]{1,3}$/, "").trim() || name;
 }
 
+/** 층 코드 → 표시 라벨. "B5F"→"지하5층", "8F"/"Level 8"→"8층", PT/RF/PH. (Number() NaN 버그 방지) */
+function storeyLabel(s: string | null | undefined): string {
+  const c = canonStorey(s);
+  if (!c) return "—";
+  if (c === "PT") return "기초(PT)";
+  if (c === "RF") return "지붕(RF)";
+  if (c === "PH") return "PH층";
+  if (c === "PHR") return "PHR층";
+  if (c.startsWith("B")) return `지하${c.slice(1)}층`;
+  const n = parseInt(c, 10);
+  return Number.isNaN(n) ? c : `${n}층`;
+}
+
+const CAT_KO: Record<string, string> = { CORE: "벽·기둥", FOOT: "기초", MOD: "슬래브·보" };
+
+/** 부재 표시명 — 이름 기반 분류가 raw ifcType 과 다르면(IfcSlab "Footing"→기초) 분류 라벨 우선 표기. */
+function typeLabel(el: ParsedElement): string {
+  const raw = TYPE_KO[el.ifcType] ?? el.ifcType;
+  const cat = classifyIfcType(el.ifcType, el.name);
+  // classifyIfcType 의 ifcType-기본값(이름 무시 시): Footing/Pile→FOOT, Wall/Column→CORE, 그 외→MOD.
+  const natural =
+    el.ifcType === "IfcFooting" || el.ifcType === "IfcPile"
+      ? "FOOT"
+      : el.ifcType === "IfcWall" || el.ifcType === "IfcWallStandardCase" || el.ifcType === "IfcColumn"
+        ? "CORE"
+        : "MOD";
+  if (cat !== natural) return `${CAT_KO[cat]}(${raw})`; // 이름 기반 교정 표시 (예 Footing→기초(슬래브))
+  return raw;
+}
+
 /**
  * 표시용 층 — 공정 태그(storey4d)는 zone 도 있거나 높이보정된 경우만 신뢰(PT/RF 명시).
  * zone 없는 불완전 PT 태그(주차장지붕 등)는 공간 층 이름을 보여 사유와 일치시킨다.
  */
 function storeyDisplay(el: ParsedElement): string {
   if (el.storey4d && (el.zone || el.recalibrated)) {
-    return el.storey4d === "PT" ? "기초(PT)" : el.storey4d === "RF" ? "지붕(RF)" : `${Number(el.storey4d)}층`;
+    return storeyLabel(el.storey4d);
   }
   return cleanStorey(el.storeyName);
 }
@@ -66,7 +96,7 @@ function workKo(wt: string | undefined, via: string): string {
 /** 부재의 공정 라벨 — 공정PSet(zone) 있으면 "ZA 3층 코어", 없으면 층 근사. */
 function procLabel(el: ParsedElement, via: string): string {
   if (el.zone && el.storey4d) {
-    const st = el.storey4d === "PT" ? "기초" : el.storey4d === "RF" ? "지붕" : `${Number(el.storey4d)}층`;
+    const st = storeyLabel(el.storey4d);
     // via 가 유닛 키(…|숫자)면 유닛 단위 매칭, …|MD 면 구역단위 묶음(공정표에 유닛 활동 없음)
     const isUnit = /\|\d+$/.test(via);
     const unit = el.unit ? (isUnit ? ` ${el.unit}호` : ` ${el.unit}호(구역단위 묶음)`) : "";
@@ -816,7 +846,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                   {hover.el.name || (TYPE_KO[hover.el.ifcType] ?? hover.el.ifcType)}
                 </div>
                 <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                  {TYPE_KO[hover.el.ifcType] ?? hover.el.ifcType} · {storeyDisplay(hover.el)}
+                  {typeLabel(hover.el)} · {storeyDisplay(hover.el)}
                   {hover.el.zone ? ` · ${hover.el.zone}` : ""}
                 </div>
                 {range && mr ? (
