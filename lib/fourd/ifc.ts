@@ -281,12 +281,20 @@ export async function parseIfc(
   onProgress?.(0.05, "모델 여는 중…");
   const modelID = api.OpenModel(new Uint8Array(buffer));
 
+  // 메타 맵 추출 — 하나가 실패해도(대형/비정상 IFC) 빈 맵으로 폴백, 지오메트리 파싱은 계속.
+  const safeMap = <T>(fn: () => Map<number, T>): Map<number, T> => {
+    try {
+      return fn();
+    } catch {
+      return new Map<number, T>();
+    }
+  };
   onProgress?.(0.15, "층 구조 분석 중…");
-  const storeyMap = buildStoreyMap(api, modelID);
+  const storeyMap = safeMap(() => buildStoreyMap(api, modelID));
   onProgress?.(0.2, "공정 속성 분석 중…");
-  const procMap = buildProcMap(api, modelID);
+  const procMap = safeMap(() => buildProcMap(api, modelID));
   onProgress?.(0.22, "정량물량(체적·면적) 분석 중…");
-  const qtyMap = buildQtyMap(api, modelID);
+  const qtyMap = safeMap(() => buildQtyMap(api, modelID));
 
   // 누적 버퍼
   const positions: number[] = [];
@@ -329,23 +337,31 @@ export async function parseIfc(
     if (!WANTED_TYPES.has(m.ifcType.toUpperCase())) return;
 
     const vStart = positions.length / 3;
-    const placed = flatMesh.geometries;
-    for (let i = 0; i < placed.size(); i++) {
-      const pg = placed.get(i);
-      const geom = api.GetGeometry(modelID, pg.geometryExpressID);
-      const verts = api.GetVertexArray(geom.GetVertexData(), geom.GetVertexDataSize());
-      const idx = api.GetIndexArray(geom.GetIndexData(), geom.GetIndexDataSize());
-      const mat = pg.flatTransformation as number[];
-      tmp.fromArray(mat);
-      normalMat.getNormalMatrix(tmp);
-      // web-ifc 정점 = [px,py,pz,nx,ny,nz] interleaved. 인덱스로 삼각형 전개(비인덱스).
-      for (let k = 0; k < idx.length; k++) {
-        const base = idx[k] * 6;
-        v.set(verts[base], verts[base + 1], verts[base + 2]).applyMatrix4(tmp);
-        n.set(verts[base + 3], verts[base + 4], verts[base + 5]).applyMatrix3(normalMat).normalize();
-        positions.push(v.x, v.y, v.z);
-        normals.push(n.x, n.y, n.z);
+    // 깨진/비정상 지오메트리(가설·토목 모델에 흔함)가 GetVertexArray 등에서 "Invalid array length"를
+    // 던져 전체 파싱이 죽지 않도록 메시별 방어. 실패 시 부분 정점 롤백 후 이 메시만 스킵.
+    try {
+      const placed = flatMesh.geometries;
+      for (let i = 0; i < placed.size(); i++) {
+        const pg = placed.get(i);
+        const geom = api.GetGeometry(modelID, pg.geometryExpressID);
+        const verts = api.GetVertexArray(geom.GetVertexData(), geom.GetVertexDataSize());
+        const idx = api.GetIndexArray(geom.GetIndexData(), geom.GetIndexDataSize());
+        const mat = pg.flatTransformation as number[];
+        tmp.fromArray(mat);
+        normalMat.getNormalMatrix(tmp);
+        // web-ifc 정점 = [px,py,pz,nx,ny,nz] interleaved. 인덱스로 삼각형 전개(비인덱스).
+        for (let k = 0; k < idx.length; k++) {
+          const base = idx[k] * 6;
+          v.set(verts[base], verts[base + 1], verts[base + 2]).applyMatrix4(tmp);
+          n.set(verts[base + 3], verts[base + 4], verts[base + 5]).applyMatrix3(normalMat).normalize();
+          positions.push(v.x, v.y, v.z);
+          normals.push(n.x, n.y, n.z);
+        }
       }
+    } catch {
+      positions.length = vStart * 3; // 부분 정점 롤백
+      normals.length = vStart * 3;
+      return; // 이 메시 스킵, 다음 메시 계속
     }
     const vCount = positions.length / 3 - vStart;
     if (vCount > 0) {
