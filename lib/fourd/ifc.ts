@@ -377,9 +377,9 @@ export async function parseIfc(
         if (z > mxz) mxz = z;
       }
       const pm = procMap.get(expressID);
-      // 정량물량: Qto 우선, 없으면 bbox 체적(㎥) 추정 (구조부재는 박스형이라 근사 양호)
+      // 정량물량: **실제 IfcElementQuantity 만 신뢰.** bbox 체적은 비박스/대형 부재(토공·가설·굴착·proxy)에서
+      // 실제의 수십~수백 배로 과대 → 물량 폭증·공기 왜곡. 없으면 undefined(=EA 로 gpt 상대 추정).
       const q = qtyMap.get(expressID);
-      const bboxVol = (mxx - mnx) * (mxy - mny) * (mxz - mnz);
       elements.push({
         globalId: m.globalId,
         expressID,
@@ -391,7 +391,7 @@ export async function parseIfc(
         cx: (mnx + mxx) / 2,
         cy: (mny + mxy) / 2,
         cz: (mnz + mxz) / 2,
-        volM3: q?.vol ?? (Number.isFinite(bboxVol) && bboxVol > 0 ? bboxVol : undefined),
+        volM3: q?.vol,
         areaM2: q?.area,
         trade: pm?.trade,
         zone: pm?.zone,
