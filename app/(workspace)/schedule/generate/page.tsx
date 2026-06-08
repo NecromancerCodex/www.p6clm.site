@@ -95,6 +95,7 @@ export default function ScheduleGeneratePage() {
   // ── 결과 ──
   const [busy, setBusy] = useState(false);
   const [genElapsed, setGenElapsed] = useState(0);
+  const [genProgress, setGenProgress] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<GenerateScheduleResult | null>(null);
   const [ganttReady, setGanttReady] = useState(false);
@@ -183,6 +184,7 @@ export default function ScheduleGeneratePage() {
   const onGenerate = async () => {
     setBusy(true);
     setGenElapsed(0);
+    setGenProgress("요청 접수 — AI 생성 시작…");
     setErr(null);
     setResult(null);
     setGanttReady(false);
@@ -201,7 +203,10 @@ export default function ScheduleGeneratePage() {
         tower_cranes: towerCranes,
         work_crews: workCrews,
         constraints: constraints.trim() || undefined,
-      }, setGenElapsed);
+      }, (sec, prog) => {
+        setGenElapsed(sec);
+        if (prog) setGenProgress(prog);
+      });
       setResult(res);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -364,10 +369,31 @@ export default function ScheduleGeneratePage() {
 
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <button type="button" className="gen-btn" disabled={!canSubmit} onClick={onGenerate}>
-          {busy ? `생성 중… ${genElapsed}초 (gpt-5.4 온톨로지 탐색, 1~3분)` : "공정표 생성"}
+          {busy ? `생성 중… ${genElapsed}초` : "공정표 생성"}
         </button>
         {err && <span style={{ color: "#dc2626", fontSize: 13 }}>{err}</span>}
       </div>
+
+      {/* AI 실시간 진행 + 스켈레톤 */}
+      {busy && (
+        <div className="gen-stream">
+          <div className="gen-stream-head">
+            <span className="gen-dot" />
+            <span style={{ fontWeight: 600, color: "#4338ca" }}>{genProgress || "AI 작업 중…"}</span>
+            <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>
+              gpt-5.4 · {genElapsed}초 (최대 10분)
+            </span>
+          </div>
+          <div className="gen-skel-rows">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="gen-skel-row">
+                <div className="gen-skel-label" />
+                <div className="gen-skel-bar" style={{ marginLeft: `${8 + i * 6}%`, width: `${20 + (i % 3) * 12}%` }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {result && (
         <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -423,6 +449,15 @@ export default function ScheduleGeneratePage() {
         .gen-rec-all:hover { background: #6d28d9; }
         .gen-btn { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .gen-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .gen-stream { border: 1px solid #e0e7ff; background: #f5f7ff; border-radius: 10px; padding: 14px; }
+        .gen-stream-head { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
+        .gen-dot { width: 9px; height: 9px; border-radius: 50%; background: #6366f1; animation: gen-pulse 1s ease-in-out infinite; }
+        @keyframes gen-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
+        .gen-skel-rows { display: flex; flex-direction: column; gap: 9px; }
+        .gen-skel-row { display: flex; align-items: center; gap: 10px; }
+        .gen-skel-label { width: 130px; height: 13px; border-radius: 4px; background: linear-gradient(90deg,#e2e8f0 25%,#eef2f7 50%,#e2e8f0 75%); background-size: 200% 100%; animation: gen-shim 1.4s linear infinite; flex-shrink: 0; }
+        .gen-skel-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,#c7d2fe 25%,#e0e7ff 50%,#c7d2fe 75%); background-size: 200% 100%; animation: gen-shim 1.4s linear infinite; }
+        @keyframes gen-shim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
       `}</style>
     </div>
   );

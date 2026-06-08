@@ -393,7 +393,7 @@ export interface GenerateScheduleResult {
  */
 export async function generateSchedule(
   req: GenerateScheduleRequest,
-  onTick?: (elapsedSec: number) => void,
+  onTick?: (elapsedSec: number, progress?: string) => void,
 ): Promise<GenerateScheduleResult> {
   // 1) 잡 생성 (즉시 반환)
   const res = await fetch(`${API_BASE}/schedule/generate`, {
@@ -408,19 +408,24 @@ export async function generateSchedule(
   }
   const { job_id } = (await res.json()) as { job_id: string };
 
-  // 2) 폴링 (3초 간격, 최대 6분)
+  // 2) 폴링 (3초 간격, 최대 10분) — progress 스트리밍
   const started = Date.now();
-  const deadline = started + 6 * 60 * 1000;
+  const deadline = started + 10 * 60 * 1000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 3000));
-    onTick?.(Math.round((Date.now() - started) / 1000));
     const s = await fetch(`${API_BASE}/schedule/generate-status/${job_id}`);
-    if (!s.ok) continue;
-    const data = (await s.json()) as { status: string; result?: GenerateScheduleResult; error?: string };
+    if (!s.ok) {
+      onTick?.(Math.round((Date.now() - started) / 1000));
+      continue;
+    }
+    const data = (await s.json()) as {
+      status: string; result?: GenerateScheduleResult; error?: string; progress?: string;
+    };
+    onTick?.(Math.round((Date.now() - started) / 1000), data.progress);
     if (data.status === "done" && data.result) return data.result;
     if (data.status === "error") throw new ScheduleApiError(500, data.error || "생성 실패");
   }
-  throw new ScheduleApiError(504, "생성 시간 초과 (6분) — 다시 시도해주세요.");
+  throw new ScheduleApiError(504, "생성 시간 초과 (10분) — 입력을 줄이거나 다시 시도해주세요.");
 }
 
 export interface InferContextResult { building_type: string; scope: string; reason: string }
