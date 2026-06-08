@@ -213,6 +213,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
+  const meshRef = useRef<THREE.Mesh | null>(null); // BIM 건물 메시 (정합 이동용)
   const hiliteViaRef = useRef<string | null>(null); // 현재 강조 키 (유닛=via / 객체=globalId)
   const hiliteModeRef = useRef<"unit" | "object">("unit");
   const [hiliteMode, setHiliteMode] = useState<"unit" | "object">("unit"); // 강조 단위 토글
@@ -248,9 +249,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const walkRef = useRef(false);
   walkRef.current = walk;
   const [walkLocked, setWalkLocked] = useState(false); // 포인터락 활성(=마우스룩 중) 여부
-  // 지반(시추 지질) 이식 — BIM 아래로 지층 표시 + 수직 정합 오프셋(m)
+  // 지반(시추 지질) 이식 — 지반 고정, BIM 건물을 X/Y/Z(m)로 움직여 정합
   const [geoOn, setGeoOn] = useState(false);
-  const [geoOffset, setGeoOffset] = useState(0);
+  const [bimOffset, setBimOffset] = useState({ x: 0, y: 0, z: 0 });
   const controlsRef = useRef<OrbitControls | null>(null);
   const fpRef = useRef<PointerLockControls | null>(null);
 
@@ -382,6 +383,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const material = new THREE.MeshLambertMaterial({ vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide });
     const mesh = new THREE.Mesh(parsed.geometry, material);
     scene.add(mesh);
+    meshRef.current = mesh;
     colorAttrRef.current = parsed.geometry.getAttribute("color") as THREE.BufferAttribute;
     // BVH 빌드(1회) — 이후 hover 레이캐스트가 즉시 응답
     try {
@@ -629,13 +631,19 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     group.scale.setScalar(1000); // m → mm
     group.position.x = parsed.center.x - (width / 2) * 1000; // XZ 중심 = BIM 중심
     group.position.z = parsed.center.z - (depthY / 2) * 1000;
-    group.position.y = groundY + geoOffset * 1000 - maxEl * 1000; // 지표를 BIM 바닥+오프셋에
+    group.position.y = groundY - maxEl * 1000; // 지반 지표를 BIM 바닥 높이에 (건물은 슬라이더로 이동)
     scene.add(group);
     return () => {
       scene.remove(group);
       build.dispose();
     };
-  }, [geoBoreholes, geoOn, geoOffset, parsed]);
+  }, [geoBoreholes, geoOn, parsed]);
+
+  // ── BIM 건물 정합 이동 (지반에 맞추기) ──
+  useEffect(() => {
+    const m = meshRef.current;
+    if (m) m.position.set(bimOffset.x * 1000, bimOffset.y * 1000, bimOffset.z * 1000);
+  }, [bimOffset]);
 
   // ── 관리자 워크 토글: 궤도 조작 비활성 / 종료 시 포인터락 해제 ──
   useEffect(() => {
@@ -980,19 +988,35 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         )}
       </div>
       {geoOn && geoBoreholes && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "#fcd34d", marginTop: -2 }}>
-          <span>🏔 지반 수직 정합</span>
-          <input
-            type="range"
-            min={-80}
-            max={80}
-            step={1}
-            value={geoOffset}
-            onChange={(e) => setGeoOffset(Number(e.target.value))}
-            style={{ flex: 1, maxWidth: 320 }}
-            aria-label="지반 수직 오프셋"
-          />
-          <span style={{ minWidth: 56, textAlign: "right" }}>{geoOffset > 0 ? "+" : ""}{geoOffset} m</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#fcd34d", marginTop: -2 }}>
+          <span>🏔 건물 위치 정합 (지반에 맞추기)</span>
+          {([
+            ["좌우 (X)", "x"],
+            ["앞뒤 (Z)", "z"],
+            ["상하 (Y)", "y"],
+          ] as const).map(([label, axis]) => (
+            <div key={axis} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ minWidth: 60 }}>{label}</span>
+              <input
+                type="range"
+                min={-120}
+                max={120}
+                step={1}
+                value={bimOffset[axis]}
+                onChange={(e) => setBimOffset((o) => ({ ...o, [axis]: Number(e.target.value) }))}
+                style={{ flex: 1, maxWidth: 300 }}
+                aria-label={`건물 ${label}`}
+              />
+              <span style={{ minWidth: 50, textAlign: "right" }}>{bimOffset[axis] > 0 ? "+" : ""}{bimOffset[axis]} m</span>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setBimOffset({ x: 0, y: 0, z: 0 })}
+            style={{ alignSelf: "flex-start", padding: "2px 10px", borderRadius: 6, border: "1px solid #475569", background: "transparent", color: "#94a3b8", fontSize: 11, cursor: "pointer" }}
+          >
+            위치 초기화
+          </button>
         </div>
       )}
       {fly && (
