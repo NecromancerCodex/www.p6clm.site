@@ -214,6 +214,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const meshRef = useRef<THREE.Mesh | null>(null); // BIM 건물 메시 (정합 이동용)
+  const gridRef = useRef<THREE.GridHelper | null>(null);
+  const groundRef = useRef<THREE.Mesh | null>(null);
   const hiliteViaRef = useRef<string | null>(null); // 현재 강조 키 (유닛=via / 객체=globalId)
   const hiliteModeRef = useRef<"unit" | "object">("unit");
   const [hiliteMode, setHiliteMode] = useState<"unit" | "object">("unit"); // 강조 단위 토글
@@ -251,6 +253,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const [walkLocked, setWalkLocked] = useState(false); // 포인터락 활성(=마우스룩 중) 여부
   // 지반(시추 지질) 이식 — 지반 고정, BIM 건물을 X/Y/Z(m)로 움직여 정합
   const [geoOn, setGeoOn] = useState(false);
+  const geoOnRef = useRef(false);
+  geoOnRef.current = geoOn;
   const [bimOffset, setBimOffset] = useState({ x: 0, y: 0, z: 0 });
   const controlsRef = useRef<OrbitControls | null>(null);
   const fpRef = useRef<PointerLockControls | null>(null);
@@ -400,6 +404,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const grid = new THREE.GridHelper(gridSize, 40, 0x4ade80, 0x15803d); // 초원 그린
     grid.position.set(parsed.center.x, groundY, parsed.center.z);
     scene.add(grid);
+    gridRef.current = grid;
     // 초원 바닥면 (그리드 살짝 아래 — z-fighting 방지)
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(gridSize, gridSize),
@@ -408,6 +413,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(parsed.center.x, groundY - 0.3, parsed.center.z);
     scene.add(ground);
+    groundRef.current = ground;
+    // 지반 표시 중이면 BIM 자체 바닥(그리드·초원)은 숨겨 지반과 겹치지 않게
+    grid.visible = !geoOnRef.current;
+    ground.visible = !geoOnRef.current;
 
     // ── WASD 자유시점 ── 누른 키 추적 → 카메라+타겟 함께 이동(마우스 회전 유지)
     const keys: Record<string, boolean> = {};
@@ -644,6 +653,12 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const m = meshRef.current;
     if (m) m.position.set(bimOffset.x * 1000, bimOffset.y * 1000, bimOffset.z * 1000);
   }, [bimOffset]);
+
+  // 지반 ON 이면 BIM 자체 바닥 그리드·초원 숨김 (지반과 겹침 방지)
+  useEffect(() => {
+    if (gridRef.current) gridRef.current.visible = !geoOn;
+    if (groundRef.current) groundRef.current.visible = !geoOn;
+  }, [geoOn]);
 
   // ── 관리자 워크 토글: 궤도 조작 비활성 / 종료 시 포인터락 해제 ──
   useEffect(() => {

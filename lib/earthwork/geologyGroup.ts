@@ -67,7 +67,7 @@ export function buildGeologyGroup(boreholes: Borehole[]): GeologyBuild {
     const geo = buildSlab(model, m);
     const mat = new THREE.MeshLambertMaterial({
       color: LAYERS[m].color, side: THREE.DoubleSide,
-      transparent: true, opacity: 0.5, depthWrite: false, // 지하 BIM 비치게
+      transparent: true, opacity: 0.65, depthWrite: false, // 지하 BIM 살짝 비치게
     });
     group.add(new THREE.Mesh(geo, mat));
     geos.push(geo);
