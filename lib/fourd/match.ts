@@ -108,6 +108,29 @@ export function normStorey(storeyName: string | null | undefined): string | null
   return s.trim() || null;
 }
 
+/**
+ * 층 표기 정규형 — 매칭/정렬용. 스케줄("8F"·"B5F")과 BIM("Level 8"·"지하5층") 의 다른 표기를 통일.
+ *  "8F"·"Level 8"·"08"·"8층"→"8", "B5F"·"지하5"→"B5", RF/PH/PHR, "PT"(피트)는 보존.
+ */
+export function canonStorey(s: string | null | undefined): string | null {
+  if (!s) return null;
+  const u = String(s).trim().toUpperCase();
+  if (!u) return null;
+  if (/PHR|PH\s*R/.test(u)) return "PHR";
+  if (/\bPH/.test(u) || u.includes("펜트")) return "PH";
+  if (/\bRF\b|ROOF|지붕|옥탑|옥상/.test(u)) return "RF";
+  let m = /\bB\s*0*(\d+)/.exec(u) || /지하\s*0*(\d+)/.exec(u);
+  if (m) return "B" + m[1]; // 지하 — 지상층과 구분 (B5≠5F)
+  m =
+    /(\d+)\s*F\b/.exec(u) ||
+    /LEVEL\s*0*(\d+)/.exec(u) ||
+    /(\d+)\s*층/.exec(u) ||
+    /\bF\s*0*(\d+)/.exec(u) ||
+    /^0*(\d+)$/.exec(u);
+  if (m) return m[1];
+  return u; // PT 등 미인식은 원형 보존
+}
+
 interface DateRange {
   start: number; // epoch ms
   end: number;
@@ -145,14 +168,15 @@ export function buildScheduleIndex(tasks: ScheduleTask[]): ScheduleIndex {
     if (Number.isNaN(s) || Number.isNaN(e)) continue;
     minD = Math.min(minD, s);
     maxD = Math.max(maxD, e);
+    const st = canonStorey(d.storey) || d.storey; // 스케줄 층 정규화 (BIM 층과 통일)
     if (d.trade === "MO") {
-      merge(mo, d.storey, s, e);
+      merge(mo, st, s, e);
     } else if (d.worktype === "FT") {
-      merge(ft, d.storey, s, e);
+      merge(ft, st, s, e);
     } else if (d.worktype === "PR") {
-      merge(pr, d.storey, s, e);
+      merge(pr, st, s, e);
     } else if (d.worktype === "CR") {
-      merge(cr, d.storey, s, e);
+      merge(cr, st, s, e);
     }
   }
   return {
@@ -202,14 +226,16 @@ export interface CodeIndex {
   maxDate: number;
 }
 
+// storey 는 canonStorey 로 정규화해 키 생성 — 스케줄("8F")/BIM("Level 8") 표기 차이 흡수.
 const codeKey = (trade: string, zone: string, storey: string, wt: string) =>
-  `${trade}|${zone}|${storey}|${wt}`;
+  `${trade}|${zone}|${canonStorey(storey) || storey}|${wt}`;
 // 유닛 키 — 모듈 번호(unit)로만. 4D 코드의 type 필드(36/46)는 스케줄 내부코드라
 // BIM 실제 타입과 어긋난다(ZC 코드=46 ↔ BIM=36, 활동명은 둘 다 "36Type"). 그래서 제외.
 // pmisx 도 활동명의 모듈 번호로 매칭한다.
-const unitKey = (zone: string, storey: string, unit: string) => `MO|${zone}|${storey}|${unit}`;
+const unitKey = (zone: string, storey: string, unit: string) =>
+  `MO|${zone}|${canonStorey(storey) || storey}|${unit}`;
 const phaseKey = (zone: string, storey: string, wt: string, phase: string) =>
-  `ST|${zone}|${storey}|${wt}|${phase}`;
+  `ST|${zone}|${canonStorey(storey) || storey}|${wt}|${phase}`;
 
 function mergeRange(m: Map<string, DateRange>, key: string, s: number, e: number) {
   const cur = m.get(key);
@@ -340,7 +366,11 @@ export function matchAllHybrid(
   let matched = 0;
   for (const el of elements) {
     let r = matchByCode(el, codeIdx);
-    if (r.via === "no_meta") r = matchElement(el, storeyIdx); // 공정 PSet 없음 → 층 폴백
+    // 코드매칭 실패(PSet 없음 OR zone 불일치 등) → 층 단위 폴백(zone 무시). 구역 세분도 차이도 흡수.
+    if (!r.range) {
+      const fb = matchElement(el, storeyIdx);
+      if (fb.range) r = fb;
+    }
     ranges.set(el.globalId, r);
     if (r.range) matched++;
     const tag = r.range
@@ -356,8 +386,9 @@ export function matchAllHybrid(
 }
 
 /** 단일 요소 매칭 — (storey, category) → 스케줄 날짜범위. zone 무시 폴백. */
-export function matchElement(el: IfcElementMeta, idx: ScheduleIndex): MatchResult {
-  const ns = normStorey(el.storeyName);
+export function matchElement(el: IfcElementMeta & Partial<ProcElement>, idx: ScheduleIndex): MatchResult {
+  // storey4d(PSet) 우선, 없으면 storeyName. canonStorey 로 스케줄 키와 통일.
+  const ns = canonStorey(el.storey4d ?? el.storeyName);
   if (!ns) return { range: null, via: "no_storey" };
   const cat = classifyIfcType(el.ifcType, el.name);
 
