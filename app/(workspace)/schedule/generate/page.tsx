@@ -232,7 +232,8 @@ export default function ScheduleGeneratePage() {
           id: t.code,
           activity_code: t.code,
           name: t.name,
-          wbs_code: "",
+          // "공종 > 층 > 구역" → "공종.층.구역" (간트가 '.'로 split해 WBS 계층 렌더)
+          wbs_code: (t.wbs || "").split(/\s*>\s*/).filter(Boolean).join("."),
           start: s,
           end: bumpEnd(s, t.end.slice(0, 10)),
           progress: 0,
