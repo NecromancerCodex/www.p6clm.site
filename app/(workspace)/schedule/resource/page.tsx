@@ -79,22 +79,32 @@ export default function ResourcePlanPage() {
       const { parseIfc } = await import("../../../../lib/fourd/ifc");
       const buf = await file.arrayBuffer();
       const parsed = await parseIfc(buf, (_p, msg) => setBimMsg(msg));
-      // 자재명(한글)으로 묶어 수량 집계.
-      const byName = new Map<string, { qty: number; ifc: string }>();
-      for (const el of parsed.elements) {
-        const nm = TYPE_KO_MAT[el.ifcType] ?? el.ifcType;
-        const cur = byName.get(nm) ?? { qty: 0, ifc: el.ifcType };
-        cur.qty += 1;
-        byName.set(nm, cur);
+      let items: BimMaterial[];
+      let mode: string;
+      if (parsed.steelQto && parsed.steelQto.length) {
+        // 철골 물량(QTO) — 규격별 중량(t). 개수보다 정확.
+        items = parsed.steelQto.map((s) => ({
+          name: `철골 ${s.group}`,
+          spec: `${s.count}본`,
+          quantity: Math.round(s.weightT * 100) / 100,
+          unit: "t",
+          ifc_type: "Steel",
+        }));
+        mode = "철골 물량(t)";
+      } else {
+        // 폴백 — 부재 타입별 개수 집계.
+        const byName = new Map<string, { qty: number; ifc: string }>();
+        for (const el of parsed.elements) {
+          const nm = TYPE_KO_MAT[el.ifcType] ?? el.ifcType;
+          const cur = byName.get(nm) ?? { qty: 0, ifc: el.ifcType };
+          cur.qty += 1;
+          byName.set(nm, cur);
+        }
+        items = [...byName].map(([name, v]) => ({ name, quantity: v.qty, unit: "EA", ifc_type: v.ifc }));
+        mode = "부재 개수";
       }
-      const items: BimMaterial[] = [...byName].map(([name, v]) => ({
-        name,
-        quantity: v.qty,
-        unit: "EA",
-        ifc_type: v.ifc,
-      }));
       const n = await importRequiredFromBim(items);
-      setBimMsg(`BIM에서 ${n}종 자재 추출 완료`);
+      setBimMsg(`BIM에서 ${n}종 추출 완료 (${mode})`);
       await reload();
     } catch (e2) {
       setBimMsg(e2 instanceof Error ? `실패: ${e2.message}` : "IFC 분석 실패");

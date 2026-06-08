@@ -33,11 +33,19 @@ export interface ParsedElement extends IfcElementMeta {
   recalibrated?: boolean; // PT 태그였으나 높이로 실제 층 보정됨
 }
 
+/** 철골 물량 — 규격(또는 공종)별 중량 합계(t). QTO PSet(철골중량(t)·규격)에서 추출. */
+export interface SteelQto {
+  group: string; // 규격(예 300x300x10x15) 또는 공종, 없으면 "철골"
+  weightT: number; // 합계 중량(t)
+  count: number; // 부재 수
+}
+
 export interface ParsedIfc {
   geometry: THREE.BufferGeometry; // position + normal + color(동적)
   elements: ParsedElement[];
   center: THREE.Vector3;
   radius: number;
+  steelQto?: SteelQto[]; // 철골 물량(있으면) — 자원 계획 BIM 자재추출 고도화
 }
 
 let _api: IfcAPI | null = null;
@@ -172,6 +180,62 @@ function buildProcMap(api: IfcAPI, modelID: number): Map<number, ProcMeta> {
 }
 
 /**
+ * 철골 물량 추출 — PSet 의 '철골중량(t)'(중량) + '규격'(단면) + 'Lv.2 Trade'(공종)를
+ * 요소별로 모아 규격/공종별 중량(t) 합산. 표준 IfcQuantity 없는 모델용.
+ *   · 중량: 속성명이 "(t)" 로 끝나는 IFCREAL (한글 인코딩 무관, ASCII 접미사).
+ *   · 규격: 속성명에 "규격" 포함 또는 값이 단면패턴(예 300x300x10x15).
+ */
+function extractSteelQto(api: IfcAPI, modelID: number): SteelQto[] {
+  const perEl = new Map<number, { w?: number; spec?: string; trade?: string }>();
+  const RELS = api.GetLineIDsWithType(modelID, IFCRELDEFINESBYPROPERTIES);
+  const isSection = (v: string) => /^\s*\d+(\.\d+)?\s*[xX*]\s*\d+/.test(v);
+  for (let i = 0; i < RELS.size(); i++) {
+    let rel: { RelatingPropertyDefinition?: { value: number }; RelatedObjects?: { value: number }[] };
+    try { rel = api.GetLine(modelID, RELS.get(i)); } catch { continue; }
+    const pd = rel.RelatingPropertyDefinition;
+    if (!pd) continue;
+    let pset: { HasProperties?: { value: number }[] };
+    try { pset = api.GetLine(modelID, pd.value); } catch { continue; }
+    if (!pset.HasProperties) continue;
+
+    let w: number | undefined;
+    let spec: string | undefined;
+    let trade: string | undefined;
+    for (const ph of pset.HasProperties) {
+      let p: { Name?: { value: string }; NominalValue?: { value: string | number } };
+      try { p = api.GetLine(modelID, ph.value); } catch { continue; }
+      const nm = p.Name?.value ?? "";
+      const raw = p.NominalValue?.value;
+      if (raw == null) continue;
+      if (nm.endsWith("(t)")) { const n = Number(raw); if (Number.isFinite(n)) w = n; }
+      else if (nm.includes("규격") || (typeof raw === "string" && isSection(raw))) spec = String(raw);
+      else if (nm.startsWith("Lv.2 Trade")) trade = String(raw);
+    }
+    if (w == null && spec == null && trade == null) continue;
+    for (const o of rel.RelatedObjects ?? []) {
+      const cur = perEl.get(o.value) ?? {};
+      if (w != null) cur.w = w;
+      if (spec != null) cur.spec = spec;
+      if (trade != null) cur.trade = trade;
+      perEl.set(o.value, cur);
+    }
+  }
+
+  const agg = new Map<string, { weightT: number; count: number }>();
+  for (const e of perEl.values()) {
+    if (e.w == null || e.w <= 0) continue;
+    const key = e.spec || e.trade || "철골";
+    const a = agg.get(key) ?? { weightT: 0, count: 0 };
+    a.weightT += e.w;
+    a.count += 1;
+    agg.set(key, a);
+  }
+  return [...agg.entries()]
+    .map(([group, a]) => ({ group, weightT: a.weightT, count: a.count }))
+    .sort((x, y) => y.weightT - x.weightT);
+}
+
+/**
  * 요소 expressID → 정량물량 {vol㎥, area㎡} (IfcElementQuantity).
  * Revit 등이 내보낸 Qto_*BaseQuantities(NetVolume/NetArea)를 추출. 없으면 빈 맵 → bbox 폴백.
  */
@@ -295,6 +359,7 @@ export async function parseIfc(
   const procMap = safeMap(() => buildProcMap(api, modelID));
   onProgress?.(0.22, "정량물량(체적·면적) 분석 중…");
   const qtyMap = safeMap(() => buildQtyMap(api, modelID));
+  const steelQto = (() => { try { return extractSteelQto(api, modelID); } catch { return []; } })();
 
   // 누적 버퍼
   const positions: number[] = [];
@@ -473,5 +538,6 @@ export async function parseIfc(
     elements,
     center: bs.center.clone(),
     radius: bs.radius,
+    steelQto: steelQto.length ? steelQto : undefined,
   };
 }
