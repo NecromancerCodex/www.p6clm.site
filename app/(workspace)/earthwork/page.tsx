@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
 import { EarthworkSection } from "../../../components/earthwork/EarthworkSection";
+import { BoreholeTable } from "../../../components/earthwork/BoreholeTable";
 import {
   BOREHOLES, LAYERS, buildGridModel, layerVolumes, parseBoreholeCsv, prepare,
   type Borehole,
@@ -90,7 +91,7 @@ export default function EarthworkPage() {
   }
 
   return (
-    <div className="ws-inner-pad">
+    <div className="ws-inner-pad" style={{ maxWidth: "none" }}>
       <div className="ws-section-title">
         <Mountain size={18} strokeWidth={1.8} />
         토공 / 지반
@@ -222,6 +223,20 @@ export default function EarthworkPage() {
       <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
         ※ IDW 보간 추정치. 시추공 11개 기반이라 외곽·심부는 오차가 큽니다. 굴착 레벨 지정 시 절토량 계산은 다음 단계.
       </p>
+
+      {/* 시추공 편집 테이블 (CAD 팔레트처럼) */}
+      <div style={{ height: 24 }} />
+      <BoreholeTable
+        key={source}
+        boreholes={boreholes}
+        onApply={(bh) => { setBoreholes(bh); setSec(farthestPair(bh)); setSource(`편집 적용 (${bh.length}공)`); }}
+        onSave={async (bh) => {
+          setBoreholes(bh);
+          setSec(farthestPair(bh));
+          try { const n = await saveBoreholes(bh); setSource(`저장됨 (${n}공)`); }
+          catch { setSource(`${bh.length}공 · 저장 실패-화면만`); }
+        }}
+      />
     </div>
   );
 }
