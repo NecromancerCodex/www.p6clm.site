@@ -638,10 +638,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     parsed.geometry.computeBoundingBox();
     const bb = parsed.geometry.boundingBox;
     const groundY = bb?.min.y ?? parsed.center.y - parsed.radius;
-    // 단위 무관 자동 맞춤 — 지반 최대변 = 건물 평면(footprint) 최대변 × 1.2 (건물 살짝 감쌈).
-    const foot = bb ? Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) : (parsed.radius || 50) * 2;
-    const geoSpan = Math.max(width, depthY) || 1;
-    const fit = (foot * 1.2) / geoSpan;
+    // 실제 규격 정합 — 지반은 미터 단위. 건물 단위(m vs mm) 자동판별 후 그에 맞춤.
+    //   건물 footprint 가 1만(=10km in m / 10m in mm)보다 크면 mm 모델 → ×1000, 아니면 m → ×1.
+    const foot = bb ? Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) : 200;
+    const fit = foot > 10000 ? 1000 : 1;
     group.scale.setScalar(fit);
     group.position.x = parsed.center.x - (width / 2) * fit; // XZ 중심 = BIM 중심
     group.position.z = parsed.center.z - (depthY / 2) * fit;
