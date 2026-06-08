@@ -332,7 +332,7 @@ export default function FourDPage() {
       for (const el of ready.parsed.elements) {
         if (ready.ranges.get(el.globalId)?.range) continue; // 이미 매칭됨
         const storey = el.storey4d ?? normStorey(el.storeyName);
-        const cat = classifyIfcType(el.ifcType);
+        const cat = classifyIfcType(el.ifcType, el.name);
         const zone = el.zone ?? null;
         const reason = (ready.ranges.get(el.globalId)?.via ?? "").split(/[:@]/)[0];
         const gkey = `${reason}|${zone ?? "-"}|${storey ?? "-"}|${cat}`;
@@ -534,7 +534,7 @@ export default function FourDPage() {
       if (ranges.get(el.globalId)?.range) continue;
       unmatched++;
       const s = el.storey4d ?? normStorey(el.storeyName);
-      const cat = classifyIfcType(el.ifcType);
+      const cat = classifyIfcType(el.ifcType, el.name);
       const k = `${el.zone ?? "-"}|${s ?? "-"}|${cat}`;
       const g = noSched.get(k);
       if (g) g.count++;
@@ -575,7 +575,7 @@ export default function FourDPage() {
     const bimPresence = new Set<string>();
     const bimZonesAt = new Map<string, Set<string>>();
     for (const el of parsed.elements) {
-      const op = OP_OF_CAT[classifyIfcType(el.ifcType)];
+      const op = OP_OF_CAT[classifyIfcType(el.ifcType, el.name)];
       const st = el.storey4d ?? normStorey(el.storeyName);
       if (!op || !st) continue;
       const bk = `${op}|${st}`;

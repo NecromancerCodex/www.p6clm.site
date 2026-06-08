@@ -71,11 +71,22 @@ export function decodeActId(code: string): DecodedCode | null {
 /** IFC 요소 분류 → 매칭 카테고리. */
 export type Category = "CORE" | "FOOT" | "MOD";
 
-export function classifyIfcType(ifcType: string): Category {
-  if (ifcType === "IfcFooting") return "FOOT";
+// 보편 부재명 어휘(한/영) — 애매하게 모델링된 ifcType(예 매트기초를 IfcSlab으로) 을 이름으로 교정.
+// 특정 공정 전용이 아니라 전 부재 범용. 프로젝트 키워드 아님.
+const _NM_FOOT = /기초|footing|매트|foundation|푸팅|지정|mat\b/i;
+const _NM_CORE = /벽|wall|기둥|column|코어|core|옹벽|pier|shear/i;
+
+export function classifyIfcType(ifcType: string, name?: string): Category {
+  // 1. 명확한 ifcType 은 그대로 신뢰
+  if (ifcType === "IfcFooting" || ifcType === "IfcPile") return "FOOT";
   if (ifcType === "IfcWall" || ifcType === "IfcWallStandardCase" || ifcType === "IfcColumn")
     return "CORE";
-  return "MOD"; // Slab/Beam/Proxy/Covering/Railing/Member/Plate ... → 층 모듈 귀속
+  if (ifcType === "IfcBeam") return "MOD";
+  // 2. 애매한 ifcType(IfcSlab/Member/Plate/Proxy/Covering 등) → 이름으로 교정
+  const n = name || "";
+  if (_NM_FOOT.test(n)) return "FOOT";
+  if (_NM_CORE.test(n)) return "CORE";
+  return "MOD"; // Slab/바닥/기타 → 수평·층모듈
 }
 
 /** IFC IfcBuildingStorey.Name → XER storey 코드. */
@@ -348,7 +359,7 @@ export function matchAllHybrid(
 export function matchElement(el: IfcElementMeta, idx: ScheduleIndex): MatchResult {
   const ns = normStorey(el.storeyName);
   if (!ns) return { range: null, via: "no_storey" };
-  const cat = classifyIfcType(el.ifcType);
+  const cat = classifyIfcType(el.ifcType, el.name);
 
   if (cat === "FOOT") {
     const r = idx.ftStoreys.get(ns) || idx.ftStoreys.get("PT");

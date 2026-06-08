@@ -240,7 +240,7 @@ export function deriveActivityUnits(
   const OP: Record<string, string> = { CORE: "CR", MOD: "MD", FOOT: "FT" };
   const presence = new Set<string>();
   for (const el of elements) {
-    const op = OP[classifyIfcType(el.ifcType)];
+    const op = OP[classifyIfcType(el.ifcType, el.name)];
     const st = el.storey4d ?? normStorey(el.storeyName);
     if (op && st) presence.add(`${op}|${st}`);
   }

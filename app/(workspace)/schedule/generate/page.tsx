@@ -135,7 +135,7 @@ export default function ScheduleGeneratePage() {
         const zone = el.zone ?? "-";
         // 4D 매처와 동일한 storey 도출(normStorey) — 생성 코드와 BIM 매칭 표기 일치 보장.
         const storey = el.storey4d ?? normStorey(el.storeyName) ?? "-";
-        const cat = classifyIfcType(el.ifcType);
+        const cat = classifyIfcType(el.ifcType, el.name);
         if (el.zone) zoneSet.add(el.zone);
         if (storey !== "-") storeySet.add(storey);
         const disc = IFC_DISCIPLINE[el.ifcType];
