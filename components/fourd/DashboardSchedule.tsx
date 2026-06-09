@@ -82,9 +82,10 @@ function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
       const deps = (t.preds ?? [])
         .map((n) => (dupNames.has(n) ? undefined : nameToCode.get(n)))
         .filter((c): c is string => !!c && c !== t.code);
-      // progress: 0~1 비율이면 %로, 이미 0~100이면 그대로.
+      // progress: 0~1 비율이면 %로, 이미 0~100이면 그대로. 0일(마일스톤)은 진행바 폭 -1 에러 → 0.
       const raw = t.progress ?? 0;
-      const progress = raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
+      const isMs = date10(t.start) === date10(t.end);
+      const progress = isMs ? 0 : raw <= 1 ? Math.round(raw * 100) : Math.round(raw);
       return {
         id: t.code,
         activity_code: t.code,
