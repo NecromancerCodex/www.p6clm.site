@@ -12,7 +12,7 @@
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  confirmPlan, getPlan, inferScheduleContext, planP6XmlUrl, savePlanActivities, savePlanLogic, startPlan,
+  confirmPlan, getPlan, inferScheduleContext, planP6XmlUrl, savePlanActivities, startPlan,
   type GanttTask, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
@@ -38,17 +38,20 @@ function loadFrappeGantt(): Promise<void> {
   return _ganttLoad;
 }
 
-const STEPS = [
-  { n: "P1·P2", t: "입력·스코프" },
-  { n: "Gate A", t: "액티비티 검토" },
-  { n: "Gate B", t: "관계·기간 검토" },
-  { n: "Gate C", t: "스케줄 확정" },
-] as const;
+// 공정 플래닝 세부 5단계 (회사 노하우 — pm_philosophy_4stages.md)
+const PLAN_SUBS = ["WBS 생성", "액티비티 정의", "액티비티 리스트", "릴레이션", "듀레이션"] as const;
 
-const stageStep = (st: PlanStage): number =>
-  st === "running_p2" ? 1 : st === "activities_ready" ? 1
-  : st === "running_p34" ? 2 : st === "logic_ready" ? 2
-  : st === "running_s1" || st === "scheduled" || st === "done" ? 3 : 0;
+/** stage → 플래닝 서브스텝 진행수 (0~5 완료) */
+const subDone = (st: PlanStage | null): number =>
+  !st ? 0 : st === "running_p2" ? 1                        // WBS 완료, 정의 중
+  : st === "activities_ready" ? 3                           // 리스트까지 완료
+  : st === "running_p34" ? 3                                // 릴레이션·듀레이션 중
+  : 5;                                                      // 플래닝 완료
+
+/** 대단계: 0=입력, 1=플래닝(진행·검토), 2=스케줄링 */
+const bigStep = (st: PlanStage | null, hasPlan: boolean): number =>
+  !hasPlan ? 0
+  : st === "running_s1" || st === "scheduled" || st === "done" ? 2 : 1;
 
 const OP_KO: Record<string, string> = { FT: "기초", CR: "코어/골조", MD: "슬래브/모듈", PR: "마감" };
 const PH_KO: Record<string, string> = { RB: "철근", FM: "거푸집", CN: "콘크리트", IN: "설치" };
@@ -83,8 +86,10 @@ export default function SchedulePlanWizard() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stage: PlanStage | null = plan?.stage ?? null;
-  const step = planId ? stageStep(stage ?? "running_p2") : 0;
+  const step = bigStep(stage, !!planId);
   const running = stage === "running_p2" || stage === "running_p34" || stage === "running_s1";
+  const subs = subDone(stage);
+
 
   const refresh = useCallback(async (id: string) => {
     try {
@@ -98,6 +103,17 @@ export default function SchedulePlanWizard() {
       setErr(e instanceof Error ? e.message : String(e));
     }
   }, [dirty]);
+
+  // Gate A 자동 통과 — 플래닝(정의→리스트→릴레이션→듀레이션)을 연속 실행하고,
+  // 사람 검토는 플래닝 전체 완료(logic_ready) 후 한 번. (회사 노하우: 플래닝 끝→DB→수정/컨펌→스케줄링)
+  const autoConfirmed = useRef(false);
+  useEffect(() => {
+    if (stage === "activities_ready" && planId && !autoConfirmed.current) {
+      autoConfirmed.current = true;
+      void confirmPlan(planId).then(() => refresh(planId)).catch(() => { autoConfirmed.current = false; });
+    }
+    if (stage === "logic_ready" || stage === "running_p34") autoConfirmed.current = false;
+  }, [stage, planId, refresh]);
 
   useEffect(() => {
     if (!planId) return;
@@ -177,23 +193,11 @@ export default function SchedulePlanWizard() {
     catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
-  const onSaveLogic = async () => {
-    if (!planId) return;
-    setBusy(true);
-    try {
-      await savePlanLogic(planId, {
-        relations: Object.fromEntries(acts.map((a) => [a.code, a.predecessors ?? []])),
-        durations: Object.fromEntries(acts.map((a) => [a.code, a.duration_days])),
-      });
-      setDirty(false);
-    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(false); }
-  };
   const onConfirm = async () => {
     if (!planId) return;
     setBusy(true); setErr(null);
     try {
-      if (dirty) { if (stage === "activities_ready") await onSaveActs(); else if (stage === "logic_ready") await onSaveLogic(); }
+      if (dirty) await onSaveActs();   // 통합 테이블: 이름·기간·선행 전부 activities 로 저장
       await confirmPlan(planId);
       await refresh(planId);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
@@ -228,23 +232,34 @@ export default function SchedulePlanWizard() {
       <div>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>공정계획 위저드</h1>
         <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>
-          PM 4단계 — 플래닝(스코프 → 액티비티 → 관계 → 기간) → 스케줄링. AI가 초안을 만들고,
-          <b> 각 게이트에서 PM이 검토·수정 후 진행</b>합니다. (원샷 데모: 자동생성기)
+          <b>공정 플래닝</b>(WBS → 액티비티 정의 → 리스트 → 릴레이션 → 듀레이션) 이 끝나면 DB에 저장되고,
+          <b> PM이 수정 또는 컨펌</b>하면 <b>공정 스케줄링</b>(베이스라인 생성)으로 넘어갑니다.
         </p>
       </div>
 
-      {/* 스텝 인디케이터 */}
+      {/* 대단계 인디케이터 — 공정 플래닝 / 공정 스케줄링 */}
       <div className="wz-steps">
-        {STEPS.map((s, i) => (
-          <div key={s.n} className={`wz-step ${i === step ? "on" : i < step ? "done" : ""}`}>
-            <span className="wz-step-badge">{i < step ? "✓" : i + 1}</span>
-            <span>
-              <b>{s.n}</b>
-              <small>{s.t}</small>
+        <div className={`wz-step big ${step === 1 ? "on" : step > 1 ? "done" : ""}`}>
+          <span className="wz-step-badge">{step > 1 ? "✓" : "1"}</span>
+          <span style={{ flex: 1 }}>
+            <b>공정 플래닝</b>
+            <span className="wz-substeps">
+              {PLAN_SUBS.map((t, i) => (
+                <span key={t} className={`wz-substep ${step >= 1 && i < subs ? "done" : step === 1 && i === subs ? "on" : ""}`}>
+                  {step >= 1 && i < subs ? "✓" : `${i + 1}.`}{t}
+                </span>
+              ))}
             </span>
-            {i < STEPS.length - 1 && <span className="wz-step-arrow">›</span>}
-          </div>
-        ))}
+          </span>
+          <span className="wz-step-arrow">›</span>
+        </div>
+        <div className={`wz-step big ${stage === "done" ? "done" : step === 2 ? "on" : ""}`}>
+          <span className="wz-step-badge">{stage === "done" ? "✓" : "2"}</span>
+          <span>
+            <b>공정 스케줄링</b>
+            <small>{stage === "done" ? "베이스라인 확정 완료" : "플래닝 기반 공정표 베이스라인 생성"}</small>
+          </span>
+        </div>
       </div>
 
       {err && (
@@ -257,7 +272,7 @@ export default function SchedulePlanWizard() {
         <div className="wz-stream">
           <div className="wz-stream-head">
             <span className="wz-dot" />
-            <b>{stage === "running_p2" ? "P2 액티비티 정의 중" : "P3 관계 · P4 기간 산정 중"}</b>
+            <b>{stage === "running_p2" ? "플래닝 2~3 — 액티비티 정의·리스트 작성 중" : "플래닝 4~5 — 릴레이션·듀레이션 산정 중"}</b>
             <span style={{ color: "#6366f1" }}>{plan?.progress ?? "AI 작업 중…"}</span>
           </div>
           <div className="wz-skel-rows">
@@ -352,25 +367,31 @@ export default function SchedulePlanWizard() {
         </details>
       )}
 
-      {/* ── Step 2: Gate A ── */}
-      {stage === "activities_ready" && (
+      {/* ── 플래닝 완료 — 검토·수정·컨펌 (회사 노하우: 플래닝 끝 → DB → 사람 수정/컨펌 → 스케줄링) ── */}
+      {stage === "logic_ready" && (
         <div className="wz-card">
           <div className="wz-gate-head">
             <div>
-              <span className="wz-gate-badge">⏸ Gate A</span>
-              <b style={{ fontSize: 14 }}> 액티비티 {acts.length}개 검토</b>
+              <span className="wz-gate-badge">⏸ 플래닝 완료</span>
+              <b style={{ fontSize: 14 }}> 액티비티 {acts.length}개 — 검토 후 스케줄링으로</b>
               {dirty && <em style={{ fontSize: 12, color: "#d97706", marginLeft: 8 }}>수정됨 · 미저장</em>}
-              <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>활동명을 직접 수정하거나 불필요한 활동을 삭제하세요. 컨펌하면 P3 선후행 · P4 기간 산정으로 진행합니다.</p>
+              <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
+                WBS → 액티비티 정의 → 리스트 → 릴레이션 → 듀레이션까지 완료됐습니다.
+                활동명·기간·선행을 직접 수정하거나 삭제한 뒤 <b>컨펌하면 공정표 베이스라인을 생성</b>합니다.
+              </p>
             </div>
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               <button className="wz-btn ghost" disabled={!dirty || busy} onClick={() => void onSaveActs()}>수정 저장</button>
-              <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>컨펌 → P3 관계 · P4 기간</button>
+              <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>컨펌 → 공정 스케줄링 (베이스라인)</button>
             </div>
           </div>
           <div className="wz-tablewrap">
             <table className="wz-table">
               <thead>
-                <tr><th style={{ textAlign: "left" }}>활동명</th><th>구역</th><th>층</th><th>공종</th><th>단계</th><th>MS</th><th /></tr>
+                <tr>
+                  <th style={{ textAlign: "left" }}>활동명</th><th>구역</th><th>층</th><th>공종</th>
+                  <th style={{ width: 80 }}>기간(일)</th><th style={{ textAlign: "left", width: "26%" }}>선행 (code, 쉼표)</th><th />
+                </tr>
               </thead>
               <tbody>
                 {acts.map((a, i) => (
@@ -378,50 +399,16 @@ export default function SchedulePlanWizard() {
                     <td><input className="wz-cell" value={a.name} onChange={(e) => editAct(i, { name: e.target.value })} /></td>
                     <td className="c">{a.fd_zone ?? "—"}</td>
                     <td className="c">{a.fd_storey ?? "—"}</td>
-                    <td className="c">{a.fd_op ? OP_KO[a.fd_op] ?? a.fd_op : "—"}</td>
-                    <td className="c">{a.fd_phase ? PH_KO[a.fd_phase] ?? a.fd_phase : "—"}</td>
-                    <td className="c">{a.milestone ? "◆" : ""}</td>
-                    <td className="c"><button className="wz-del" onClick={() => removeAct(i)}>삭제</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Step 3: Gate B ── */}
-      {stage === "logic_ready" && (
-        <div className="wz-card">
-          <div className="wz-gate-head">
-            <div>
-              <span className="wz-gate-badge">⏸ Gate B</span>
-              <b style={{ fontSize: 14 }}> 선후행 · 기간 검토</b>
-              {dirty && <em style={{ fontSize: 12, color: "#d97706", marginLeft: 8 }}>수정됨 · 미저장</em>}
-              <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>기간(일)과 선행 활동을 수정하세요. 컨펌하면 CPM 날짜 계산(S1 스케줄링)으로 진행합니다.</p>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <button className="wz-btn ghost" disabled={!dirty || busy} onClick={() => void onSaveLogic()}>수정 저장</button>
-              <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>컨펌 → S1 스케줄링 (CPM)</button>
-            </div>
-          </div>
-          <div className="wz-tablewrap">
-            <table className="wz-table">
-              <thead>
-                <tr><th style={{ textAlign: "left" }}>활동</th><th style={{ width: 90 }}>기간(일)</th><th style={{ textAlign: "left" }}>선행 (code, 쉼표 구분)</th></tr>
-              </thead>
-              <tbody>
-                {acts.map((a, i) => (
-                  <tr key={a.code}>
-                    <td style={{ fontSize: 12, color: "#1e293b" }}>{a.name} <span style={{ color: "#94a3b8" }}>({a.code})</span></td>
+                    <td className="c">{a.fd_op ? OP_KO[a.fd_op] ?? a.fd_op : a.milestone ? "◆MS" : "—"}</td>
                     <td className="c">
-                      <input type="number" min={0} className="wz-cell c" style={{ width: 64 }} value={a.duration_days}
+                      <input type="number" min={0} className="wz-cell c" style={{ width: 60 }} value={a.duration_days}
                              onChange={(e) => editAct(i, { duration_days: Number(e.target.value) })} disabled={a.milestone} />
                     </td>
                     <td>
                       <input className="wz-cell" value={(a.predecessors ?? []).map((p) => p.code).join(", ")}
                              onChange={(e) => editAct(i, { predecessors: e.target.value.split(/[\s,]+/).filter(Boolean).map((c) => ({ code: c, type: "FS", lag_days: 0 })) })} />
                     </td>
+                    <td className="c"><button className="wz-del" onClick={() => removeAct(i)}>삭제</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -436,16 +423,16 @@ export default function SchedulePlanWizard() {
           <div className="wz-gate-head">
             <div>
               <span className="wz-gate-badge" style={stage === "done" ? { background: "#dcfce7", color: "#15803d" } : undefined}>
-                {stage === "done" ? "✅ 확정 완료" : "⏸ Gate C"}
+                {stage === "done" ? "✅ 베이스라인 확정" : "⏸ 공정 스케줄링"}
               </span>
-              <b style={{ fontSize: 14 }}> {stage === "done" ? "공정계획이 확정되었습니다" : "스케줄 최종 검토"}</b>
+              <b style={{ fontSize: 14 }}> {stage === "done" ? "공정표 베이스라인이 확정되었습니다" : "공정표 베이스라인 — 최종 검토"}</b>
               <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
-                CPM 으로 계산된 날짜입니다. {stage === "scheduled" ? "간트를 검토하고 확정하세요." : "P6 XML 을 다운로드해 Primavera 에서 사용하세요."}
+                플래닝 기반으로 CPM 날짜를 계산한 베이스라인입니다. {stage === "scheduled" ? "간트를 검토하고 확정하세요." : "P6 XML 을 다운로드해 Primavera 에서 사용하세요."}
               </p>
             </div>
             <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               {stage === "scheduled" && (
-                <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>최종 확정</button>
+                <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>베이스라인 확정</button>
               )}
               {planId && (
                 <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planP6XmlUrl(planId)}>P6 XML 다운로드</a>
@@ -475,6 +462,11 @@ export default function SchedulePlanWizard() {
                          display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
         .wz-step.on .wz-step-badge { background: #2563eb; color: #fff; }
         .wz-step.done .wz-step-badge { background: #22c55e; color: #fff; }
+        .wz-step.big { padding: 12px 16px; }
+        .wz-substeps { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+        .wz-substep { font-size: 10.5px; padding: 2px 8px; border-radius: 10px; background: #f1f5f9; color: #94a3b8; }
+        .wz-substep.on { background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+        .wz-substep.done { background: #dcfce7; color: #15803d; }
         .wz-step-arrow { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); color: #cbd5e1; font-size: 16px; z-index: 1; }
         .wz-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; background: #fff; }
         .wz-in { width: 100%; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; box-sizing: border-box; background: #fff; }
