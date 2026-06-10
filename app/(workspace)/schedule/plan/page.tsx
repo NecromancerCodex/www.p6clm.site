@@ -403,7 +403,10 @@ export default function SchedulePlanWizard() {
               <thead>
                 <tr>
                   <th style={{ textAlign: "left" }}>활동명</th><th>구역</th><th>층</th><th>공종</th>
-                  <th style={{ width: 80 }}>기간(일)</th><th style={{ textAlign: "left", width: "26%" }}>선행 (code, 쉼표)</th><th />
+                  <th style={{ width: 80 }}>기간(일)</th>
+                  <th style={{ width: 56 }} title="필요 타워크레인 (양중작업) — SGS 자원 평준화 입력">🏗️</th>
+                  <th style={{ width: 56 }} title="필요 작업조 — SGS 자원 평준화 입력">👷</th>
+                  <th style={{ textAlign: "left", width: "22%" }}>선행 (code, 쉼표)</th><th />
                 </tr>
               </thead>
               <tbody>
@@ -416,6 +419,14 @@ export default function SchedulePlanWizard() {
                     <td className="c">
                       <input type="number" min={0} className="wz-cell c" style={{ width: 60 }} value={a.duration_days}
                              onChange={(e) => editAct(i, { duration_days: Number(e.target.value) })} disabled={a.milestone} />
+                    </td>
+                    <td className="c">
+                      <input type="number" min={0} max={9} className="wz-cell c" style={{ width: 44 }} value={a.res_crane ?? 0}
+                             onChange={(e) => editAct(i, { res_crane: Number(e.target.value) })} disabled={a.milestone} />
+                    </td>
+                    <td className="c">
+                      <input type="number" min={0} max={9} className="wz-cell c" style={{ width: 44 }} value={a.res_crew ?? 0}
+                             onChange={(e) => editAct(i, { res_crew: Number(e.target.value) })} disabled={a.milestone} />
                     </td>
                     <td>
                       <input className="wz-cell" value={(a.predecessors ?? []).map((p) => p.code).join(", ")}
@@ -455,7 +466,7 @@ export default function SchedulePlanWizard() {
           {plan?.payload.schedule && (
             <div className="wz-rat-body" style={{ marginBottom: 10 }}>
               <p><b>베이스라인 근거</b> — PM이 컨펌한 플래닝(활동·선후행·기간)을 입력으로,
-                시스템이 CPM(근무일 기준 forward pass)으로 날짜를 결정론 계산했습니다.
+                시스템이 CPM + SGS 자원 평준화(크레인·작업조 한도 내 배치)로 날짜를 결정론 계산했습니다.
                 활동 {String((plan.payload.schedule as Record<string, unknown>).activity_count ?? ganttTasks.length)}개
                 · 준공 {String((plan.payload.schedule as Record<string, unknown>).end_date ?? "-")}.
                 {Array.isArray((plan.payload.schedule as Record<string, unknown>).warnings) &&

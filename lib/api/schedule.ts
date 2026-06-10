@@ -456,6 +456,7 @@ export interface PlanActivity {
   duration_days: number; milestone?: boolean;
   predecessors?: PlanPredecessor[];
   fd_zone?: string | null; fd_storey?: string | null; fd_op?: string | null; fd_phase?: string | null;
+  res_crane?: number; res_crew?: number;   // SGS 자원 평준화 입력 (양중=크레인1)
 }
 export interface PlanScopeWbs {
   wbs: { discipline: string; storeys: { storey: string; zones: string[] }[] }[];
