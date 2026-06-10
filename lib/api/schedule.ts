@@ -434,7 +434,7 @@ export async function generateSchedule(
 export interface InferContextResult { building_type: string; scope: string; structure_type: string; reason: string }
 export async function inferScheduleContext(req: {
   storeys: string[]; zones: string[];
-  element_summary: { type: string; count: number }[]; total_count: number;
+  element_summary: { type: string; count: number; names?: string[] }[]; total_count: number;
 }): Promise<InferContextResult> {
   const res = await fetch(`${API_BASE}/schedule/infer-context`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),

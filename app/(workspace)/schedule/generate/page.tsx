@@ -130,8 +130,13 @@ export default function ScheduleGeneratePage() {
       const storeySet = new Set<string>();
       const discSet = new Set<string>();
       const typeCount = new Map<string, number>();
+      const typeNames = new Map<string, Set<string>>();  // 구조 판정 신호 — type별 대표 부재명
       for (const el of parsed.elements) {
         typeCount.set(el.ifcType, (typeCount.get(el.ifcType) ?? 0) + 1);
+        if (el.name) {
+          const ns = typeNames.get(el.ifcType) ?? new Set<string>();
+          if (ns.size < 3) { ns.add(el.name.slice(0, 30)); typeNames.set(el.ifcType, ns); }
+        }
         const zone = el.zone ?? "-";
         // 4D 매처와 동일한 storey 도출(normStorey) — 생성 코드와 BIM 매칭 표기 일치 보장.
         const storey = el.storey4d ?? normStorey(el.storeyName) ?? "-";
@@ -166,7 +171,7 @@ export default function ScheduleGeneratePage() {
       // ① 건물유형·범위 AI 추천 (비전문가 자동완성) — BIM 요약으로 추론
       const elementSummary = [...typeCount.entries()]
         .sort((a, b) => b[1] - a[1])
-        .map(([type, count]) => ({ type, count }));
+        .map(([type, count]) => ({ type, count, names: [...(typeNames.get(type) ?? [])] }));
       void inferScheduleContext({
         storeys: storeyList, zones: zoneList,
         element_summary: elementSummary, total_count: parsed.elements.length,

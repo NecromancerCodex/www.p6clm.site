@@ -128,8 +128,13 @@ export default function SchedulePlanWizard() {
       const agg = new Map<string, GenWorkUnit>();
       const zoneSet = new Set<string>(); const storeySet = new Set<string>();
       const typeCount = new Map<string, number>();
+      const typeNames = new Map<string, Set<string>>();  // 구조 판정 신호 — type별 대표 부재명
       for (const el of parsed.elements) {
         typeCount.set(el.ifcType, (typeCount.get(el.ifcType) ?? 0) + 1);
+        if (el.name) {
+          const ns = typeNames.get(el.ifcType) ?? new Set<string>();
+          if (ns.size < 3) { ns.add(el.name.slice(0, 30)); typeNames.set(el.ifcType, ns); }
+        }
         const zone = el.zone ?? "-";
         const storey = el.storey4d ?? normStorey(el.storeyName) ?? "-";
         const cat = classifyIfcType(el.ifcType, el.name);
@@ -147,7 +152,7 @@ export default function SchedulePlanWizard() {
       setBimName(`${file.name} — ${parsed.elements.length.toLocaleString()}부재 → ${agg.size} 워크패키지`);
       void inferScheduleContext({
         storeys: [...storeySet], zones: [...zoneSet],
-        element_summary: [...typeCount.entries()].sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count })),
+        element_summary: [...typeCount.entries()].sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count, names: [...(typeNames.get(type) ?? [])] })),
         total_count: parsed.elements.length,
       }).then((ctx) => {
         if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
