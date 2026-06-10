@@ -376,6 +376,28 @@ export default function SchedulePlanWizard() {
               <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>컨펌 → 공정 스케줄링 (베이스라인)</button>
             </div>
           </div>
+          {plan?.payload.rationale && (
+            <details className="wz-rat" open>
+              <summary>🧠 AI 판단 근거 — 왜 이렇게 계획했는가</summary>
+              <div className="wz-rat-body">
+                {plan.payload.rationale.define && (
+                  <p><b>액티비티 분해</b> — {plan.payload.rationale.define}</p>
+                )}
+                {plan.payload.rationale.relation && (
+                  <p><b>선후행</b> — {plan.payload.rationale.relation}
+                    {plan.payload.stats?.relation && (
+                      <span className="wz-rat-stat"> (AI 판단 {plan.payload.stats.relation.llm ?? 0}활동 + 물리 백스톱 {plan.payload.stats.relation.backstop ?? 0}건)</span>
+                    )}</p>
+                )}
+                {plan.payload.rationale.duration && (
+                  <p><b>기간 산정</b> — {plan.payload.rationale.duration}
+                    {plan.payload.stats?.duration && (
+                      <span className="wz-rat-stat"> ({plan.payload.stats.duration.applied ?? 0}/{plan.payload.stats.duration.total ?? 0} 활동 산정)</span>
+                    )}</p>
+                )}
+              </div>
+            </details>
+          )}
           <div className="wz-tablewrap">
             <table className="wz-table">
               <thead>
@@ -430,6 +452,19 @@ export default function SchedulePlanWizard() {
               )}
             </div>
           </div>
+          {plan?.payload.schedule && (
+            <div className="wz-rat-body" style={{ marginBottom: 10 }}>
+              <p><b>베이스라인 근거</b> — PM이 컨펌한 플래닝(활동·선후행·기간)을 입력으로,
+                시스템이 CPM(근무일 기준 forward pass)으로 날짜를 결정론 계산했습니다.
+                활동 {String((plan.payload.schedule as Record<string, unknown>).activity_count ?? ganttTasks.length)}개
+                · 준공 {String((plan.payload.schedule as Record<string, unknown>).end_date ?? "-")}.
+                {Array.isArray((plan.payload.schedule as Record<string, unknown>).warnings) &&
+                  ((plan.payload.schedule as Record<string, unknown>).warnings as string[]).length > 0 && (
+                  <span className="wz-rat-stat"> ⚠ 보정 {((plan.payload.schedule as Record<string, unknown>).warnings as string[]).length}건 (순환·기간상한 등)</span>
+                )}
+              </p>
+            </div>
+          )}
           {ganttReady && ganttTasks.length > 0 ? (
             <GanttChart tasks={ganttTasks} height={520} viewMode="Week" fillWidth />
           ) : (
@@ -488,6 +523,12 @@ export default function SchedulePlanWizard() {
         .wz-cell:focus { border-color: #2563eb; background: #fff; outline: none; }
         .wz-del { background: none; border: none; color: #ef4444; font-size: 11px; cursor: pointer; }
         .wz-del:hover { text-decoration: underline; }
+        .wz-rat { border: 1px solid #e9d5ff; background: #faf5ff; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+        .wz-rat summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: #7c3aed; }
+        .wz-rat-body { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .wz-rat-body p { margin: 0; font-size: 12.5px; color: #475569; line-height: 1.65; }
+        .wz-rat-body b { color: #1e293b; }
+        .wz-rat-stat { color: #7c3aed; font-size: 11.5px; }
         .wz-stream { border: 1px solid #e0e7ff; background: #f5f7ff; border-radius: 10px; padding: 14px; }
         .wz-stream-head { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
         .wz-dot { width: 9px; height: 9px; border-radius: 50%; background: #6366f1; animation: wz-pulse 1s ease-in-out infinite; }

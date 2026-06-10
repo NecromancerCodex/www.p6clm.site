@@ -469,6 +469,8 @@ export interface PlanState {
     activities_user?: PlanActivity[];
     notes?: string | null;
     schedule?: { tasks?: GanttTask[] & Record<string, unknown>[] } & Record<string, unknown>;
+    rationale?: { define?: string; relation?: string; duration?: string };
+    stats?: { relation?: { llm?: number; backstop?: number }; duration?: { applied?: number; total?: number } };
     error?: string;
   };
 }
