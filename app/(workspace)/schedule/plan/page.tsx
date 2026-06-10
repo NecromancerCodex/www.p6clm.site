@@ -7,7 +7,7 @@
  *   → [3 Gate B: 관계·기간 검토·수정] → S1 CPM → [4 Gate C: 간트 확인·확정] → P6 XML
  *
  * AI = 초안 제안, PM = 각 게이트에서 컨펌·수정 (사람이 진실원천).
- * 원샷 데모는 /schedule/generate (PoC 보존).
+ * 원샷 데모는 /schedule/generate (PoC 보존). 디자인 언어는 generate 와 동일(styled-jsx·slate).
  */
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -38,13 +38,20 @@ function loadFrappeGantt(): Promise<void> {
   return _ganttLoad;
 }
 
-const STEPS = ["입력·스코프", "액티비티 (Gate A)", "관계·기간 (Gate B)", "스케줄 확정 (Gate C)"] as const;
+const STEPS = [
+  { n: "P1·P2", t: "입력·스코프" },
+  { n: "Gate A", t: "액티비티 검토" },
+  { n: "Gate B", t: "관계·기간 검토" },
+  { n: "Gate C", t: "스케줄 확정" },
+] as const;
 
-/** stage → 위저드 스텝 인덱스 */
 const stageStep = (st: PlanStage): number =>
   st === "running_p2" ? 1 : st === "activities_ready" ? 1
   : st === "running_p34" ? 2 : st === "logic_ready" ? 2
   : st === "running_s1" || st === "scheduled" || st === "done" ? 3 : 0;
+
+const OP_KO: Record<string, string> = { FT: "기초", CR: "코어/골조", MD: "슬래브/모듈", PR: "마감" };
+const PH_KO: Record<string, string> = { RB: "철근", FM: "거푸집", CN: "콘크리트", IN: "설치" };
 
 export default function SchedulePlanWizard() {
   // ── 1단계: 입력 폼 ──
@@ -68,7 +75,7 @@ export default function SchedulePlanWizard() {
   const [planId, setPlanId] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanState | null>(null);
   const [scopeWbs, setScopeWbs] = useState<PlanScopeWbs | null>(null);
-  const [acts, setActs] = useState<PlanActivity[]>([]);   // 편집 버퍼 (Gate A/B)
+  const [acts, setActs] = useState<PlanActivity[]>([]);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -79,13 +86,11 @@ export default function SchedulePlanWizard() {
   const step = planId ? stageStep(stage ?? "running_p2") : 0;
   const running = stage === "running_p2" || stage === "running_p34" || stage === "running_s1";
 
-  // ── 폴링: running 단계 동안 3초 간격 ──
   const refresh = useCallback(async (id: string) => {
     try {
       const p = await getPlan(id);
       setPlan(p);
       if (p.payload.scope) setScopeWbs(p.payload.scope);
-      // 편집 버퍼 동기화 — 사용자 수정 중(dirty)이 아닐 때만 서버본으로 갱신
       const serverActs = p.payload.activities_user ?? p.payload.activities;
       if (serverActs && !dirty) setActs(serverActs);
       if (p.stage === "error") setErr(p.payload.error ?? p.progress ?? "오류");
@@ -132,7 +137,7 @@ export default function SchedulePlanWizard() {
       }
       setWorkUnits([...agg.values()]);
       setZones([...zoneSet]); setStoreys([...storeySet]);
-      setBimName(`${file.name} (${parsed.elements.length}부재 → ${agg.size}워크패키지)`);
+      setBimName(`${file.name} — ${parsed.elements.length.toLocaleString()}부재 → ${agg.size} 워크패키지`);
       void inferScheduleContext({
         storeys: [...storeySet], zones: [...zoneSet],
         element_summary: [...typeCount.entries()].sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count })),
@@ -148,7 +153,6 @@ export default function SchedulePlanWizard() {
     } finally { setBimBusy(false); }
   };
 
-  // ── 시작 (P1+P2) ──
   const onStart = async () => {
     setBusy(true); setErr(null);
     try {
@@ -166,7 +170,6 @@ export default function SchedulePlanWizard() {
     finally { setBusy(false); }
   };
 
-  // ── 게이트 액션 ──
   const onSaveActs = async () => {
     if (!planId) return;
     setBusy(true);
@@ -197,7 +200,6 @@ export default function SchedulePlanWizard() {
     finally { setBusy(false); }
   };
 
-  // ── 간트 (scheduled 이후) ──
   const ganttTasks: GanttTask[] = useMemo(() => {
     const tasks = (plan?.payload.schedule?.tasks ?? []) as Array<Record<string, unknown>>;
     const bump = (s: string, e: string) => {
@@ -214,7 +216,6 @@ export default function SchedulePlanWizard() {
     })) as GanttTask[];
   }, [plan]);
 
-  // ── 편집 헬퍼 ──
   const editAct = (i: number, patch: Partial<PlanActivity>) => {
     setActs((prev) => prev.map((a, j) => (j === i ? { ...a, ...patch } : a)));
     setDirty(true);
@@ -223,149 +224,202 @@ export default function SchedulePlanWizard() {
 
   // ════════════════ 렌더 ════════════════
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4">
-      <header>
-        <h1 className="text-xl font-bold">공정계획 위저드 — PM 4단계</h1>
-        <p className="text-sm text-gray-500">플래닝(스코프→액티비티→관계→기간) → 스케줄링. 각 게이트에서 검토·수정 후 진행합니다.</p>
-      </header>
+    <div style={{ padding: 20, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div>
+        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>공정계획 위저드</h1>
+        <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>
+          PM 4단계 — 플래닝(스코프 → 액티비티 → 관계 → 기간) → 스케줄링. AI가 초안을 만들고,
+          <b> 각 게이트에서 PM이 검토·수정 후 진행</b>합니다. (원샷 데모: 자동생성기)
+        </p>
+      </div>
 
       {/* 스텝 인디케이터 */}
-      <ol className="flex gap-2 text-sm">
+      <div className="wz-steps">
         {STEPS.map((s, i) => (
-          <li key={s} className={`flex-1 rounded border px-3 py-2 text-center ${
-            i === step ? "border-blue-500 bg-blue-50 font-semibold text-blue-700"
-            : i < step ? "border-green-300 bg-green-50 text-green-700" : "border-gray-200 text-gray-400"}`}>
-            {i < step ? "✓ " : `${i + 1}. `}{s}
-          </li>
+          <div key={s.n} className={`wz-step ${i === step ? "on" : i < step ? "done" : ""}`}>
+            <span className="wz-step-badge">{i < step ? "✓" : i + 1}</span>
+            <span>
+              <b>{s.n}</b>
+              <small>{s.t}</small>
+            </span>
+            {i < STEPS.length - 1 && <span className="wz-step-arrow">›</span>}
+          </div>
         ))}
-      </ol>
+      </div>
 
-      {err && <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{err}</div>}
+      {err && (
+        <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#b91c1c" }}>
+          {err}
+        </div>
+      )}
+
       {running && (
-        <div className="flex items-center gap-3 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
-          <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-          {plan?.progress ?? "AI 작업 중…"}
+        <div className="wz-stream">
+          <div className="wz-stream-head">
+            <span className="wz-dot" />
+            <b>{stage === "running_p2" ? "P2 액티비티 정의 중" : "P3 관계 · P4 기간 산정 중"}</b>
+            <span style={{ color: "#6366f1" }}>{plan?.progress ?? "AI 작업 중…"}</span>
+          </div>
+          <div className="wz-skel-rows">
+            {[78, 62, 88, 54, 70].map((w, i) => (
+              <div key={i} className="wz-skel-row">
+                <div className="wz-skel-label" />
+                <div className="wz-skel-bar" style={{ width: `${w}%`, animationDelay: `${i * 0.12}s` }} />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       {/* ── Step 1: 입력 ── */}
       {step === 0 && (
-        <section className="space-y-4 rounded border p-4">
-          <div className="flex items-center gap-3">
-            <label className="cursor-pointer rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-              {bimBusy ? "BIM 분석 중…" : "BIM(IFC) 업로드"}
-              <input type="file" accept=".ifc" className="hidden" disabled={bimBusy}
-                     onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f); }} />
-            </label>
-            {bimName && <span className="text-sm text-gray-600">{bimName}</span>}
+        <>
+          <div className="wz-card">
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <label className="wz-bim">
+                {bimBusy ? "BIM 분석 중…" : "📦 BIM(IFC) 업로드 — 워크패키지 자동 집계"}
+                <input type="file" accept=".ifc" style={{ display: "none" }} disabled={bimBusy}
+                       onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f); }} />
+              </label>
+              {bimName && <span style={{ fontSize: 12, color: "#475569" }}>{bimName}</span>}
+            </div>
+            {inferReason && <p style={{ fontSize: 12, color: "#7c3aed", margin: "8px 0 0" }}>🤖 AI 판정: {inferReason}</p>}
           </div>
-          {inferReason && <p className="text-xs text-gray-500">🤖 AI 판정: {inferReason}</p>}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <label className="text-sm">건물유형*
-              <input className="mt-1 w-full rounded border px-2 py-1.5" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="예: 모듈러 주택" /></label>
-            <label className="text-sm">범위(scope)
-              <input className="mt-1 w-full rounded border px-2 py-1.5" value={scope} onChange={(e) => setScope(e.target.value)} placeholder="골조 / 전체" /></label>
-            <label className="text-sm">구조유형
-              <select className="mt-1 w-full rounded border px-2 py-1.5" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
-                <option value="">자동/미지정</option><option>RC</option><option>철골</option><option>SRC</option>
-                <option>PC·모듈러</option><option value="혼합">혼합(RC코어+철골)</option>
-              </select></label>
-            <label className="text-sm">착공일*
-              <input type="date" className="mt-1 w-full rounded border px-2 py-1.5" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-            <label className="text-sm">목표공기(개월)
-              <input type="number" className="mt-1 w-full rounded border px-2 py-1.5" value={durationMonths} onChange={(e) => setDurationMonths(e.target.value)} /></label>
-            <label className="text-sm">주 근무일
-              <select className="mt-1 w-full rounded border px-2 py-1.5" value={wdpw} onChange={(e) => setWdpw(Number(e.target.value))}>
-                <option value={5}>주5일</option><option value={6}>주6일</option><option value={7}>주7일</option>
-              </select></label>
-            <label className="text-sm">타워크레인(대)
-              <input type="number" min={0} className="mt-1 w-full rounded border px-2 py-1.5" value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
-            <label className="text-sm">작업조(조)
-              <input type="number" min={1} className="mt-1 w-full rounded border px-2 py-1.5" value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
-            <label className="text-sm md:col-span-3">제약(자유서술)
-              <input className="mt-1 w-full rounded border px-2 py-1.5" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한" /></label>
+
+          <div className="wz-card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Field label="① 무엇을 — 건물유형 *">
+              <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="예: 모듈러 공동주택" />
+              <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
+            </Field>
+            <Field label="② 구조유형 — 공법 선택">
+              <select className="wz-in" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
+                <option value="">자동 판정 (BIM 업로드 시)</option>
+                <option value="RC">RC (철근콘크리트)</option>
+                <option value="철골">철골</option>
+                <option value="SRC">SRC</option>
+                <option value="PC·모듈러">PC·모듈러</option>
+                <option value="혼합">혼합 (RC코어 + 철골)</option>
+              </select>
+            </Field>
+            <Field label="③ 언제 — 착공일 * / 목표공기">
+              <div style={{ display: "flex", gap: 8 }}>
+                <input type="date" className="wz-in" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                <input type="number" className="wz-in" style={{ width: 110 }} value={durationMonths}
+                       onChange={(e) => setDurationMonths(e.target.value)} placeholder="개월" />
+                <select className="wz-in" style={{ width: 100 }} value={wdpw} onChange={(e) => setWdpw(Number(e.target.value))}>
+                  <option value={5}>주5일</option><option value={6}>주6일</option><option value={7}>주7일</option>
+                </select>
+              </div>
+            </Field>
+            <Field label="④ 자원 — 타워크레인 / 작업조">
+              <div style={{ display: "flex", gap: 8 }}>
+                <label className="wz-sub">크레인(대)
+                  <input type="number" min={0} className="wz-in" value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
+                <label className="wz-sub">작업조(조)
+                  <input type="number" min={1} className="wz-in" value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
+              </div>
+            </Field>
+            <Field label="⑤ 제약 — 자유서술 (선택)">
+              <input className="wz-in" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한, 인접 민원" />
+            </Field>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end", gap: 10 }}>
+              {workUnits.length > 0 && (
+                <span style={{ fontSize: 12, color: "#475569" }}>
+                  📦 워크패키지 <b>{workUnits.length}</b> · 구역 {zones.length} · 층 {storeys.length}
+                </span>
+              )}
+              <button className="wz-btn" disabled={!buildingType.trim() || !startDate || busy} onClick={() => void onStart()}>
+                {busy ? "시작 중…" : "P1 스코프 확정 → P2 액티비티 생성"}
+              </button>
+            </div>
           </div>
-          {workUnits.length > 0 && (
-            <p className="text-sm text-gray-600">📦 워크패키지 {workUnits.length}개 · 구역 {zones.length} · 층 {storeys.length}</p>
-          )}
-          <button className="rounded bg-blue-600 px-5 py-2 text-white disabled:opacity-40" disabled={!buildingType.trim() || !startDate || busy} onClick={() => void onStart()}>
-            {busy ? "시작 중…" : "P1 스코프 확정 → P2 액티비티 생성"}
-          </button>
-        </section>
+        </>
       )}
 
-      {/* WBS 요약 (P1 산출 — 전 단계 공통 표시) */}
+      {/* WBS 요약 (P1 산출) */}
       {scopeWbs && step >= 1 && (
-        <details className="rounded border bg-gray-50 p-3 text-sm" open={step === 1 && running}>
-          <summary className="cursor-pointer font-semibold">P1 스코프 — WBS ({scopeWbs.package_count} 워크패키지 · 구역 {scopeWbs.zones.length})</summary>
-          <div className="mt-2 space-y-1">
+        <details className="wz-card" style={{ background: "#f8fafc" }} open={step === 1 && running}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#334155" }}>
+            P1 스코프 — WBS · 워크패키지 {scopeWbs.package_count} · 구역 {scopeWbs.zones.length}
+          </summary>
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#475569" }}>
             {scopeWbs.wbs.map((d) => (
               <div key={d.discipline}>
-                <b>{d.discipline}</b>: {d.storeys.map((s) => `${s.storey}(${s.zones.length}구역)`).join(" · ")}
+                <b style={{ color: "#1e293b" }}>{d.discipline}</b> — {d.storeys.map((s) => `${s.storey}(${s.zones.length})`).join(" · ")}
               </div>
             ))}
           </div>
         </details>
       )}
 
-      {/* ── Step 2: Gate A 액티비티 ── */}
+      {/* ── Step 2: Gate A ── */}
       {stage === "activities_ready" && (
-        <section className="space-y-3 rounded border p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">⏸ Gate A — 액티비티 {acts.length}개 검토 {dirty && <em className="text-amber-600">(수정됨·미저장)</em>}</h2>
-            <div className="flex gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm disabled:opacity-40" disabled={!dirty || busy} onClick={() => void onSaveActs()}>수정 저장</button>
-              <button className="rounded bg-green-600 px-4 py-1.5 text-sm text-white disabled:opacity-40" disabled={busy} onClick={() => void onConfirm()}>컨펌 → P3 관계·P4 기간</button>
+        <div className="wz-card">
+          <div className="wz-gate-head">
+            <div>
+              <span className="wz-gate-badge">⏸ Gate A</span>
+              <b style={{ fontSize: 14 }}> 액티비티 {acts.length}개 검토</b>
+              {dirty && <em style={{ fontSize: 12, color: "#d97706", marginLeft: 8 }}>수정됨 · 미저장</em>}
+              <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>활동명을 직접 수정하거나 불필요한 활동을 삭제하세요. 컨펌하면 P3 선후행 · P4 기간 산정으로 진행합니다.</p>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <button className="wz-btn ghost" disabled={!dirty || busy} onClick={() => void onSaveActs()}>수정 저장</button>
+              <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>컨펌 → P3 관계 · P4 기간</button>
             </div>
           </div>
-          <div className="max-h-[480px] overflow-auto rounded border">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-gray-100">
-                <tr><th className="p-2 text-left">활동명</th><th className="p-2">구역</th><th className="p-2">층</th><th className="p-2">공종</th><th className="p-2">단계</th><th className="p-2">MS</th><th className="p-2" /></tr>
+          <div className="wz-tablewrap">
+            <table className="wz-table">
+              <thead>
+                <tr><th style={{ textAlign: "left" }}>활동명</th><th>구역</th><th>층</th><th>공종</th><th>단계</th><th>MS</th><th /></tr>
               </thead>
               <tbody>
                 {acts.map((a, i) => (
-                  <tr key={a.code} className="border-t hover:bg-blue-50/40">
-                    <td className="p-1"><input className="w-full rounded border px-1 py-0.5" value={a.name} onChange={(e) => editAct(i, { name: e.target.value })} /></td>
-                    <td className="p-1 text-center text-gray-600">{a.fd_zone ?? "-"}</td>
-                    <td className="p-1 text-center text-gray-600">{a.fd_storey ?? "-"}</td>
-                    <td className="p-1 text-center text-gray-600">{a.fd_op ?? "-"}</td>
-                    <td className="p-1 text-center text-gray-600">{a.fd_phase ?? "-"}</td>
-                    <td className="p-1 text-center">{a.milestone ? "◆" : ""}</td>
-                    <td className="p-1 text-center"><button className="text-red-500 hover:underline" onClick={() => removeAct(i)}>삭제</button></td>
+                  <tr key={a.code}>
+                    <td><input className="wz-cell" value={a.name} onChange={(e) => editAct(i, { name: e.target.value })} /></td>
+                    <td className="c">{a.fd_zone ?? "—"}</td>
+                    <td className="c">{a.fd_storey ?? "—"}</td>
+                    <td className="c">{a.fd_op ? OP_KO[a.fd_op] ?? a.fd_op : "—"}</td>
+                    <td className="c">{a.fd_phase ? PH_KO[a.fd_phase] ?? a.fd_phase : "—"}</td>
+                    <td className="c">{a.milestone ? "◆" : ""}</td>
+                    <td className="c"><button className="wz-del" onClick={() => removeAct(i)}>삭제</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
+        </div>
       )}
 
-      {/* ── Step 3: Gate B 관계·기간 ── */}
+      {/* ── Step 3: Gate B ── */}
       {stage === "logic_ready" && (
-        <section className="space-y-3 rounded border p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">⏸ Gate B — 선후행·기간 검토 {dirty && <em className="text-amber-600">(수정됨·미저장)</em>}</h2>
-            <div className="flex gap-2">
-              <button className="rounded border px-3 py-1.5 text-sm disabled:opacity-40" disabled={!dirty || busy} onClick={() => void onSaveLogic()}>수정 저장</button>
-              <button className="rounded bg-green-600 px-4 py-1.5 text-sm text-white disabled:opacity-40" disabled={busy} onClick={() => void onConfirm()}>컨펌 → S1 스케줄링(CPM)</button>
+        <div className="wz-card">
+          <div className="wz-gate-head">
+            <div>
+              <span className="wz-gate-badge">⏸ Gate B</span>
+              <b style={{ fontSize: 14 }}> 선후행 · 기간 검토</b>
+              {dirty && <em style={{ fontSize: 12, color: "#d97706", marginLeft: 8 }}>수정됨 · 미저장</em>}
+              <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>기간(일)과 선행 활동을 수정하세요. 컨펌하면 CPM 날짜 계산(S1 스케줄링)으로 진행합니다.</p>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <button className="wz-btn ghost" disabled={!dirty || busy} onClick={() => void onSaveLogic()}>수정 저장</button>
+              <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>컨펌 → S1 스케줄링 (CPM)</button>
             </div>
           </div>
-          <div className="max-h-[480px] overflow-auto rounded border">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-gray-100">
-                <tr><th className="p-2 text-left">활동명</th><th className="p-2">기간(일)</th><th className="p-2 text-left">선행 (code, 쉼표 구분)</th></tr>
+          <div className="wz-tablewrap">
+            <table className="wz-table">
+              <thead>
+                <tr><th style={{ textAlign: "left" }}>활동</th><th style={{ width: 90 }}>기간(일)</th><th style={{ textAlign: "left" }}>선행 (code, 쉼표 구분)</th></tr>
               </thead>
               <tbody>
                 {acts.map((a, i) => (
-                  <tr key={a.code} className="border-t hover:bg-blue-50/40">
-                    <td className="p-1">{a.name} <span className="text-gray-400">({a.code})</span></td>
-                    <td className="p-1 text-center">
-                      <input type="number" min={0} className="w-16 rounded border px-1 py-0.5 text-center" value={a.duration_days}
+                  <tr key={a.code}>
+                    <td style={{ fontSize: 12, color: "#1e293b" }}>{a.name} <span style={{ color: "#94a3b8" }}>({a.code})</span></td>
+                    <td className="c">
+                      <input type="number" min={0} className="wz-cell c" style={{ width: 64 }} value={a.duration_days}
                              onChange={(e) => editAct(i, { duration_days: Number(e.target.value) })} disabled={a.milestone} />
                     </td>
-                    <td className="p-1">
-                      <input className="w-full rounded border px-1 py-0.5" value={(a.predecessors ?? []).map((p) => p.code).join(", ")}
+                    <td>
+                      <input className="wz-cell" value={(a.predecessors ?? []).map((p) => p.code).join(", ")}
                              onChange={(e) => editAct(i, { predecessors: e.target.value.split(/[\s,]+/).filter(Boolean).map((c) => ({ code: c, type: "FS", lag_days: 0 })) })} />
                     </td>
                   </tr>
@@ -373,30 +427,103 @@ export default function SchedulePlanWizard() {
               </tbody>
             </table>
           </div>
-        </section>
+        </div>
       )}
 
-      {/* ── Step 4: Gate C 간트·확정 ── */}
+      {/* ── Step 4: Gate C ── */}
       {(stage === "scheduled" || stage === "done") && (
-        <section className="space-y-3 rounded border p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">{stage === "done" ? "✅ 확정 완료" : "⏸ Gate C — 스케줄 최종 검토"}</h2>
-            <div className="flex gap-2">
+        <div className="wz-card">
+          <div className="wz-gate-head">
+            <div>
+              <span className="wz-gate-badge" style={stage === "done" ? { background: "#dcfce7", color: "#15803d" } : undefined}>
+                {stage === "done" ? "✅ 확정 완료" : "⏸ Gate C"}
+              </span>
+              <b style={{ fontSize: 14 }}> {stage === "done" ? "공정계획이 확정되었습니다" : "스케줄 최종 검토"}</b>
+              <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
+                CPM 으로 계산된 날짜입니다. {stage === "scheduled" ? "간트를 검토하고 확정하세요." : "P6 XML 을 다운로드해 Primavera 에서 사용하세요."}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
               {stage === "scheduled" && (
-                <button className="rounded bg-green-600 px-4 py-1.5 text-sm text-white disabled:opacity-40" disabled={busy} onClick={() => void onConfirm()}>최종 확정</button>
+                <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>최종 확정</button>
               )}
               {planId && (
-                <a className="rounded border px-4 py-1.5 text-sm hover:bg-gray-50" href={planP6XmlUrl(planId)}>P6 XML 다운로드</a>
+                <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planP6XmlUrl(planId)}>P6 XML 다운로드</a>
               )}
             </div>
           </div>
           {ganttReady && ganttTasks.length > 0 ? (
             <GanttChart tasks={ganttTasks} height={520} viewMode="Week" fillWidth />
           ) : (
-            <p className="text-sm text-gray-500">간트 로드 중… (활동 {ganttTasks.length}개)</p>
+            <div style={{ fontSize: 13, color: "#94a3b8", padding: 20 }}>간트 렌더링 준비 중… (활동 {ganttTasks.length}개)</div>
           )}
-        </section>
+        </div>
       )}
+
+      <style jsx>{`
+        .wz-steps { display: flex; gap: 0; align-items: stretch; }
+        .wz-step { flex: 1; display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid #e2e8f0;
+                   background: #fff; color: #94a3b8; position: relative; }
+        .wz-step:first-child { border-radius: 10px 0 0 10px; }
+        .wz-step:last-child { border-radius: 0 10px 10px 0; }
+        .wz-step + .wz-step { border-left: none; }
+        .wz-step b { display: block; font-size: 12px; line-height: 1.2; }
+        .wz-step small { display: block; font-size: 11px; }
+        .wz-step.on { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+        .wz-step.done { background: #f0fdf4; color: #15803d; }
+        .wz-step-badge { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #64748b;
+                         display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+        .wz-step.on .wz-step-badge { background: #2563eb; color: #fff; }
+        .wz-step.done .wz-step-badge { background: #22c55e; color: #fff; }
+        .wz-step-arrow { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); color: #cbd5e1; font-size: 16px; z-index: 1; }
+        .wz-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; background: #fff; }
+        .wz-in { width: 100%; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; box-sizing: border-box; background: #fff; }
+        .wz-sub { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #64748b; flex: 1; }
+        .wz-bim { display: inline-block; padding: 9px 14px; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 12.5px;
+                  cursor: pointer; color: #475569; background: #f8fafc; }
+        .wz-bim:hover { border-color: #2563eb; color: #2563eb; }
+        .wz-btn { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .wz-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .wz-btn.green { background: #16a34a; }
+        .wz-btn.green:disabled { background: #cbd5e1; }
+        .wz-btn.ghost { background: #fff; color: #334155; border: 1px solid #cbd5e1; }
+        .wz-btn.ghost:disabled { color: #cbd5e1; }
+        .wz-gate-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+        .wz-gate-badge { display: inline-block; padding: 3px 10px; border-radius: 13px; background: #fef3c7; color: #b45309;
+                         font-size: 12px; font-weight: 700; margin-right: 6px; }
+        .wz-tablewrap { max-height: 480px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .wz-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .wz-table thead th { position: sticky; top: 0; background: #f1f5f9; color: #475569; font-size: 11px;
+                             padding: 8px; border-bottom: 1px solid #e2e8f0; z-index: 1; }
+        .wz-table td { padding: 4px 6px; border-bottom: 1px solid #f1f5f9; color: #475569; }
+        .wz-table td.c { text-align: center; }
+        .wz-table tbody tr:hover { background: #f8fafc; }
+        .wz-cell { width: 100%; padding: 4px 7px; border: 1px solid transparent; border-radius: 5px; font-size: 12px;
+                   background: transparent; box-sizing: border-box; }
+        .wz-cell.c { text-align: center; }
+        .wz-cell:hover { border-color: #cbd5e1; background: #fff; }
+        .wz-cell:focus { border-color: #2563eb; background: #fff; outline: none; }
+        .wz-del { background: none; border: none; color: #ef4444; font-size: 11px; cursor: pointer; }
+        .wz-del:hover { text-decoration: underline; }
+        .wz-stream { border: 1px solid #e0e7ff; background: #f5f7ff; border-radius: 10px; padding: 14px; }
+        .wz-stream-head { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
+        .wz-dot { width: 9px; height: 9px; border-radius: 50%; background: #6366f1; animation: wz-pulse 1s ease-in-out infinite; }
+        @keyframes wz-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
+        .wz-skel-rows { display: flex; flex-direction: column; gap: 9px; }
+        .wz-skel-row { display: flex; align-items: center; gap: 10px; }
+        .wz-skel-label { width: 130px; height: 13px; border-radius: 4px; background: linear-gradient(90deg,#e2e8f0 25%,#eef2f7 50%,#e2e8f0 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; flex-shrink: 0; }
+        .wz-skel-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,#c7d2fe 25%,#e0e7ff 50%,#c7d2fe 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; }
+        @keyframes wz-shim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+      `}</style>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>{label}</label>
+      {children}
     </div>
   );
 }
