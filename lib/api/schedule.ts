@@ -442,3 +442,78 @@ export async function inferScheduleContext(req: {
   if (!res.ok) return { building_type: "", scope: "", structure_type: "", reason: "" };
   return (await res.json()) as InferContextResult;
 }
+
+// ═══ PM 4단계 단계별 계획 (휴먼인더루프) — /schedule/plan/* ═══════════════════
+
+export type PlanStage =
+  | "running_p2" | "activities_ready" | "running_p34" | "logic_ready"
+  | "running_s1" | "scheduled" | "done" | "error";
+
+export interface PlanPredecessor { code: string; type?: string; lag_days?: number }
+export interface PlanActivity {
+  code: string; name: string;
+  wbs_path?: string; discipline?: string; method?: string | null;
+  duration_days: number; milestone?: boolean;
+  predecessors?: PlanPredecessor[];
+  fd_zone?: string | null; fd_storey?: string | null; fd_op?: string | null; fd_phase?: string | null;
+}
+export interface PlanScopeWbs {
+  wbs: { discipline: string; storeys: { storey: string; zones: string[] }[] }[];
+  package_count: number; zones: string[]; scope: string; structure_type?: string | null;
+}
+export interface PlanState {
+  plan_id: string; stage: PlanStage; progress?: string | null;
+  payload: {
+    scope?: PlanScopeWbs;
+    activities?: PlanActivity[];
+    activities_user?: PlanActivity[];
+    notes?: string | null;
+    schedule?: { tasks?: GanttTask[] & Record<string, unknown>[] } & Record<string, unknown>;
+    error?: string;
+  };
+}
+
+async function planFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}/schedule/plan${path}`, {
+    headers: { "Content-Type": "application/json" }, ...init,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const detail = (body && (body.detail ?? body.error)) || `${res.status} ${res.statusText}`;
+    throw new ScheduleApiError(res.status, String(detail));
+  }
+  return (await res.json()) as T;
+}
+
+/** P1 스코프(즉시) + P2 액티비티(백그라운드) 시작 */
+export async function startPlan(req: GenerateScheduleRequest): Promise<{ plan_id: string; stage: PlanStage; scope: PlanScopeWbs }> {
+  return planFetch("/start", { method: "POST", body: JSON.stringify(req) });
+}
+
+/** 단계·산출물 폴링 */
+export async function getPlan(planId: string): Promise<PlanState> {
+  return planFetch(`/${planId}`);
+}
+
+/** [Gate A] 액티비티 수정본 저장 */
+export async function savePlanActivities(planId: string, activities: PlanActivity[], note?: string): Promise<void> {
+  await planFetch(`/${planId}/activities`, { method: "PUT", body: JSON.stringify({ activities, note }) });
+}
+
+/** [Gate B] 관계·기간 수정본 저장 */
+export async function savePlanLogic(
+  planId: string,
+  edit: { relations?: Record<string, PlanPredecessor[]>; durations?: Record<string, number>; note?: string },
+): Promise<void> {
+  await planFetch(`/${planId}/logic`, { method: "PUT", body: JSON.stringify(edit) });
+}
+
+/** 현 단계 컨펌 → 다음 단계 */
+export async function confirmPlan(planId: string): Promise<{ stage: PlanStage }> {
+  return planFetch(`/${planId}/confirm`, { method: "POST" });
+}
+
+/** P6 XML 다운로드 URL */
+export function planP6XmlUrl(planId: string): string {
+  return `${API_BASE}/schedule/plan/${planId}/p6xml`;
+}
