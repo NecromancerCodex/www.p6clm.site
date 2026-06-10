@@ -41,12 +41,13 @@ function loadFrappeGantt(): Promise<void> {
 // 공정 플래닝 세부 5단계 (회사 노하우 — pm_philosophy_4stages.md)
 const PLAN_SUBS = ["WBS 생성", "액티비티 정의", "액티비티 리스트", "릴레이션", "듀레이션"] as const;
 
-/** stage → 플래닝 서브스텝 진행수 (0~5 완료) */
-const subDone = (st: PlanStage | null): number =>
-  !st ? 0 : st === "running_p2" ? 1                        // WBS 완료, 정의 중
-  : st === "activities_ready" ? 3                           // 리스트까지 완료
-  : st === "running_p34" ? 3                                // 릴레이션·듀레이션 중
-  : 5;                                                      // 플래닝 완료
+/** 플래닝 서브스텝 진행수 — progress 의 "[n/5]" 를 파싱 (백엔드 노드가 정확히 표기) */
+const subDone = (st: PlanStage | null, progress?: string | null): number => {
+  if (!st) return 0;
+  if (st !== "running_p2") return 5;                        // 플래닝 완료 이후
+  const m = /\[(\d)\/5\]/.exec(progress ?? "");
+  return m ? Math.max(0, Number(m[1]) - 1) : 1;             // [n/5] 진행 중 = n-1 완료
+};
 
 /** 대단계: 0=입력, 1=플래닝(진행·검토), 2=스케줄링 */
 const bigStep = (st: PlanStage | null, hasPlan: boolean): number =>
@@ -88,7 +89,7 @@ export default function SchedulePlanWizard() {
   const stage: PlanStage | null = plan?.stage ?? null;
   const step = bigStep(stage, !!planId);
   const running = stage === "running_p2" || stage === "running_p34" || stage === "running_s1";
-  const subs = subDone(stage);
+  const subs = subDone(stage, plan?.progress);
 
 
   const refresh = useCallback(async (id: string) => {
@@ -104,16 +105,6 @@ export default function SchedulePlanWizard() {
     }
   }, [dirty]);
 
-  // Gate A 자동 통과 — 플래닝(정의→리스트→릴레이션→듀레이션)을 연속 실행하고,
-  // 사람 검토는 플래닝 전체 완료(logic_ready) 후 한 번. (회사 노하우: 플래닝 끝→DB→수정/컨펌→스케줄링)
-  const autoConfirmed = useRef(false);
-  useEffect(() => {
-    if (stage === "activities_ready" && planId && !autoConfirmed.current) {
-      autoConfirmed.current = true;
-      void confirmPlan(planId).then(() => refresh(planId)).catch(() => { autoConfirmed.current = false; });
-    }
-    if (stage === "logic_ready" || stage === "running_p34") autoConfirmed.current = false;
-  }, [stage, planId, refresh]);
 
   useEffect(() => {
     if (!planId) return;
@@ -272,7 +263,7 @@ export default function SchedulePlanWizard() {
         <div className="wz-stream">
           <div className="wz-stream-head">
             <span className="wz-dot" />
-            <b>{stage === "running_p2" ? "플래닝 2~3 — 액티비티 정의·리스트 작성 중" : "플래닝 4~5 — 릴레이션·듀레이션 산정 중"}</b>
+            <b>공정 플래닝 진행 중</b>
             <span style={{ color: "#6366f1" }}>{plan?.progress ?? "AI 작업 중…"}</span>
           </div>
           <div className="wz-skel-rows">
