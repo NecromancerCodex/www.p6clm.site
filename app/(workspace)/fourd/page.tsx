@@ -611,7 +611,19 @@ export default function FourDPage() {
     const noBim = NOBIM_ORDER.filter((c) => noBimMap.has(c)).map((c) => ({ cause: c, ...noBimMap.get(c)! }));
 
     // ③ 타임라인 순서 검토 + ④ 4D Clash — codeIndex 날짜로 검증
-    const FR = (s: string) => (s === "PT" ? 0 : s === "RF" ? 13 : parseInt(s, 10) || 0);
+    // 층 랭크 — 백엔드 _storey_rank 와 동일: 지하=음수(깊을수록 작게), PT 최하, RF/PH/PHR 최상.
+    // (이전: parseInt("B4")=NaN→0 으로 지하·옥탑이 전부 0 → 가짜 '순서 역전' 15건 오보)
+    const FR = (s: string) => {
+      const u = (s || "").toUpperCase();
+      if (u === "PT" || u.includes("PIT")) return -100;
+      if (u.includes("PHR")) return 10001;
+      if (u.startsWith("PH")) return 10000;
+      if (u === "RF" || u.includes("지붕")) return 9999;
+      const b = /B\s*0*(\d+)/.exec(u);
+      if (b) return -parseInt(b[1], 10);
+      const m = /\d+/.exec(u);
+      return m ? parseInt(m[0], 10) : 500;
+    };
     const OPN: Record<string, string> = { FT: "기초", CR: "골조", MD: "모듈", PR: "파라펫" };
     const seqViolations: string[] = [];
     const clashes4d: string[] = [];
