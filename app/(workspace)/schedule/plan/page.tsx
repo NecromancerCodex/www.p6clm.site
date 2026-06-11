@@ -341,7 +341,8 @@ export default function SchedulePlanWizard() {
                 </select>
                 <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
                         title="굴착·골조 전략 — 발주·부지 조건으로 결정되는 정보(AI 추정 불가)">
-                  <option value="bottom_up">순타 (지하 → 지상)</option>
+                  <option value="bottom_up">순타·일괄 (전 구역 지하 → 지상)</option>
+                  <option value="bottom_up_phased">순타·단계 (구역별 지하→지상 연속)</option>
                   <option value="top_down">역타 (지하·지상 병행)</option>
                 </select>
               </div>
@@ -416,7 +417,7 @@ export default function SchedulePlanWizard() {
                 <span style={{ marginLeft: 8, fontSize: 11.5, padding: "3px 10px", borderRadius: 12,
                                background: plan.payload.strategy === "top_down" ? "#fce7f3" : "#e0f2fe",
                                color: plan.payload.strategy === "top_down" ? "#be185d" : "#0369a1", fontWeight: 700 }}>
-                  {plan.payload.strategy === "top_down" ? "역타 (지하·지상 병행)" : "순타 (지하 → 지상)"}
+                  {plan.payload.strategy === "top_down" ? "역타 (지하·지상 병행)" : plan.payload.strategy === "bottom_up_phased" ? "순타·단계 (구역별 연속)" : "순타·일괄 (전 구역 지하 먼저)"}
                 </span>
               )}
               {dirty && <em style={{ fontSize: 12, color: "#d97706", marginLeft: 8 }}>수정됨 · 미저장</em>}
