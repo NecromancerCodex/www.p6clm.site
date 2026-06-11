@@ -20,6 +20,7 @@ export default function PlanWatcher() {
   const pathname = usePathname();
   const [toast, setToast] = useState<{ kind: "ok" | "err"; msg: string; planId: string } | null>(null);
   const lastNotified = useRef<string | null>(null);   // planId:stage — 중복 알림 방지
+  const doneSeen = useRef<Set<string>>(new Set());    // 확정 완료 본 플랜 — 폴링 중단(체크포인트는 유지)
 
   const notify = useCallback((kind: "ok" | "err", msg: string, planId: string) => {
     setToast({ kind, msg, planId });
@@ -37,6 +38,7 @@ export default function PlanWatcher() {
     const tick = async () => {
       const planId = localStorage.getItem(PLAN_CKPT);
       if (!planId) return;
+      if (doneSeen.current.has(planId)) return;   // 확정 완료 본 플랜 — 감시 중단(체크포인트는 유지)
       if (pathname?.startsWith("/schedule/plan")) return;   // 페이지 자체 폴링이 처리 — 중복 방지
       try {
         const p = await getPlan(planId);
@@ -50,7 +52,7 @@ export default function PlanWatcher() {
           lastNotified.current = key;
           notify("err", "⚠️ 공정 플래닝 실패 — 확인이 필요합니다", planId);
         } else if (stage === "done") {
-          localStorage.removeItem(PLAN_CKPT);   // 확정 완료 — 감시 종료
+          doneSeen.current.add(planId);   // 감시만 종료 — 체크포인트는 '새 계획 시작' 전까지 유지(복원용)
         }
       } catch {
         /* 폴링 실패는 조용히 — 다음 틱에 재시도 */

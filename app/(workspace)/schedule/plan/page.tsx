@@ -116,7 +116,7 @@ export default function SchedulePlanWizard() {
       const serverActs = p.payload.activities_user ?? p.payload.activities;
       if (serverActs && !dirty) setActs(serverActs);
       if (p.stage === "error") setErr(p.payload.error ?? p.progress ?? "오류");
-      if (p.stage === "done") localStorage.removeItem(PLAN_CKPT);   // 확정 완료 — 체크포인트 해제
+      // 체크포인트는 done 에도 유지 — '새 계획 시작' 누를 때까지 새로고침/이동 후 복원 보장.
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
