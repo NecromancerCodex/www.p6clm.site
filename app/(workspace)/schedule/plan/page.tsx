@@ -545,7 +545,7 @@ export default function SchedulePlanWizard() {
           )}
           {(() => {
             const tgt = (plan?.payload.schedule as Record<string, unknown> | undefined)?.target as
-              | { target_days: number; achieved_days?: number; met?: boolean;
+              | { target_days: number; achieved_days?: number; met?: boolean; advice?: string;
                   suggestion?: { crane: number; crew: number; days: number } | null } | undefined;
             if (!tgt || stage === "done") return null;
             const m = (d?: number) => (d ? `${Math.round(d / 30.4)}개월` : "-");
