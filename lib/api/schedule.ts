@@ -462,7 +462,7 @@ export interface PlanActivity {
   res_crane?: number; res_crew?: number;   // SGS 자원 평준화 입력 (양중=크레인1)
 }
 export interface PlanScopeWbs {
-  wbs: { discipline: string; storeys: { storey: string; zones: string[] }[] }[];
+  wbs: { zone: string; storeys: { storey: string; discs: string[] }[] }[];
   package_count: number; zones: string[]; scope: string; structure_type?: string | null;
 }
 export interface PlanState {

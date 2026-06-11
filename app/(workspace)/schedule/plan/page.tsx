@@ -396,10 +396,15 @@ export default function SchedulePlanWizard() {
           <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#334155" }}>
             P1 스코프 — WBS · 워크패키지 {scopeWbs.package_count} · 구역 {scopeWbs.zones.length}
           </summary>
-          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#475569" }}>
-            {scopeWbs.wbs.map((d) => (
-              <div key={d.discipline}>
-                <b style={{ color: "#1e293b" }}>{d.discipline}</b> — {d.storeys.map((s) => `${s.storey}(${s.zones.length})`).join(" · ")}
+          <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 6, fontSize: 12, color: "#475569" }}>
+            {scopeWbs.wbs.map((z) => (
+              <div key={z.zone} style={{ border: "1px solid #f1f5f9", borderRadius: 8, padding: "6px 10px" }}>
+                <b style={{ color: "#1e293b" }}>{z.zone}</b>
+                <span style={{ color: "#94a3b8" }}> · {z.storeys.length}개 층</span>
+                <div style={{ marginTop: 2, color: "#64748b" }}>
+                  {z.storeys[0]?.storey} ~ {z.storeys[z.storeys.length - 1]?.storey}
+                  {" — "}{[...new Set(z.storeys.flatMap((s) => s.discs))].join(" · ")}
+                </div>
               </div>
             ))}
           </div>
