@@ -369,6 +369,7 @@ export interface GenerateScheduleRequest {
   tower_cranes: number;        // 타워크레인 수 — 동시 양중 한계(스태거)
   work_crews: number;          // 작업조 수 — 동시 동일공종 한계
   constraints?: string;
+  strategy?: string;   // bottom_up(순타)|top_down(역타) — BIM에 없는 발주·부지 조건(사람 선택)
 }
 export interface GenTask {
   code: string; name: string; start: string; end: string;

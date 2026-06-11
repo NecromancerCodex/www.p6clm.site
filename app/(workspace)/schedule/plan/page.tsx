@@ -73,6 +73,7 @@ export default function SchedulePlanWizard() {
   const [towerCranes, setTowerCranes] = useState(2);
   const [workCrews, setWorkCrews] = useState(3);
   const [constraints, setConstraints] = useState("");
+  const [strategy, setStrategy] = useState("bottom_up");
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
   const [storeys, setStoreys] = useState<string[]>([]);
@@ -191,6 +192,7 @@ export default function SchedulePlanWizard() {
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
         constraints: constraints.trim() || undefined,
+        strategy,
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
@@ -327,15 +329,22 @@ export default function SchedulePlanWizard() {
               <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="예: 모듈러 공동주택" />
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
             </Field>
-            <Field label="② 구조유형 — 공법 선택">
-              <select className="wz-in" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
-                <option value="">자동 판정 (BIM 업로드 시)</option>
-                <option value="RC">RC (철근콘크리트)</option>
-                <option value="철골">철골</option>
-                <option value="SRC">SRC</option>
-                <option value="PC·모듈러">PC·모듈러</option>
-                <option value="혼합">혼합 (RC코어 + 철골)</option>
-              </select>
+            <Field label="② 구조유형 / 시공 전략 — BIM에 없는 정보는 직접 선택">
+              <div style={{ display: "flex", gap: 8 }}>
+                <select className="wz-in" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
+                  <option value="">구조: 자동 판정</option>
+                  <option value="RC">RC (철근콘크리트)</option>
+                  <option value="철골">철골</option>
+                  <option value="SRC">SRC</option>
+                  <option value="PC·모듈러">PC·모듈러</option>
+                  <option value="혼합">혼합 (RC코어 + 철골)</option>
+                </select>
+                <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
+                        title="굴착·골조 전략 — 발주·부지 조건으로 결정되는 정보(AI 추정 불가)">
+                  <option value="bottom_up">순타 (지하 → 지상)</option>
+                  <option value="top_down">역타 (지하·지상 병행)</option>
+                </select>
+              </div>
             </Field>
             <Field label="③ 언제 — 착공일 * / 목표공기">
               <div style={{ display: "flex", gap: 8 }}>
@@ -355,8 +364,16 @@ export default function SchedulePlanWizard() {
                   <input type="number" min={1} className="wz-in" value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
               </div>
             </Field>
-            <Field label="⑤ 제약 — 자유서술 (선택)">
-              <input className="wz-in" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한, 역타공법 적용 등 특수 공법 지정도 가능" />
+            <Field label="⑤ 현장 조건·제약 — BIM에 없는 정보를 알려주세요 (AI가 공정에 반영)">
+              <input className="wz-in" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한, 암반 굴착, 도심 반입 제한" />
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
+                {["야간작업 불가", "동절기 타설 제한", "암반 굴착(발파)", "연약지반", "도심 자재반입 제한", "인접 민원 주의", "우기 집중 지역"].map((c) => (
+                  <button key={c} type="button" className="wz-chip"
+                          onClick={() => setConstraints((p) => (p.includes(c) ? p : (p ? p + ", " : "") + c))}>
+                    + {c}
+                  </button>
+                ))}
+              </div>
             </Field>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end", gap: 10 }}>
               {workUnits.length > 0 && (
@@ -580,6 +597,9 @@ export default function SchedulePlanWizard() {
         .wz-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; background: #fff; }
         .wz-in { width: 100%; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; box-sizing: border-box; background: #fff; }
         .wz-sub { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #64748b; flex: 1; }
+        .wz-chip { padding: 3px 10px; border: 1px solid #cbd5e1; border-radius: 13px; font-size: 11.5px;
+                   background: #fff; color: #475569; cursor: pointer; }
+        .wz-chip:hover { border-color: #2563eb; color: #2563eb; }
         .wz-bim { display: inline-block; padding: 9px 14px; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 12.5px;
                   cursor: pointer; color: #475569; background: #f8fafc; }
         .wz-bim:hover { border-color: #2563eb; color: #2563eb; }
