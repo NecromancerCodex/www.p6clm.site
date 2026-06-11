@@ -513,6 +513,34 @@ export default function SchedulePlanWizard() {
               </p>
             </div>
           )}
+          {(() => {
+            const tgt = (plan?.payload.schedule as Record<string, unknown> | undefined)?.target as
+              | { target_days: number; achieved_days?: number; met?: boolean;
+                  suggestion?: { crane: number; crew: number; days: number } | null } | undefined;
+            if (!tgt || stage === "done") return null;
+            const m = (d?: number) => (d ? `${Math.round(d / 30.4)}개월` : "-");
+            return tgt.met ? (
+              <div style={{ border: "1px solid #bbf7d0", background: "#f0fdf4", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#15803d", marginBottom: 10 }}>
+                ✅ 목표공기 달성 — 목표 {m(tgt.target_days)} / 산출 {m(tgt.achieved_days)}
+              </div>
+            ) : (
+              <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#92400e", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ flex: 1 }}>
+                  ⚠ 목표공기 초과 — 목표 <b>{m(tgt.target_days)}</b> vs 산출 <b>{m(tgt.achieved_days)}</b>.
+                  {tgt.suggestion
+                    ? <> 크레인 <b>{tgt.suggestion.crane}대</b>·작업조 <b>{tgt.suggestion.crew}조</b>면 <b>{m(tgt.suggestion.days)}</b> 달성 가능.</>
+                    : <> 자원 증설로는 불가 — 선후행·기간이 지배(공법·플래닝 재검토 필요).</>}
+                </span>
+                {tgt.suggestion && (
+                  <button className="wz-btn" disabled={busy} onClick={() => {
+                    setBusy(true);
+                    void confirmPlan(planId!, { crane: tgt.suggestion!.crane, crew: tgt.suggestion!.crew })
+                      .then(() => refresh(planId!)).finally(() => setBusy(false));
+                  }}>이 자원으로 재스케줄</button>
+                )}
+              </div>
+            );
+          })()}
           {ganttReady && ganttTasks.length > 0 ? (
             <GanttChart tasks={ganttTasks} height={520} viewMode="Week" fillWidth />
           ) : (

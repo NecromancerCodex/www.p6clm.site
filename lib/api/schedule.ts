@@ -505,9 +505,9 @@ export async function savePlanActivities(planId: string, activities: PlanActivit
   await planFetch(`/${planId}/activities`, { method: "PUT", body: JSON.stringify({ activities, note }) });
 }
 
-/** 현 단계 컨펌 → 다음 단계 */
-export async function confirmPlan(planId: string): Promise<{ stage: PlanStage }> {
-  return planFetch(`/${planId}/confirm`, { method: "POST" });
+/** 현 단계 컨펌 → 다음 단계. crane/crew 주면 그 자원으로 재스케줄(목표공기 역산 제안 적용) */
+export async function confirmPlan(planId: string, res?: { crane?: number; crew?: number }): Promise<{ stage: PlanStage }> {
+  return planFetch(`/${planId}/confirm`, { method: "POST", body: JSON.stringify(res ?? {}) });
 }
 
 /** P6 XML 다운로드 URL */
