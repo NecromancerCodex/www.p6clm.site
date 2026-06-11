@@ -395,6 +395,13 @@ export default function SchedulePlanWizard() {
             <div>
               <span className="wz-gate-badge">⏸ 플래닝 완료</span>
               <b style={{ fontSize: 14 }}> 액티비티 {acts.length}개 — 검토 후 스케줄링으로</b>
+              {plan?.payload.strategy && (
+                <span style={{ marginLeft: 8, fontSize: 11.5, padding: "3px 10px", borderRadius: 12,
+                               background: plan.payload.strategy === "top_down" ? "#fce7f3" : "#e0f2fe",
+                               color: plan.payload.strategy === "top_down" ? "#be185d" : "#0369a1", fontWeight: 700 }}>
+                  {plan.payload.strategy === "top_down" ? "역타 (지하·지상 병행)" : "순타 (지하 → 지상)"}
+                </span>
+              )}
               {dirty && <em style={{ fontSize: 12, color: "#d97706", marginLeft: 8 }}>수정됨 · 미저장</em>}
               <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
                 WBS → 액티비티 정의 → 리스트 → 릴레이션 → 듀레이션까지 완료됐습니다.

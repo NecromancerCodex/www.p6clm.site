@@ -472,6 +472,7 @@ export interface PlanState {
     activities_user?: PlanActivity[];
     notes?: string | null;
     schedule?: { tasks?: GanttTask[] & Record<string, unknown>[] } & Record<string, unknown>;
+    strategy?: string;   // bottom_up(순타)|top_down(역타) — SGS 지하밴드 토글
     rationale?: { define?: string; relation?: string; duration?: string };
     stats?: { relation?: { llm?: number; backstop?: number }; duration?: { applied?: number; total?: number } };
     error?: string;
