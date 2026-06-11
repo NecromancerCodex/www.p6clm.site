@@ -154,8 +154,10 @@ const RECENCY_DAYS = 75; // 완료 후 이 기간 동안 밝게 빛나다 진초
 const G_PLANNED = [0.20, 0.26, 0.40]; // 미착수 — 어두운 청회색(배경으로 가라앉음)
 const G_ACT_START = [0.99, 0.86, 0.30]; // 진행 시작 — 밝은 노랑
 const G_ACT_END = [0.96, 0.41, 0.09]; // 진행 임박(타설·양생) — 진한 주황(뜨거운 작업)
-const G_DONE_FRESH = [0.36, 0.93, 0.56]; // 갓 완료 — 밝은 라임(시공 전선)
-const G_DONE_SETTLED = [0.06, 0.44, 0.31]; // 정착 완료 — 진초록(시간 지나 가라앉음)
+// 완료는 항상 '또렷한 초록' — 갓 완료만 살짝 밝게(시공 전선 힌트), 정착은 진초록.
+// (이전 밝은 라임은 100% 시점 마지막 완료층이 '연하게/미완성처럼' 보이는 문제 → 대비 축소)
+const G_DONE_FRESH = [0.16, 0.74, 0.44]; // 갓 완료 — 선명한 초록(살짝 밝음)
+const G_DONE_SETTLED = [0.07, 0.48, 0.32]; // 정착 완료 — 진초록
 
 const _lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const _lerp3 = (c1: number[], c2: number[], t: number): number[] =>
