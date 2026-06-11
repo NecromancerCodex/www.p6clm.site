@@ -57,6 +57,53 @@ export const BOREHOLES: Borehole[] = [
   { id: "NH-11", x: 285816.9, y: 212024.125, el: 2.94, depth: 40.0, gwl: 11.25, t: L0({ fill: 7.0, clay: 15.5, sand: 1.0, srock: 3.5, mrock: 6.0, hrock: 6.5 }) },
 ];
 
+// ── 대표 지형 프리셋 ── 실 시추 없이 지형 형태를 바로 3D로 확인하는 데모/템플릿.
+export type TerrainKind = "flat" | "slope" | "hill" | "valley";
+
+export const TERRAIN_PRESETS: { kind: TerrainKind; label: string; desc: string }[] = [
+  { kind: "flat", label: "평지", desc: "지표고 일정" },
+  { kind: "slope", label: "경사지", desc: "한쪽으로 기울어진 지형" },
+  { kind: "hill", label: "구릉", desc: "가운데가 솟은 언덕" },
+  { kind: "valley", label: "계곡", desc: "가운데가 패인 골짜기" },
+];
+
+// 모든 프리셋 공통 지층 두께(합 42m) — 지표고만 형태별로 달라짐.
+const PRESET_PROFILE = { fill: 3, clay: 5, sand: 4, gravel: 2, wsoil: 3, wrock: 4, srock: 6, mrock: 7, hrock: 8 };
+
+/** 5×5 격자(120×120m)에 형태별 지표고를 부여한 가상 시추공 셋. */
+export function makeTerrainPreset(kind: TerrainKind): Borehole[] {
+  const N = 5;
+  const span = 120;
+  const step = span / (N - 1); // 30m 간격
+  const base = 50; // 기준 지표고 EL
+  const out: Borehole[] = [];
+  let i = 0;
+  for (let iy = 0; iy < N; iy++) {
+    for (let ix = 0; ix < N; ix++) {
+      const x = ix * step;
+      const y = iy * step;
+      const u = ix / (N - 1); // 0..1
+      const v = iy / (N - 1);
+      const dx = u - 0.5;
+      const dy = v - 0.5;
+      let el = base;
+      if (kind === "slope") el = base - 14 + u * 28; // 36 → 64 (한 방향 경사)
+      else if (kind === "hill") el = base + 24 * Math.exp(-(dx * dx + dy * dy) / 0.06); // 중앙 봉우리
+      else if (kind === "valley") el = base + 4 - 24 * Math.exp(-(dx * dx + dy * dy) / 0.06); // 중앙 골
+      out.push({
+        id: `T-${String(++i).padStart(2, "0")}`,
+        x,
+        y,
+        el: Math.round(el * 100) / 100,
+        depth: 42,
+        gwl: 8,
+        t: L0({ ...PRESET_PROFILE }),
+      });
+    }
+  }
+  return out;
+}
+
 /** 시추공의 층 경계 표고 (위→아래). 길이 = LAYERS.length+1. [0]=지표, [L]=최하단. */
 export function interfaceElevations(b: Borehole): number[] {
   const out = [b.el];

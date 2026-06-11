@@ -12,7 +12,7 @@ import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
 import { EarthworkSection } from "../../../components/earthwork/EarthworkSection";
 import { BoreholeTable } from "../../../components/earthwork/BoreholeTable";
 import {
-  BOREHOLES, LAYERS, buildGridModel, layerVolumes, parseBoreholeCsv, prepare,
+  BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, layerVolumes, makeTerrainPreset, parseBoreholeCsv, prepare,
   type Borehole,
 } from "../../../lib/earthwork/model";
 import { loadBoreholes, saveBoreholes } from "../../../lib/api/earthwork";
@@ -116,6 +116,28 @@ export default function EarthworkPage() {
         <span style={{ fontSize: 11, color: "#94a3b8" }}>
           헤더: borehole,X,Y,surface_EL,drill_depth,gwl_GL,fill,clay,sand,gravel,wsoil,wrock,srock,mrock,hrock
         </span>
+      </div>
+
+      {/* 대표 지형 프리셋 (로컬 미리보기 — DB 저장 안 함) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 0 14px" }}>
+        <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>지형 프리셋:</span>
+        {TERRAIN_PRESETS.map((p) => (
+          <button
+            key={p.kind}
+            type="button"
+            title={p.desc}
+            onClick={() => {
+              const bh = makeTerrainPreset(p.kind);
+              setBoreholes(bh);
+              setSec(farthestPair(bh));
+              setSource(`프리셋: ${p.label} (가상 ${bh.length}공)`);
+            }}
+            style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#f8fafc", color: "#334155", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+          >
+            {p.label}
+          </button>
+        ))}
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>형태 미리보기용 가상 지반 (저장하려면 CSV 업로드)</span>
       </div>
 
       {/* 3D 뷰어 */}
