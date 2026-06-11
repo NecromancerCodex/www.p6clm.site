@@ -167,12 +167,16 @@ const _lerp3 = (c1: number[], c2: number[], t: number): number[] =>
  *  완료: 밝은 라임→진초록(완료 후 경과로 페이드 — 최근 작업 전선이 도드라짐)
  */
 function gradientColor(dateMs: number, range: { start: number; end: number }): number[] {
+  // statusAt 과 경계 일치: dateMs >= end → 완료. (이전 p<=1 이 끝나는 날을 '진행중'으로 칠해
+  // 100% 시점 옥상이 주황으로 남던 버그)
+  if (dateMs < range.start) return G_PLANNED;
+  if (dateMs >= range.end) {
+    const recency = Math.min(1, (dateMs - range.end) / (RECENCY_DAYS * DAY_MS));
+    return _lerp3(G_DONE_FRESH, G_DONE_SETTLED, recency);
+  }
   const span = range.end - range.start;
-  const p = span > 0 ? (dateMs - range.start) / span : dateMs >= range.start ? 1 : -1;
-  if (p < 0) return G_PLANNED;
-  if (p <= 1) return _lerp3(G_ACT_START, G_ACT_END, p);
-  const recency = Math.min(1, (dateMs - range.end) / (RECENCY_DAYS * DAY_MS));
-  return _lerp3(G_DONE_FRESH, G_DONE_SETTLED, recency);
+  const p = span > 0 ? (dateMs - range.start) / span : 0;
+  return _lerp3(G_ACT_START, G_ACT_END, p);
 }
 
 // AI 추정(policy) 보라 계열도 진행률로 부드럽게.
@@ -180,11 +184,11 @@ const GE_PLANNED = [0.80, 0.74, 0.93];
 const GE_ACTIVE = [0.66, 0.42, 0.95];
 const GE_DONE = [0.42, 0.20, 0.72];
 function gradientEstColor(dateMs: number, range: { start: number; end: number }): number[] {
+  if (dateMs < range.start) return GE_PLANNED;
+  if (dateMs >= range.end) return GE_DONE;
   const span = range.end - range.start;
-  const p = span > 0 ? (dateMs - range.start) / span : dateMs >= range.start ? 1 : -1;
-  if (p < 0) return GE_PLANNED;
-  if (p <= 1) return _lerp3(GE_ACTIVE, GE_DONE, p);
-  return GE_DONE;
+  const p = span > 0 ? (dateMs - range.start) / span : 0;
+  return _lerp3(GE_ACTIVE, GE_DONE, p);
 }
 
 /** 실사 모드 — 부재 종류별 재질색 (콘크리트·유리·목재 등). */
