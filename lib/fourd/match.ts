@@ -222,9 +222,21 @@ export interface CodeIndex {
   byKey: Map<string, DateRange>; // 거친 키: ST|zone|storey|wt, MO|zone|storey|MD (집계)
   byUnit: Map<string, DateRange>; // 유닛 키: MO|zone|storey|mtype|unit (세분 — pmisx 식 모듈단위)
   byPhase: Map<string, DateRange>; // 단계 키: ST|zone|storey|wt|phase (단계별 — 콘크리트 등)
+  byZoneCat: Map<string, DateRange>; // 구역+카테고리: zone|storey|CORE|MOD|FOOT (trade/wt 코드 불일치 흡수)
   minDate: number;
   maxDate: number;
 }
+
+// 스케줄 op(CR/MD/FT/PR) → 부재 카테고리. BIM 부재(classifyIfcType)와 같은 축으로 통일해
+// trade(ST/MO)·wt(WAL/SLB/COL) 코드 차이를 무시하고 구역 단위 매칭을 살린다.
+function opToCat(op: string): Category {
+  const o = (op || "").toUpperCase();
+  if (o === "FT" || o.startsWith("FOO") || o.startsWith("PILE")) return "FOOT";
+  if (o === "CR" || o.startsWith("COR") || o.startsWith("WAL") || o.startsWith("COL")) return "CORE";
+  return "MOD"; // MD/PR/SLB/BEA 등 수평·모듈
+}
+const zoneCatKey = (zone: string, storey: string, cat: Category) =>
+  `${zone}|${canonStorey(storey) || storey}|${cat}`;
 
 // storey 는 canonStorey 로 정규화해 키 생성 — 스케줄("8F")/BIM("Level 8") 표기 차이 흡수.
 const codeKey = (trade: string, zone: string, storey: string, wt: string) =>
@@ -252,6 +264,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   const byKey = new Map<string, DateRange>();
   const byUnit = new Map<string, DateRange>();
   const byPhase = new Map<string, DateRange>();
+  const byZoneCat = new Map<string, DateRange>();
   let minD = Infinity;
   let maxD = -Infinity;
   for (const t of tasks) {
@@ -265,16 +278,19 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     if (d.trade === "MO") {
       mergeRange(byKey, codeKey("MO", d.zone, d.storey, "MD"), s, e);
       if (d.unit) mergeRange(byUnit, unitKey(d.zone, d.storey, d.unit), s, e);
+      mergeRange(byZoneCat, zoneCatKey(d.zone, d.storey, "MOD"), s, e);
     } else {
       const wt = d.worktype ?? "";
       mergeRange(byKey, codeKey("ST", d.zone, d.storey, wt), s, e);
       if (d.phase) mergeRange(byPhase, phaseKey(d.zone, d.storey, wt, d.phase), s, e);
+      mergeRange(byZoneCat, zoneCatKey(d.zone, d.storey, opToCat(wt)), s, e);
     }
   }
   return {
     byKey,
     byUnit,
     byPhase,
+    byZoneCat,
     minDate: minD === Infinity ? Date.now() : minD,
     maxDate: maxD === -Infinity ? Date.now() : maxD,
   };
@@ -366,7 +382,14 @@ export function matchAllHybrid(
   let matched = 0;
   for (const el of elements) {
     let r = matchByCode(el, codeIdx);
-    // 코드매칭 실패(PSet 없음 OR zone 불일치 등) → 층 단위 폴백(zone 무시). 구역 세분도 차이도 흡수.
+    // 1차 폴백 — 구역+카테고리(trade/wt 코드 불일치 흡수, 구역은 유지). 슬래브 trade=ST↔스케줄 MO,
+    // 벽 wt=WAL↔스케줄 CR 처럼 코드가 어긋나도 구역·층·부재종류로 제 구역에 정확 매칭(구역 미상 방지).
+    if (!r.range && el.zone && el.storey4d) {
+      const zck = zoneCatKey(el.zone, el.storey4d, classifyIfcType(el.ifcType, el.name));
+      const rz = codeIdx.byZoneCat.get(zck);
+      if (rz) r = { range: rz, via: zck };
+    }
+    // 2차 폴백 — 층 단위(zone 무시). 구역도 없을 때만.
     if (!r.range) {
       const fb = matchElement(el, storeyIdx);
       if (fb.range) r = fb;
