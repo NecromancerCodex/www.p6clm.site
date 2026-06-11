@@ -356,7 +356,7 @@ export default function SchedulePlanWizard() {
               </div>
             </Field>
             <Field label="⑤ 제약 — 자유서술 (선택)">
-              <input className="wz-in" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한, 인접 민원" />
+              <input className="wz-in" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한, 역타공법 적용 등 특수 공법 지정도 가능" />
             </Field>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end", gap: 10 }}>
               {workUnits.length > 0 && (
