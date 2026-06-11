@@ -446,8 +446,10 @@ export async function inferScheduleContext(req: {
 // ═══ PM 4단계 단계별 계획 (휴먼인더루프) — /schedule/plan/* ═══════════════════
 
 export type PlanStage =
-  | "running_p2" | "activities_ready" | "running_p34" | "logic_ready"
-  | "running_s1" | "scheduled" | "done" | "error";
+  | "running_p2"      // 플래닝 그래프 실행 중 (WBS~듀레이션, [n/5] progress)
+  | "logic_ready"     // 플래닝 완료 — 검토 게이트
+  | "scheduled"       // 베이스라인 생성 — 최종 검토
+  | "done" | "error";
 
 export interface PlanPredecessor { code: string; type?: string; lag_days?: number }
 export interface PlanActivity {
@@ -501,14 +503,6 @@ export async function getPlan(planId: string): Promise<PlanState> {
 /** [Gate A] 액티비티 수정본 저장 */
 export async function savePlanActivities(planId: string, activities: PlanActivity[], note?: string): Promise<void> {
   await planFetch(`/${planId}/activities`, { method: "PUT", body: JSON.stringify({ activities, note }) });
-}
-
-/** [Gate B] 관계·기간 수정본 저장 */
-export async function savePlanLogic(
-  planId: string,
-  edit: { relations?: Record<string, PlanPredecessor[]>; durations?: Record<string, number>; note?: string },
-): Promise<void> {
-  await planFetch(`/${planId}/logic`, { method: "PUT", body: JSON.stringify(edit) });
 }
 
 /** 현 단계 컨펌 → 다음 단계 */

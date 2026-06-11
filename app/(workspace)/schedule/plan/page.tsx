@@ -10,6 +10,7 @@
  * 원샷 데모는 /schedule/generate (PoC 보존). 디자인 언어는 generate 와 동일(styled-jsx·slate).
  */
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   confirmPlan, getPlan, inferScheduleContext, planP6XmlUrl, savePlanActivities, startPlan,
@@ -51,13 +52,14 @@ const subDone = (st: PlanStage | null, progress?: string | null): number => {
 
 /** 대단계: 0=입력, 1=플래닝(진행·검토), 2=스케줄링 */
 const bigStep = (st: PlanStage | null, hasPlan: boolean): number =>
-  !hasPlan ? 0
-  : st === "running_s1" || st === "scheduled" || st === "done" ? 2 : 1;
+  !hasPlan ? 0 : st === "scheduled" || st === "done" ? 2 : 1;
 
 const OP_KO: Record<string, string> = { FT: "기초", CR: "코어/골조", MD: "슬래브/모듈", PR: "마감" };
 const PH_KO: Record<string, string> = { RB: "철근", FM: "거푸집", CN: "콘크리트", IN: "설치" };
 
 export default function SchedulePlanWizard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   // ── 1단계: 입력 폼 ──
   const [buildingType, setBuildingType] = useState("");
   const [scope, setScope] = useState("");
@@ -86,9 +88,16 @@ export default function SchedulePlanWizard() {
   const [ganttReady, setGanttReady] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // 새로고침 복구 — URL ?plan= 의 계획을 이어서 폴링 (백그라운드 2~3분 작업 유실 방지)
+  useEffect(() => {
+    const q = searchParams.get("plan");
+    if (q && !planId) setPlanId(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stage: PlanStage | null = plan?.stage ?? null;
   const step = bigStep(stage, !!planId);
-  const running = stage === "running_p2" || stage === "running_p34" || stage === "running_s1";
+  const running = stage === "running_p2";   // 플래닝 그래프가 logic_ready 까지 한 번에 (p34/s1 상태 미사용)
   const subs = subDone(stage, plan?.progress);
 
 
@@ -178,6 +187,7 @@ export default function SchedulePlanWizard() {
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
+      router.replace(`?plan=${r.plan_id}`);   // 새로고침해도 이어서 (plan_id 영속)
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
@@ -259,8 +269,14 @@ export default function SchedulePlanWizard() {
       </div>
 
       {err && (
-        <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#b91c1c" }}>
-          {err}
+        <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#b91c1c", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <span>{err}</span>
+          {stage === "error" && (
+            <button className="wz-btn ghost" style={{ flexShrink: 0 }} onClick={() => {
+              setPlanId(null); setPlan(null); setActs([]); setErr(null); setDirty(false);
+              router.replace("?");
+            }}>새 계획 시작</button>
+          )}
         </div>
       )}
 
