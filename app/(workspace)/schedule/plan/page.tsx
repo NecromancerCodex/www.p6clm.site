@@ -54,6 +54,9 @@ const subDone = (st: PlanStage | null, progress?: string | null): number => {
 const bigStep = (st: PlanStage | null, hasPlan: boolean): number =>
   !hasPlan ? 0 : st === "scheduled" || st === "done" ? 2 : 1;
 
+// 진행 중 계획 체크포인트 — 페이지 이동/새로고침 후 돌아와도 이어서 (URL ?plan= 과 이중 안전망)
+const PLAN_CKPT = "clm.schedule.plan.active";
+
 const OP_KO: Record<string, string> = { FT: "기초", CR: "코어/골조", MD: "슬래브/모듈", PR: "마감" };
 const PH_KO: Record<string, string> = { RB: "철근", FM: "거푸집", CN: "콘크리트", IN: "설치" };
 
@@ -88,10 +91,13 @@ export default function SchedulePlanWizard() {
   const [ganttReady, setGanttReady] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 새로고침 복구 — URL ?plan= 의 계획을 이어서 폴링 (백그라운드 2~3분 작업 유실 방지)
+  // 복구 — URL ?plan= 우선, 없으면 localStorage 체크포인트 (페이지 이동/새로고침 후 이어서)
   useEffect(() => {
-    const q = searchParams.get("plan");
-    if (q && !planId) setPlanId(q);
+    const q = searchParams.get("plan") || (typeof window !== "undefined" ? localStorage.getItem(PLAN_CKPT) : null);
+    if (q && !planId) {
+      setPlanId(q);
+      router.replace(`?plan=${q}`);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -109,6 +115,7 @@ export default function SchedulePlanWizard() {
       const serverActs = p.payload.activities_user ?? p.payload.activities;
       if (serverActs && !dirty) setActs(serverActs);
       if (p.stage === "error") setErr(p.payload.error ?? p.progress ?? "오류");
+      if (p.stage === "done") localStorage.removeItem(PLAN_CKPT);   // 확정 완료 — 체크포인트 해제
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
@@ -188,6 +195,7 @@ export default function SchedulePlanWizard() {
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
       router.replace(`?plan=${r.plan_id}`);   // 새로고침해도 이어서 (plan_id 영속)
+      localStorage.setItem(PLAN_CKPT, r.plan_id);   // 페이지 이동 후 돌아와도 이어서
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   };
@@ -274,6 +282,7 @@ export default function SchedulePlanWizard() {
           {stage === "error" && (
             <button className="wz-btn ghost" style={{ flexShrink: 0 }} onClick={() => {
               setPlanId(null); setPlan(null); setActs([]); setErr(null); setDirty(false);
+              localStorage.removeItem(PLAN_CKPT);
               router.replace("?");
             }}>새 계획 시작</button>
           )}
@@ -481,6 +490,13 @@ export default function SchedulePlanWizard() {
               )}
               {planId && (
                 <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planP6XmlUrl(planId)}>P6 XML 다운로드</a>
+              )}
+              {stage === "done" && (
+                <button className="wz-btn" onClick={() => {
+                  setPlanId(null); setPlan(null); setActs([]); setErr(null); setDirty(false);
+                  localStorage.removeItem(PLAN_CKPT);
+                  router.replace("?");
+                }}>새 계획 시작</button>
               )}
             </div>
           </div>
