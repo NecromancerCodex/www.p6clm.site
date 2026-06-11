@@ -148,6 +148,45 @@ function colorFor(status: number): number[] {
   return C_GHOST;
 }
 
+// ── 시공 웨이브 그라데이션 (연속) — 3색 이산 대신 라이프사이클을 부드럽게 ──
+const DAY_MS = 86_400_000;
+const RECENCY_DAYS = 75; // 완료 후 이 기간 동안 밝게 빛나다 진초록으로 정착 (시공 전선 강조)
+const G_PLANNED = [0.20, 0.26, 0.40]; // 미착수 — 어두운 청회색(배경으로 가라앉음)
+const G_ACT_START = [0.99, 0.86, 0.30]; // 진행 시작 — 밝은 노랑
+const G_ACT_END = [0.96, 0.41, 0.09]; // 진행 임박(타설·양생) — 진한 주황(뜨거운 작업)
+const G_DONE_FRESH = [0.36, 0.93, 0.56]; // 갓 완료 — 밝은 라임(시공 전선)
+const G_DONE_SETTLED = [0.06, 0.44, 0.31]; // 정착 완료 — 진초록(시간 지나 가라앉음)
+
+const _lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const _lerp3 = (c1: number[], c2: number[], t: number): number[] =>
+  [_lerp(c1[0], c2[0], t), _lerp(c1[1], c2[1], t), _lerp(c1[2], c2[2], t)];
+
+/**
+ * 라이프사이클 그라데이션 색.
+ *  미착수: 어두운 청회색  ·  진행: 노랑→주황(진행률 0→100%, 무르익을수록 뜨겁게)
+ *  완료: 밝은 라임→진초록(완료 후 경과로 페이드 — 최근 작업 전선이 도드라짐)
+ */
+function gradientColor(dateMs: number, range: { start: number; end: number }): number[] {
+  const span = range.end - range.start;
+  const p = span > 0 ? (dateMs - range.start) / span : dateMs >= range.start ? 1 : -1;
+  if (p < 0) return G_PLANNED;
+  if (p <= 1) return _lerp3(G_ACT_START, G_ACT_END, p);
+  const recency = Math.min(1, (dateMs - range.end) / (RECENCY_DAYS * DAY_MS));
+  return _lerp3(G_DONE_FRESH, G_DONE_SETTLED, recency);
+}
+
+// AI 추정(policy) 보라 계열도 진행률로 부드럽게.
+const GE_PLANNED = [0.80, 0.74, 0.93];
+const GE_ACTIVE = [0.66, 0.42, 0.95];
+const GE_DONE = [0.42, 0.20, 0.72];
+function gradientEstColor(dateMs: number, range: { start: number; end: number }): number[] {
+  const span = range.end - range.start;
+  const p = span > 0 ? (dateMs - range.start) / span : dateMs >= range.start ? 1 : -1;
+  if (p < 0) return GE_PLANNED;
+  if (p <= 1) return _lerp3(GE_ACTIVE, GE_DONE, p);
+  return GE_DONE;
+}
+
 /** 실사 모드 — 부재 종류별 재질색 (콘크리트·유리·목재 등). */
 function materialColor(ifcType: string): number[] {
   if (ifcType === "IfcFooting") return [0.40, 0.40, 0.38]; // 기초 — 진한 콘크리트
@@ -181,19 +220,23 @@ function elemColor(el: ParsedElement, status: number, realistic: boolean): { c: 
   return { c: colorFor(status), a: 1 };
 }
 
-/** 요소 표시 색 — AI 추정(policy 매칭) 완료/진행은 보라(확정과 구분), 그 외는 elemColor. */
+/** 요소 표시 색 — 상태 모드는 연속 그라데이션(시공 웨이브). 실사/추정은 각 규칙. */
 function colorForElement(
   el: ParsedElement,
   via: string | undefined,
-  status: number,
+  dateMs: number,
+  range: { start: number; end: number } | null,
   realistic: boolean,
 ): { c: number[]; a: number } {
-  const isEst = (via ?? "").startsWith("policy|");
-  // 추정 매칭(미매칭 아님)은 상태 무관 보라 계열 — "AI=보라" 일관. 명도로 완료>진행>미착수.
-  if (isEst && !realistic && status !== -1) {
-    return { c: status === 2 ? C_EST_DONE : status === 1 ? C_EST_ACTIVE : C_EST_PLANNED, a: 1 };
+  if (!range) return realistic ? { c: C_CONTEXT, a: 1 } : { c: C_GHOST, a: 1 }; // 미매칭
+  if (realistic) {
+    const status = statusAt(dateMs, range);
+    return elemColor(el, status, realistic);
   }
-  return elemColor(el, status, realistic);
+  const isEst = (via ?? "").startsWith("policy|");
+  // 추정(AI 정책매칭)은 보라 그라데이션 — 확정(노랑→초록 웨이브)과 색상으로 분리.
+  if (isEst) return { c: gradientEstColor(dateMs, range), a: 1 };
+  return { c: gradientColor(dateMs, range), a: 1 }; // 확정 — 시공 웨이브
 }
 
 /** 요소 정점 범위에 RGBA 채우기. */
@@ -739,7 +782,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         const isHi = hk != null && (hmode === "object" ? el.globalId === hk : mr?.via === hk);
         if (isHi) paintElement(arr, el, C_HILITE, 1);
         else {
-          const { c, a } = colorForElement(el, mr?.via, st, realistic);
+          const { c, a } = colorForElement(el, mr?.via, dateMs, mr?.range ?? null, realistic);
           paintElement(arr, el, c, a);
         }
       }
@@ -782,7 +825,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         if (!matches(el, prevKey, prevMode)) continue;
         const mr2 = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr2?.range ?? null);
-        const { c, a } = colorForElement(el, mr2?.via, st, realistic);
+        const { c, a } = colorForElement(el, mr2?.via, dateMs, mr2?.range ?? null, realistic);
         paintElement(arr, el, c, a);
       }
     }
