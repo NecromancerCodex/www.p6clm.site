@@ -203,6 +203,7 @@ export default function FourDPage() {
     setBusy(true);
     setError(null);
     setReady(null);
+    setPromoted(false);
     try {
       // 1) 공정표 → tasks
       //    .xer 는 브라우저에서 직접 파싱(백엔드가 4D 코드/target 날짜를 안 돌려줌).
@@ -322,6 +323,7 @@ export default function FourDPage() {
   // ── 정책기반 AI 매칭 — 규칙 미매칭 그룹을 gpt-5-mini 로 후보활동에 연결 ──
   const [policyBusy, setPolicyBusy] = useState(false);
   const [policyProg, setPolicyProg] = useState("");
+  const [promoted, setPromoted] = useState(false);   // 정책(AI) 제안을 공정표에 편입(확정)했는가
   const runPolicy = useCallback(async () => {
     if (!ready || !ready.codeIndex) return;
     setPolicyBusy(true);
@@ -415,6 +417,7 @@ export default function FourDPage() {
         policyCount: applied,
         policyResolved: resolved,
       });
+      setPromoted(false);   // 새 제안 — 사람 컨펌(편입) 대기 상태
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -792,9 +795,34 @@ export default function FourDPage() {
                 {policyBusy ? `AI 분석 중… ${policyProg}` : "🤖 정책기반 AI 매칭 (미매칭 채우기)"}
               </button>
               {ready.policyCount > 0 && (
-                <span style={{ color: "#7c3aed" }}>
-                  +{ready.policyCount.toLocaleString()}개 정책 매칭 (해당 없는 건 회색 유지)
+                <span style={{ color: promoted ? "#16a34a" : "#7c3aed" }}>
+                  +{ready.policyCount.toLocaleString()}개 {promoted ? "공정표 편입(확정)" : "정책 매칭(추정) — 검토 후 편입"}
                 </span>
+              )}
+              {ready.policyCount > 0 && !promoted && (
+                <button
+                  onClick={() => {
+                    // 사람 컨펌 — 정책(AI) 추정을 공정표에 편입(확정): via 의 'policy|' 접두 제거 → 초록 승격.
+                    // 부재가 해당 워크유닛 셀에 흡수(기존 날짜 공유) — 새 활동/날짜 없음 → CP·흩어짐 무영향.
+                    const newRanges = new Map(ready.ranges);
+                    let n = 0;
+                    for (const [gid, mr] of newRanges) {
+                      if (mr.via?.startsWith("policy|")) {
+                        newRanges.set(gid, { range: mr.range, via: mr.via.slice(7) });
+                        n++;
+                      }
+                    }
+                    setReady({ ...ready, ranges: newRanges });
+                    setPromoted(true);
+                  }}
+                  style={{
+                    padding: "8px 14px", borderRadius: 8, border: "1px solid #16a34a",
+                    background: "#16a34a", color: "#fff", fontWeight: 600, cursor: "pointer",
+                  }}
+                  title="AI가 추정한 워크유닛 배정을 검토 후 공정표에 정식 편입 — 보라(추정) → 초록(확정)"
+                >
+                  ✅ 공정표에 편입 (확정 {ready.policyCount.toLocaleString()}개)
+                </button>
               )}
               <button
                 onClick={buildReport}
