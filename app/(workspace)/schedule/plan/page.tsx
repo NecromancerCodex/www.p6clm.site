@@ -146,8 +146,10 @@ export default function SchedulePlanWizard() {
       const zoneSet = new Set<string>(); const storeySet = new Set<string>();
       const typeCount = new Map<string, number>();
       const typeNames = new Map<string, Set<string>>();  // 구조 판정 신호 — type별 대표 부재명
+      const tradeCount = new Map<string, number>();       // 공정 PSet Lv.2 Trade(ST/MO) — 구조유형의 진실
       for (const el of parsed.elements) {
         typeCount.set(el.ifcType, (typeCount.get(el.ifcType) ?? 0) + 1);
+        if (el.trade) tradeCount.set(el.trade, (tradeCount.get(el.trade) ?? 0) + 1);
         if (el.name) {
           const ns = typeNames.get(el.ifcType) ?? new Set<string>();
           if (ns.size < 3) { ns.add(el.name.slice(0, 30)); typeNames.set(el.ifcType, ns); }
@@ -170,6 +172,7 @@ export default function SchedulePlanWizard() {
       void inferScheduleContext({
         storeys: [...storeySet], zones: [...zoneSet],
         element_summary: [...typeCount.entries()].sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count, names: [...(typeNames.get(type) ?? [])] })),
+        trade_summary: [...tradeCount.entries()].map(([trade, count]) => ({ trade, count })),
         total_count: parsed.elements.length,
       }).then((ctx) => {
         if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);

@@ -436,6 +436,7 @@ export interface InferContextResult { building_type: string; scope: string; stru
 export async function inferScheduleContext(req: {
   storeys: string[]; zones: string[];
   element_summary: { type: string; count: number; names?: string[] }[]; total_count: number;
+  trade_summary?: { trade: string; count: number }[];   // 공정 PSet Trade(ST/MO) — 구조유형 결정론 신호
 }): Promise<InferContextResult> {
   const res = await fetch(`${API_BASE}/schedule/infer-context`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),
