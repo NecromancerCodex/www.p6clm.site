@@ -24,6 +24,7 @@ import {
   buildScheduleIndex,
   classifyIfcType,
   decodeActId,
+  expandModularUnits,
   matchAll,
   matchAllHybrid,
   normStorey,
@@ -258,6 +259,9 @@ export default function FourDPage() {
       // 공정PSet 있으면 hybrid(zone정확). 없어도 공정표에 4D 코드(codeCount>0, 생성 공정표 등)가
       // 있으면 codeIndex 를 만들어 둔다 — AI 매칭·보고서·워크패키지 버튼/기능 활성화용.
       let codeIndex: CodeIndex | null = useCode || codeCount > 0 ? buildCodeIndex(tasks) : null;
+      // PC·모듈러 호 단위 4D 순차 전개 (Stage 2) — 셀 윈도우 안에서 모듈을 호별로 분배.
+      // 타워는 el.unit(호 PSet) 없어 무동작. 매칭 전에 codeIndex.byUnit 을 채운다.
+      if (codeIndex) expandModularUnits(parsed.elements, codeIndex);
       if (useCode && codeIndex) {
         // 규칙은 "확정 매칭"만 — 실제 활동에 연결되는 것(유닛/단계/구역/층).
         // 활동이 없는 하드케이스(ZA/ZC 유닛불일치·PT구조·주차장)는 미매칭으로 두고

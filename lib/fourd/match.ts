@@ -296,6 +296,46 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   };
 }
 
+/**
+ * PC·모듈러 호(unit) 단위 4D 순차 전개 (Stage 2, Option A — 타워 무손상).
+ *
+ * 스케줄은 셀(존×층) 단위 그대로(검증된 32셀 불변). 4D 뷰어만, 한 MD 셀 윈도우[start,end] 안에서
+ * 그 셀의 모듈(호)들을 호 번호 순으로 균등 분배해 byUnit 을 채운다 → 모듈이 하나씩 거치되는 시각.
+ *
+ * 격리(3중): ① 백엔드 is_modular(req) ② trade==="MO" ③ **el.unit 존재**.
+ *   타워 BIM 엔 Lv.6 Unit(호) PSet 자체가 없어 el.unit 이 undefined → 이 함수가 byUnit 을
+ *   단 한 건도 만들지 않는다(cellUnits 가 빔). ST 경로·matchByCode·스케줄 모두 불변.
+ *
+ * idx 를 제자리 변형(byUnit 채움). buildCodeIndex 직후·matchAll* 전에 1회 호출.
+ */
+export function expandModularUnits(elements: ProcElement[], idx: CodeIndex): void {
+  // ① 셀별 호 집합 — MO + 호 부재만(타워는 el.unit 없어 진입 불가). 매칭될 MD 셀 활동이 있을 때만.
+  const cellUnits = new Map<string, Set<string>>(); // codeKey(MO,zone,storey,MD) → {padded unit}
+  for (const el of elements) {
+    if (el.trade !== "MO" || !el.unit || !el.zone || !el.storey4d) continue;
+    const ck = codeKey("MO", el.zone, el.storey4d, "MD");
+    if (!idx.byKey.has(ck)) continue; // 셀 활동 없으면 분배 대상 아님
+    let set = cellUnits.get(ck);
+    if (!set) cellUnits.set(ck, (set = new Set()));
+    set.add(el.unit.padStart(2, "0"));
+  }
+  // ② 셀 윈도우를 호 순서대로 균등 분배 → byUnit (matchByCode 의 el.unit 분기가 소비)
+  for (const [ck, units] of cellUnits) {
+    if (units.size <= 1) continue; // 호 1개면 셀 그대로(분배 의미 없음)
+    const cell = idx.byKey.get(ck)!;
+    const [, zone, storey] = ck.split("|"); // "MO|zone|storey|MD" (storey 는 이미 canonStorey)
+    const sorted = [...units].sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+    const n = sorted.length;
+    const span = cell.end - cell.start;
+    sorted.forEach((u, i) => {
+      idx.byUnit.set(unitKey(zone, storey, u), {
+        start: cell.start + Math.round((span * i) / n),
+        end: cell.start + Math.round((span * (i + 1)) / n),
+      });
+    });
+  }
+}
+
 export interface Candidate {
   key: string; // trade|zone|storey|wt
   name: string; // 한글 활동명 (LLM 의미매칭 신호)
