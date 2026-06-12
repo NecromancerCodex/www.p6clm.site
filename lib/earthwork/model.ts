@@ -67,8 +67,10 @@ export const TERRAIN_PRESETS: { kind: TerrainKind; label: string; desc: string }
   { kind: "valley", label: "계곡", desc: "가운데가 패인 골짜기" },
 ];
 
-// 모든 프리셋 공통 지층 두께(합 42m) — 지표고만 형태별로 달라짐.
-const PRESET_PROFILE = { fill: 3, clay: 5, sand: 4, gravel: 2, wsoil: 3, wrock: 4, srock: 6, mrock: 7, hrock: 8 };
+// 암반대(풍화~경암)는 평탄하게 고정, 토사(fill~gravel)가 지표까지 채움 → 지형 따라 토사 물량이 달라짐.
+const ROCK_LAYERS = { wsoil: 3, wrock: 4, srock: 6, mrock: 7, hrock: 8 }; // 합 28m, 전 지점 동일
+const ROCK_TOP_EL = 20; // 암반대 상단 표고(평탄)
+const SOIL_RATIO = { fill: 0.27, clay: 0.36, sand: 0.27, gravel: 0.1 }; // 토사 내 비율
 
 /** 5×5 격자(120×120m)에 형태별 지표고를 부여한 가상 시추공 셋. */
 export function makeTerrainPreset(kind: TerrainKind): Borehole[] {
@@ -90,14 +92,22 @@ export function makeTerrainPreset(kind: TerrainKind): Borehole[] {
       if (kind === "slope") el = base - 14 + u * 28; // 36 → 64 (한 방향 경사)
       else if (kind === "hill") el = base + 24 * Math.exp(-(dx * dx + dy * dy) / 0.06); // 중앙 봉우리
       else if (kind === "valley") el = base + 4 - 24 * Math.exp(-(dx * dx + dy * dy) / 0.06); // 중앙 골
+      const r2 = (n: number) => Math.round(n * 100) / 100;
+      const soil = Math.max(2, el - ROCK_TOP_EL); // 지표~암반상단 = 토사 총두께(지형 따라 변함)
       out.push({
         id: `T-${String(++i).padStart(2, "0")}`,
         x,
         y,
-        el: Math.round(el * 100) / 100,
-        depth: 42,
+        el: r2(el),
+        depth: r2(el - (ROCK_TOP_EL - 28)), // 지표~암반 최하단(평탄 base)
         gwl: 8,
-        t: L0({ ...PRESET_PROFILE }),
+        t: L0({
+          fill: r2(soil * SOIL_RATIO.fill),
+          clay: r2(soil * SOIL_RATIO.clay),
+          sand: r2(soil * SOIL_RATIO.sand),
+          gravel: r2(soil * SOIL_RATIO.gravel),
+          ...ROCK_LAYERS,
+        }),
       });
     }
   }
