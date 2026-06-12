@@ -695,6 +695,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       fp.dispose();
       controls.dispose();
       renderer.dispose();
+      // dispose()는 GPU 리소스만 해제 — WebGL 컨텍스트 자체는 forceContextLoss 로 명시 반환해야
+      // 반복 로드 시 컨텍스트 누수('Too many active WebGL contexts' → Aborted 크래시) 방지.
+      try {
+        renderer.forceContextLoss();
+      } catch {
+        /* noop */
+      }
       try {
         (parsed.geometry as BvhGeom).disposeBoundsTree();
       } catch {
