@@ -18,6 +18,7 @@ type BvhGeom = THREE.BufferGeometry & { computeBoundsTree: () => void; disposeBo
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, canonStorey, classifyIfcType, type MatchResult } from "../../lib/fourd/match";
+import { LAYERS, DEFAULT_HIDDEN_TRADES } from "../../lib/fourd/layers";
 import { buildGeologyGroup } from "../../lib/earthwork/geologyGroup";
 import type { Borehole } from "../../lib/earthwork/model";
 
@@ -337,11 +338,16 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const [geoOn, setGeoOn] = useState(false);
   const geoOnRef = useRef(false);
   geoOnRef.current = geoOn;
-  // 가설(TW) 표시 토글 — 기본 off(16k+ 비계·동바리 클러터 방지). 토공(CV)은 항상 표시.
-  const [twOn, setTwOn] = useState(false);
-  const twOnRef = useRef(false);
-  twOnRef.current = twOn;
-  const hasTW = parsed.elements.some((e) => e.trade === "TW");
+  // 디시플린 레이어 표시 — trade(Lv.2)별 on/off. 기본 숨김(가설·MEP)은 클러터/대용량 방지.
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(DEFAULT_HIDDEN_TRADES));
+  const hiddenRef = useRef(hidden);
+  hiddenRef.current = hidden;
+  // 이 모델에 실제 존재하는 레이어(trade)만 패널에 — 정의된 순서대로.
+  const presentLayers = useMemo(() => {
+    const present = new Set<string>();
+    for (const el of parsed.elements) if (el.trade) present.add(el.trade);
+    return LAYERS.filter((l) => present.has(l.trade));
+  }, [parsed]);
   const [bimOffset, setBimOffset] = useState({ x: 0, y: 0, z: 0 });
   const controlsRef = useRef<OrbitControls | null>(null);
   const fpRef = useRef<PointerLockControls | null>(null);
@@ -789,9 +795,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       const counts = { done: 0, active: 0, planned: 0, ghost: 0, estimate: 0 };
       // 전체 재색칠 (정확성 우선 — 부분 업로드는 정합성 버그로 폐기)
       for (const el of parsed.elements) {
-        // 가설(TW) 토글 off → 색 루프에서 완전 skip (이미 토글 effect 가 알파0 으로 숨겨둠).
-        // 매 프레임 16k+ TW 정점 재페인트를 피해 슬라이더 렉 제거. KPI 집계도 제외.
-        if (el.trade === "TW" && !twOnRef.current) continue;
+        // 숨김 레이어(가설·MEP 등) → 색 루프에서 완전 skip (hide effect 가 알파0 으로 숨겨둠).
+        // 매 프레임 대용량 정점 재페인트를 피해 슬라이더 렉 제거. KPI 집계도 제외.
+        if (el.trade && hiddenRef.current.has(el.trade)) continue;
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
         // AI 정책매칭 = 추정. 확정(규칙)과 분리 집계·색칠. 추정은 상태 무관 estimate 로.
@@ -820,20 +826,19 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       );
     });
     return () => cancelAnimationFrame(raf);
-  }, [dateMs, parsed, ranges, realistic, twOn]);
+  }, [dateMs, parsed, ranges, realistic, hidden]);
 
-  // 가설(TW) off → 알파0 으로 1회 숨김(마운트·토글 off 시). on 이면 위 메인 루프가 칠함.
-  // 매 프레임 재페인트를 피하려 메인 루프는 숨김 TW 를 skip → 여기서만 hide 처리.
+  // 숨김 레이어 → 알파0 으로 1회 숨김(마운트·토글 off 시). 표시 레이어는 위 메인 루프가 칠함.
+  // 매 프레임 재페인트를 피하려 메인 루프는 숨김 레이어를 skip → 여기서만 hide 처리.
   useEffect(() => {
-    if (twOn) return;
     const attr = colorAttrRef.current;
     if (!attr) return;
     const arr = attr.array as Float32Array;
     for (const el of parsed.elements) {
-      if (el.trade === "TW") paintElement(arr, el, BLACK_HIDDEN, 0);
+      if (el.trade && hidden.has(el.trade)) paintElement(arr, el, BLACK_HIDDEN, 0);
     }
     attr.needsUpdate = true;
-  }, [twOn, parsed]);
+  }, [hidden, parsed]);
 
   // ── hover 한 공정단위 실제 부재를 황색 강조 (증분: 그룹이 바뀔 때만 재색칠) ──
   // 박스(AABB)는 U자 형상에서 겹쳐 부정확 → 실제 부재를 칠해 정확한 공정 범위를 보인다.
@@ -858,8 +863,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     if (prevKey) {
       for (const el of parsed.elements) {
         if (!matches(el, prevKey, prevMode)) continue;
-        if (el.trade === "TW" && !twOnRef.current) {
-          paintElement(arr, el, BLACK_HIDDEN, 0); // 토글 off → 복원도 숨김 유지
+        if (el.trade && hiddenRef.current.has(el.trade)) {
+          paintElement(arr, el, BLACK_HIDDEN, 0); // 숨김 레이어 → 복원도 숨김 유지
           continue;
         }
         const mr2 = ranges.get(el.globalId);
@@ -1122,24 +1127,36 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             {geoOn ? "🏔 지반 ON" : "지반 OFF"}
           </button>
         )}
-        {hasTW && (
-          <button
-            onClick={() => setTwOn((v) => !v)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: 999,
-              border: "1px solid " + (twOn ? "#0891b2" : "#475569"),
-              background: twOn ? "#0891b2" : "transparent",
-              color: twOn ? "#fff" : "#94a3b8",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-            title="가설(비계·동바리·거푸집 등 TW)을 4D에 표시 — 층별 골조 따라 등장"
-          >
-            {twOn ? "🧰 가설 ON" : "가설 OFF"}
-          </button>
-        )}
+        {presentLayers.map((l) => {
+          const on = !hidden.has(l.trade);
+          return (
+            <button
+              key={l.trade}
+              onClick={() =>
+                setHidden((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(l.trade)) next.delete(l.trade);
+                  else next.add(l.trade);
+                  return next;
+                })
+              }
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: "1px solid " + (on ? "#0891b2" : "#475569"),
+                background: on ? "#0891b2" : "transparent",
+                color: on ? "#fff" : "#94a3b8",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+              title={`${l.name} 레이어 ${on ? "표시 중 — 끄기" : "숨김 — 켜기"} (Lv.2 Trade=${l.trade})`}
+            >
+              {on ? "● " : "○ "}
+              {l.name}
+            </button>
+          );
+        })}
       </div>
       {geoOn && geoBoreholes && (
         <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#fcd34d", marginTop: -2 }}>
