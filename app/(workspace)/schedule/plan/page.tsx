@@ -68,6 +68,7 @@ export default function SchedulePlanWizard() {
   const [buildingType, setBuildingType] = useState("");
   const [scope, setScope] = useState("");
   const [structureType, setStructureType] = useState("");
+  const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
   const [startDate, setStartDate] = useState("");
   const [durationMonths, setDurationMonths] = useState("");
   const [wdpw, setWdpw] = useState(6);
@@ -157,6 +158,7 @@ export default function SchedulePlanWizard() {
           if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
           if (ctx.scope && !scope) setScope(ctx.scope);
           if (ctx.structure_type) setStructureType(ctx.structure_type);
+        if (ctx.discipline) setDiscipline(ctx.discipline);
           if (ctx.reason) setInferReason(ctx.reason);
         });
         setBimBusy(false);
@@ -203,6 +205,7 @@ export default function SchedulePlanWizard() {
         if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
         if (ctx.scope && !scope) setScope(ctx.scope);
         if (ctx.structure_type) setStructureType(ctx.structure_type);
+        if (ctx.discipline) setDiscipline(ctx.discipline);
         if (ctx.reason) setInferReason(ctx.reason);
       });
     } catch (e) {
@@ -357,16 +360,29 @@ export default function SchedulePlanWizard() {
               <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="예: 모듈러 공동주택" />
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
             </Field>
-            <Field label="② 구조유형 / 시공 전략 — BIM에 없는 정보는 직접 선택">
-              <div style={{ display: "flex", gap: 8 }}>
-                <select className="wz-in" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
-                  <option value="">구조: 자동 판정</option>
-                  <option value="RC">RC (철근콘크리트)</option>
-                  <option value="철골">철골</option>
-                  <option value="SRC">SRC</option>
-                  <option value="PC·모듈러">PC·모듈러</option>
-                  <option value="혼합">혼합 (RC코어 + 철골)</option>
+            <Field label="② 공종 / 구조유형 / 시공 전략 — 자동 판정 후 직접 수정 가능">
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {/* 공종(디시플린) — BIM trade 자동채움, 사람이 수정(휴먼인더루프). 비구조면 구조유형 숨김. */}
+                <select className="wz-in" value={discipline} onChange={(e) => setDiscipline(e.target.value)}
+                        title="BIM 공종 자동 판정 — 틀리면 직접 선택 (토목/건축/MEP/조경은 구조유형 무관)">
+                  <option value="">공종: 자동 판정</option>
+                  <option value="토목">토목</option>
+                  <option value="구조">구조</option>
+                  <option value="건축">건축</option>
+                  <option value="MEP">MEP (기계·소방·전기·통신)</option>
+                  <option value="조경">조경</option>
                 </select>
+                {/* 구조유형 — '구조' 또는 '자동'일 때만 (토목/건축/MEP/조경엔 무의미) */}
+                {(discipline === "" || discipline === "구조") && (
+                  <select className="wz-in" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
+                    <option value="">구조: 자동 판정</option>
+                    <option value="RC">RC (철근콘크리트)</option>
+                    <option value="철골">철골</option>
+                    <option value="SRC">SRC</option>
+                    <option value="PC·모듈러">PC·모듈러</option>
+                    <option value="혼합">혼합 (RC코어 + 철골)</option>
+                  </select>
+                )}
                 <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
                         title="굴착·골조 전략 — 발주·부지 조건으로 결정되는 정보(AI 추정 불가)">
                   <option value="bottom_up">순타·일괄 (전 구역 지하 → 지상)</option>

@@ -432,7 +432,7 @@ export async function generateSchedule(
   throw new ScheduleApiError(504, "생성 시간 초과 (10분) — 입력을 줄이거나 다시 시도해주세요.");
 }
 
-export interface InferContextResult { building_type: string; scope: string; structure_type: string; reason: string }
+export interface InferContextResult { building_type: string; scope: string; structure_type: string; reason: string; discipline?: string }
 export async function inferScheduleContext(req: {
   storeys: string[]; zones: string[];
   element_summary: { type: string; count: number; names?: string[] }[]; total_count: number;
