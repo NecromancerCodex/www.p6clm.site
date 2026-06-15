@@ -530,7 +530,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const totalVerts = parsed.groups.reduce((s, g) => s + (g.geometry.getAttribute("position")?.count ?? 0), 0);
     const totalIdx = parsed.groups.reduce((s, g) => s + (g.geometry.getIndex()?.count ?? 0), 0);
     const batched = new THREE.BatchedMesh(Math.max(1, totalInst), Math.max(1, totalVerts), Math.max(1, totalIdx), material);
-    batched.perObjectFrustumCulled = true; // 인스턴스별 frustum culling — 화면 밖 부재 렌더 skip
+    // ⚠️ 둘 다 false 여야 onBeforeRender 가 early-return(three BatchedMesh.js:1509) → 매 프레임 480k
+    // 인스턴스 정렬·컬링 skip. 불투명이라 깊이정렬 불필요, 인스턴스 과다라 per-instance 컬링 CPU 손해 >
+    // GPU 이득(4M 정점은 GPU 가뿐). multiDraw 1회 구성 후 재사용(가시성 변경 시에만 1회 재구성).
+    batched.perObjectFrustumCulled = false;
+    batched.sortObjects = false;
     const base = new Int32Array(parsed.groups.length);
     const instElem = new Int32Array(Math.max(1, totalInst));
     const _m = new THREE.Matrix4();
