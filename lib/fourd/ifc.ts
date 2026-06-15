@@ -618,12 +618,11 @@ export async function parseIfc(
   const center = bbox.getCenter(new THREE.Vector3());
   // 기존 boundingSphere.radius 와 호환되게 대각선 절반(외접구 반지름)으로 산출.
   const radius = has ? bbox.getSize(new THREE.Vector3()).length() / 2 || 50 : 50;
-  // ── 렉 진단: 그룹 수 = InstancedMesh draw call 수. 싱글톤(count==1)이 많으면 draw call 폭발. ──
-  const singles = groups.filter((g) => g.count === 1).length;
+  // ── 진단: BatchedMesh 1개로 렌더(draw call 1). 유니크형상=addGeometry 수, 인스턴스=배치 수. ──
   const totalInst = groups.reduce((s, g) => s + g.count, 0);
-  const diag = `그룹(draw call) ${groups.length} · 싱글톤 ${singles} · 인스턴스 ${totalInst} · 요소 ${elements.length}`;
+  const diag = `유니크형상 ${groups.length} · 인스턴스 ${totalInst} · 요소 ${elements.length}`;
   // eslint-disable-next-line no-console
-  console.log("[4D 렉진단]", diag);
+  console.log("[4D]", diag, "(draw call 1)");
   onProgress?.(1, `완료 — ${diag}`);
 
   return {
