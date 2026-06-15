@@ -11,13 +11,16 @@ import { PointerLockControls } from "three/examples/jsm/controls/PointerLockCont
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 
 // three-mesh-bvh — 레이캐스트 O(삼각형수)→O(log) 가속. 인스턴싱 그룹 지오메트리 hover 렉 해소.
-// InstancedMesh.raycast 도 acceleratedRaycast 로 교체(인스턴스 행렬 역변환 + BVH). 미지원 빌드는
-// 기본 InstancedMesh raycast 로 폴백되도록 try/catch 로 computeBoundsTree 만 보호.
+// ⚠️ Mesh.prototype.raycast 만 가속으로 교체한다. InstancedMesh.prototype 은 건드리지 않는다:
+//   three-mesh-bvh 0.9.x 의 acceleratedRaycast(raycastObject3D)는 object.matrixWorld 하나만
+//   역변환해 InstancedMesh 의 인스턴스별 instanceMatrix 를 무시하고 instanceId 도 세팅하지 않는다
+//   (Mesh·BatchedMesh 만 지원). → 과거엔 모든 인스턴스가 그룹 원점으로 붕괴(hover 정보·워크 접지 깨짐).
+//   THREE 기본 InstancedMesh.raycast 는 내부 _mesh(=Mesh).raycast 를 인스턴스마다 호출하므로,
+//   Mesh.prototype 만 가속화해도 인스턴스별 BVH 가속 + 정확한 instanceMatrix + instanceId 를 모두 얻는다.
 type BvhGeom = THREE.BufferGeometry & { computeBoundsTree: () => void; disposeBoundsTree: () => void };
 (THREE.BufferGeometry.prototype as unknown as { computeBoundsTree: unknown }).computeBoundsTree = computeBoundsTree;
 (THREE.BufferGeometry.prototype as unknown as { disposeBoundsTree: unknown }).disposeBoundsTree = disposeBoundsTree;
 (THREE.Mesh.prototype as unknown as { raycast: unknown }).raycast = acceleratedRaycast;
-(THREE.InstancedMesh.prototype as unknown as { raycast: unknown }).raycast = acceleratedRaycast;
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, canonStorey, classifyIfcType, type MatchResult } from "../../lib/fourd/match";
