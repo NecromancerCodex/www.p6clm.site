@@ -223,9 +223,14 @@ export interface CodeIndex {
   byUnit: Map<string, DateRange>; // 유닛 키: MO|zone|storey|mtype|unit (세분 — pmisx 식 모듈단위)
   byPhase: Map<string, DateRange>; // 단계 키: ST|zone|storey|wt|phase (단계별 — 콘크리트 등)
   byZoneCat: Map<string, DateRange>; // 구역+카테고리: zone|storey|CORE|MOD|FOOT (trade/wt 코드 불일치 흡수)
+  byStorey: Map<string, DateRange>; // 층(canonStorey)별 골조 window — 가설(TW) 층 추종용(zone 무관)
+  earthworkWindow: DateRange | null; // 토공(흙막이/굴착/차수) 공통활동 기간 — 토목(CV) 매칭용
   minDate: number;
   maxDate: number;
 }
+
+// 토공 공통 활동(4D 코드 없음 — 공통)을 이름으로 식별. 토목(CV) 부재가 이 기간에 매칭됨.
+const _EARTHWORK_KW = /흙막이|토공|굴착|터파기|차수|되메우|버림|토류|가시설|파일|말뚝/;
 
 // 스케줄 op(CR/MD/FT/PR) → 부재 카테고리. BIM 부재(classifyIfcType)와 같은 축으로 통일해
 // trade(ST/MO)·wt(WAL/SLB/COL) 코드 차이를 무시하고 구역 단위 매칭을 살린다.
@@ -265,16 +270,28 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   const byUnit = new Map<string, DateRange>();
   const byPhase = new Map<string, DateRange>();
   const byZoneCat = new Map<string, DateRange>();
+  const byStorey = new Map<string, DateRange>();
+  let ewStart = Infinity;
+  let ewEnd = -Infinity;
   let minD = Infinity;
   let maxD = -Infinity;
   for (const t of tasks) {
-    const d = decodeActId(t.code);
-    if (!d) continue;
     const s = t.start ? Date.parse(t.start) : NaN;
     const e = t.end ? Date.parse(t.end) : NaN;
     if (Number.isNaN(s) || Number.isNaN(e)) continue;
+    // 토공 공통활동(4D 코드 없음) — 이름으로 식별해 earthwork window 누적 (토목 CV 매칭용)
+    if (_EARTHWORK_KW.test(t.name || "")) {
+      ewStart = Math.min(ewStart, s);
+      ewEnd = Math.max(ewEnd, e);
+      minD = Math.min(minD, s);
+      maxD = Math.max(maxD, e);
+    }
+    const d = decodeActId(t.code);
+    if (!d) continue;
     minD = Math.min(minD, s);
     maxD = Math.max(maxD, e);
+    // 층(canonStorey)별 골조 window — 가설(TW)이 zone 체계 달라도 층 기준 골조 추종 (zone 무관 키)
+    mergeRange(byStorey, canonStorey(d.storey) || d.storey, s, e);
     if (d.trade === "MO") {
       mergeRange(byKey, codeKey("MO", d.zone, d.storey, "MD"), s, e);
       if (d.unit) mergeRange(byUnit, unitKey(d.zone, d.storey, d.unit), s, e);
@@ -291,6 +308,8 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     byUnit,
     byPhase,
     byZoneCat,
+    byStorey,
+    earthworkWindow: ewStart === Infinity ? null : { start: ewStart, end: ewEnd },
     minDate: minD === Infinity ? Date.now() : minD,
     maxDate: maxD === -Infinity ? Date.now() : maxD,
   };
@@ -365,6 +384,21 @@ export function buildCandidates(tasks: ScheduleTask[]): Candidate[] {
  *  ST 부재: ST|zone|storey|wt
  */
 export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
+  // 토목(CV) → 토공 window (굴착·흙막이 기간). 골조 전 초반에 표시. zone/storey 없어도 매칭.
+  if (el.trade === "CV") {
+    return idx.earthworkWindow
+      ? { range: idx.earthworkWindow, via: "earthwork:CV" }
+      : { range: null, via: "no_earthwork" };
+  }
+  // 가설(TW) → 층별 골조 추종 (비계·동바리가 각 층 시공 시 등장). zone 체계 달라도 storey 기준.
+  if (el.trade === "TW") {
+    const k = el.storey4d ? canonStorey(el.storey4d) || el.storey4d : "";
+    const r = k ? idx.byStorey.get(k) : undefined;
+    if (r) return { range: r, via: `tw_storey:${k}` };
+    return idx.earthworkWindow
+      ? { range: idx.earthworkWindow, via: "tw_earthwork" }
+      : { range: null, via: `no_storey:${k}` };
+  }
   if (!el.trade || !el.zone || !el.storey4d) return { range: null, via: "no_meta" };
   if (el.trade === "MO") {
     if (el.unit) {

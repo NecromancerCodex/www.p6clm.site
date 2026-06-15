@@ -136,6 +136,7 @@ const C_ACTIVE = [0.133, 0.827, 0.933]; // cyan
 const C_PLANNED = [0.376, 0.647, 0.98]; // blue
 const C_GHOST = [0.32, 0.34, 0.4]; // 미매칭 (어두운 회색)
 const C_HILITE = [1.0, 0.85, 0.2]; // hover 공정단위 강조 (황색)
+const BLACK_HIDDEN = [0, 0, 0]; // 가설(TW) 토글 off 시 알파 0 으로 숨김용 색
 // AI 정책매칭 = '추정'(확정 아님). 상태 무관하게 보라 계열(명도로 완료>진행>미착수 구분) → "AI=보라" 일관.
 const C_EST_DONE = [0.55, 0.30, 0.88]; // 추정 완료 (진보라)
 const C_EST_ACTIVE = [0.70, 0.50, 0.95]; // 추정 진행 (중보라)
@@ -336,6 +337,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const [geoOn, setGeoOn] = useState(false);
   const geoOnRef = useRef(false);
   geoOnRef.current = geoOn;
+  // 가설(TW) 표시 토글 — 기본 off(16k+ 비계·동바리 클러터 방지). 토공(CV)은 항상 표시.
+  const [twOn, setTwOn] = useState(false);
+  const twOnRef = useRef(false);
+  twOnRef.current = twOn;
+  const hasTW = parsed.elements.some((e) => e.trade === "TW");
   const [bimOffset, setBimOffset] = useState({ x: 0, y: 0, z: 0 });
   const controlsRef = useRef<OrbitControls | null>(null);
   const fpRef = useRef<PointerLockControls | null>(null);
@@ -783,6 +789,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       const counts = { done: 0, active: 0, planned: 0, ghost: 0, estimate: 0 };
       // 전체 재색칠 (정확성 우선 — 부분 업로드는 정합성 버그로 폐기)
       for (const el of parsed.elements) {
+        // 가설(TW) 토글 off → 알파 0 으로 숨김(alphaTest). KPI 집계에서도 제외.
+        if (el.trade === "TW" && !twOnRef.current) {
+          paintElement(arr, el, BLACK_HIDDEN, 0);
+          continue;
+        }
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
         // AI 정책매칭 = 추정. 확정(규칙)과 분리 집계·색칠. 추정은 상태 무관 estimate 로.
@@ -811,7 +822,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       );
     });
     return () => cancelAnimationFrame(raf);
-  }, [dateMs, parsed, ranges, realistic]);
+  }, [dateMs, parsed, ranges, realistic, twOn]);
 
   // ── hover 한 공정단위 실제 부재를 황색 강조 (증분: 그룹이 바뀔 때만 재색칠) ──
   // 박스(AABB)는 U자 형상에서 겹쳐 부정확 → 실제 부재를 칠해 정확한 공정 범위를 보인다.
@@ -836,6 +847,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     if (prevKey) {
       for (const el of parsed.elements) {
         if (!matches(el, prevKey, prevMode)) continue;
+        if (el.trade === "TW" && !twOnRef.current) {
+          paintElement(arr, el, BLACK_HIDDEN, 0); // 토글 off → 복원도 숨김 유지
+          continue;
+        }
         const mr2 = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr2?.range ?? null);
         const { c, a } = colorForElement(el, mr2?.via, dateMs, mr2?.range ?? null, realistic);
@@ -1094,6 +1109,24 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             title="시추 지질(지반)을 BIM 아래로 이식 — 지하구조 × 지반 확인"
           >
             {geoOn ? "🏔 지반 ON" : "지반 OFF"}
+          </button>
+        )}
+        {hasTW && (
+          <button
+            onClick={() => setTwOn((v) => !v)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 999,
+              border: "1px solid " + (twOn ? "#0891b2" : "#475569"),
+              background: twOn ? "#0891b2" : "transparent",
+              color: twOn ? "#fff" : "#94a3b8",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title="가설(비계·동바리·거푸집 등 TW)을 4D에 표시 — 층별 골조 따라 등장"
+          >
+            {twOn ? "🧰 가설 ON" : "가설 OFF"}
           </button>
         )}
       </div>
