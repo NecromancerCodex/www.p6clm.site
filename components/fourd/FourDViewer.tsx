@@ -367,9 +367,16 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const r = parsed.radius || 50;
     camera.position.set(parsed.center.x + r * 1.4, parsed.center.y + r * 1.2, parsed.center.z + r * 1.4);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // 대용량(토목 비계 등 80만 정점+) 감지 → fill 비용 절감(AA off, 1x 렌더).
+    const vtxCount = (parsed.geometry.getAttribute("position")?.count as number) ?? 0;
+    const heavy = vtxCount > 800_000;
+    const renderer = new THREE.WebGLRenderer({
+      antialias: !heavy,                     // 대용량은 MSAA 끔 (GPU fill 절감)
+      powerPreference: "high-performance",   // 외장(고성능) GPU 우선 — 노트북 내장 GPU 회피
+    });
     renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // 대용량은 1x 렌더(고해상도 디스플레이에서 정점당 fill 4배 절감), 일반은 ≤2x 선명도 유지.
+    renderer.setPixelRatio(heavy ? 1 : Math.min(window.devicePixelRatio, 2));
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
