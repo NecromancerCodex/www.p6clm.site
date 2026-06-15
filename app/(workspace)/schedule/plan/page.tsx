@@ -127,11 +127,14 @@ export default function SchedulePlanWizard() {
 
   useEffect(() => {
     if (!planId) return;
-    if (pollRef.current) clearInterval(pollRef.current);
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    // 생성 중(running_p2)·초기(null)에만 3초 폴링. 안정상태(logic_ready/scheduled/done/error)면
+    // 폴링 중단 — 488행 표+간트를 매 3초 통째 재렌더하던 렉 제거 + DB(Neon) 3초마다 찌르던 부하 제거.
+    if (stage && stage !== "running_p2") return; // 안정상태 → 폴링 중단(데이터는 직전 폴이 이미 가져옴)
     pollRef.current = setInterval(() => { void refresh(planId); }, 3000);
     void refresh(planId);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [planId, refresh]);
+  }, [planId, refresh, stage]);
 
   useEffect(() => {
     if (stage === "scheduled" || stage === "done")
