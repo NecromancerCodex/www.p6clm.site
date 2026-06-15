@@ -219,6 +219,7 @@ export default function SchedulePlanWizard() {
       const r = await startPlan({
         building_type: buildingType.trim(), scope: scope.trim() || undefined,
         structure_type: structureType.trim() || undefined,
+        discipline: discipline.trim() || undefined,
         zones, storeys, work_units: workUnits, methods: [],
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,

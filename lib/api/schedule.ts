@@ -358,6 +358,7 @@ export interface GenerateScheduleRequest {
   building_type: string;
   scope?: string;
   structure_type?: string;
+  discipline?: string; // 공종(토목/구조/건축/MEP/조경) — 공종별 모듈 디스패치
   zones: string[];
   storeys: string[];
   work_units: GenWorkUnit[];
