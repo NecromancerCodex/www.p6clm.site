@@ -46,6 +46,7 @@ export interface ParsedIfc {
   center: THREE.Vector3;
   radius: number;
   steelQto?: SteelQto[]; // 철골 물량(있으면) — 자원 계획 BIM 자재추출 고도화
+  skippedTrades?: string[]; // 메모리 절약 위해 기하 로드 안 한 trade(가설 등) — 패널이 '로드' 제공
 }
 
 let _api: IfcAPI | null = null;
@@ -340,6 +341,7 @@ function toPascalIfc(upper: string): string {
 export async function parseIfc(
   buffer: ArrayBuffer,
   onProgress?: (p: number, msg: string) => void,
+  skipTrades?: Set<string>, // 이 trade(가설 TW 등)는 기하를 로드하지 않음 — 브라우저 메모리 절약(C-2)
 ): Promise<ParsedIfc> {
   const api = await getApi();
   onProgress?.(0.05, "모델 여는 중…");
@@ -365,6 +367,7 @@ export async function parseIfc(
   const positions: number[] = [];
   const normals: number[] = [];
   const elements: ParsedElement[] = [];
+  const skipped = new Set<string>(); // 기하 스킵된 trade(가설 등) 기록 — 패널이 '로드' 버튼 제공
   const tmp = new THREE.Matrix4();
   const v = new THREE.Vector3();
   const n = new THREE.Vector3();
@@ -400,6 +403,16 @@ export async function parseIfc(
     const m = meta(expressID);
     if (!m) return;
     if (!WANTED_TYPES.has(m.ifcType.toUpperCase())) return;
+
+    // C-2: 숨김 기본 레이어(가설 TW 등)는 기하 로드 안 함 — 정점이 안 쌓여 브라우저 메모리 절약.
+    // trade 만 기록(패널이 존재를 알고 '로드' 버튼 제공). 단일 메시 색칠/매칭 로직은 무영향(요소만 적어짐).
+    if (skipTrades && skipTrades.size) {
+      const pmEarly = procMap.get(expressID);
+      if (pmEarly?.trade && skipTrades.has(pmEarly.trade)) {
+        skipped.add(pmEarly.trade);
+        return;
+      }
+    }
 
     const vStart = positions.length / 3;
     // 깨진/비정상 지오메트리(가설·토목 모델에 흔함)가 GetVertexArray 등에서 "Invalid array length"를
@@ -539,5 +552,6 @@ export async function parseIfc(
     center: bs.center.clone(),
     radius: bs.radius,
     steelQto: steelQto.length ? steelQto : undefined,
+    skippedTrades: skipped.size ? [...skipped] : undefined,
   };
 }

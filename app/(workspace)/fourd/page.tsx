@@ -36,6 +36,7 @@ import {
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
 import { saveFourdFiles, loadFourdFiles, clearFourdFiles, type CachedFourd } from "../../../lib/fourd/fileCache";
+import { DEFAULT_HIDDEN_TRADES } from "../../../lib/fourd/layers";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
 import { deriveWorkPackages, deriveActivityUnits, type DerivedPackage, type ActivityUnit } from "../../../lib/fourd/workpackage";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
@@ -196,6 +197,9 @@ export default function FourDPage() {
     void loadFourdFiles().then(setCached);
   }, []);
 
+  // C-2: 무거운 숨김 레이어(가설 등) 기하는 기본 미로드(브라우저 메모리 절약). 사용자가 '로드'하면 추가.
+  const loadExtraRef = useRef<Set<string>>(new Set());
+
   const run = useCallback(async (sFile?: File, iFile?: File) => {
     // 명시 인자(복원 시) 우선, 없으면 state. setState 는 비동기라 복원 직후 호출에 인자 전달.
     const sf = sFile ?? scheduleFile;
@@ -243,9 +247,12 @@ export default function FourDPage() {
       }
 
       // 2) IFC 파싱 (브라우저 web-ifc, 동적 import — SSR 회피)
+      // C-2: 무거운 숨김 레이어(가설 TW·MEP)는 기하 미로드 → 브라우저 메모리 절약(토목 ~80%↓).
+      //      사용자가 '로드'한 레이어(loadExtraRef)는 스킵 대상에서 제외.
+      const skipTrades = new Set([...DEFAULT_HIDDEN_TRADES].filter((t) => !loadExtraRef.current.has(t)));
       const { parseIfc } = await import("../../../lib/fourd/ifc");
       const buf = await inf.arrayBuffer();
-      const parsed = await parseIfc(buf, (p, msg) => setProgress({ p, msg }));
+      const parsed = await parseIfc(buf, (p, msg) => setProgress({ p, msg }), skipTrades);
 
       // 3) 매칭 — 공정 PSet(REV) 있으면 코드매칭(zone 정확), 없으면 층근사 폴백
       setProgress({ p: 1, msg: "매칭 중…" });
@@ -308,6 +315,12 @@ export default function FourDPage() {
       setProgress(null);
     }
   }, [scheduleFile, ifcFile]);
+
+  /** 스킵된 레이어(가설 등) 로드 요청 — 해당 trade 를 추가하고 재파싱(기하 포함). */
+  const onLoadLayer = useCallback((trade: string) => {
+    loadExtraRef.current = new Set([...loadExtraRef.current, trade]);
+    void run();
+  }, [run]);
 
   /** 캐시된 파일로 이어서 분석 — state 세팅 + 명시 인자로 즉시 run. */
   const restoreCached = useCallback(() => {
@@ -877,6 +890,8 @@ export default function FourDPage() {
               dailyBusy={dailyBusy}
               onDateChange={setViewerDateMs}
               geoBoreholes={geoBoreholes}
+              skippedTrades={ready.parsed.skippedTrades ?? []}
+              onLoadLayer={onLoadLayer}
               activities={
                 ready.codeIndex
                   ? [...ready.codeIndex.byKey.entries()].map(([k, r]) => ({

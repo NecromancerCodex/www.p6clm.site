@@ -18,7 +18,7 @@ type BvhGeom = THREE.BufferGeometry & { computeBoundsTree: () => void; disposeBo
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, canonStorey, classifyIfcType, type MatchResult } from "../../lib/fourd/match";
-import { LAYERS, DEFAULT_HIDDEN_TRADES } from "../../lib/fourd/layers";
+import { LAYERS, layerName } from "../../lib/fourd/layers";
 import { buildGeologyGroup } from "../../lib/earthwork/geologyGroup";
 import type { Borehole } from "../../lib/earthwork/model";
 
@@ -272,6 +272,10 @@ interface Props {
   onDateChange?: (dateMs: number) => void;
   /** 지반(시추 지질) 이식용 시추공 — 있으면 '지반 표시' 토글 노출. */
   geoBoreholes?: Borehole[];
+  /** C-2: 메모리 절약 위해 기하 미로드한 trade(가설 등) — 패널이 '로드' 버튼 노출. */
+  skippedTrades?: string[];
+  /** 스킵 레이어 로드 요청 — 부모가 해당 trade 포함해 재파싱. */
+  onLoadLayer?: (trade: string) => void;
 }
 
 /** 부재 PSet → 4D 활동코드 재구성 (pmisx ID 와 동일 형식). 예 502HGMOZB013607MDIN */
@@ -291,7 +295,7 @@ function fmt(ms: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName, onGenerateDaily, dailyBusy = false, onDateChange, geoBoreholes }: Props) {
+export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName, onGenerateDaily, dailyBusy = false, onDateChange, geoBoreholes, skippedTrades = [], onLoadLayer }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -338,8 +342,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const [geoOn, setGeoOn] = useState(false);
   const geoOnRef = useRef(false);
   geoOnRef.current = geoOn;
-  // 디시플린 레이어 표시 — trade(Lv.2)별 on/off. 기본 숨김(가설·MEP)은 클러터/대용량 방지.
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set(DEFAULT_HIDDEN_TRADES));
+  // 디시플린 레이어 표시 — trade(Lv.2)별 on/off. C-2: 무거운 기본숨김 레이어는 파싱단계에서
+  // 아예 스킵(미로드)하므로 여기 알파-숨김은 빈 셋으로 시작 — 로드된 레이어는 모두 기본 표시.
+  // (로드된 레이어를 끄고 싶으면 사용자가 토글 → hidden 에 추가)
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set<string>());
   const hiddenRef = useRef(hidden);
   hiddenRef.current = hidden;
   // 이 모델에 실제 존재하는 레이어(trade)만 패널에 — 정의된 순서대로.
@@ -1164,6 +1170,26 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             </button>
           );
         })}
+        {/* C-2: 기하 미로드된 레이어(가설 등) — 클릭 시 재파싱해 로드(메모리 더 씀, 경고). */}
+        {skippedTrades.map((t) => (
+          <button
+            key={`skip-${t}`}
+            onClick={() => onLoadLayer?.(t)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 999,
+              border: "1px dashed #a16207",
+              background: "transparent",
+              color: "#ca8a04",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+            title={`${layerName(t)} 레이어는 메모리 절약을 위해 미로드 — 클릭 시 로드(재파싱, 메모리 더 사용)`}
+          >
+            ⬇ {layerName(t)} 로드
+          </button>
+        ))}
       </div>
       {geoOn && geoBoreholes && (
         <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#fcd34d", marginTop: -2 }}>
