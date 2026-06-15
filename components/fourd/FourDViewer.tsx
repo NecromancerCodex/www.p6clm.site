@@ -789,11 +789,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       const counts = { done: 0, active: 0, planned: 0, ghost: 0, estimate: 0 };
       // 전체 재색칠 (정확성 우선 — 부분 업로드는 정합성 버그로 폐기)
       for (const el of parsed.elements) {
-        // 가설(TW) 토글 off → 알파 0 으로 숨김(alphaTest). KPI 집계에서도 제외.
-        if (el.trade === "TW" && !twOnRef.current) {
-          paintElement(arr, el, BLACK_HIDDEN, 0);
-          continue;
-        }
+        // 가설(TW) 토글 off → 색 루프에서 완전 skip (이미 토글 effect 가 알파0 으로 숨겨둠).
+        // 매 프레임 16k+ TW 정점 재페인트를 피해 슬라이더 렉 제거. KPI 집계도 제외.
+        if (el.trade === "TW" && !twOnRef.current) continue;
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
         // AI 정책매칭 = 추정. 확정(규칙)과 분리 집계·색칠. 추정은 상태 무관 estimate 로.
@@ -823,6 +821,19 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     });
     return () => cancelAnimationFrame(raf);
   }, [dateMs, parsed, ranges, realistic, twOn]);
+
+  // 가설(TW) off → 알파0 으로 1회 숨김(마운트·토글 off 시). on 이면 위 메인 루프가 칠함.
+  // 매 프레임 재페인트를 피하려 메인 루프는 숨김 TW 를 skip → 여기서만 hide 처리.
+  useEffect(() => {
+    if (twOn) return;
+    const attr = colorAttrRef.current;
+    if (!attr) return;
+    const arr = attr.array as Float32Array;
+    for (const el of parsed.elements) {
+      if (el.trade === "TW") paintElement(arr, el, BLACK_HIDDEN, 0);
+    }
+    attr.needsUpdate = true;
+  }, [twOn, parsed]);
 
   // ── hover 한 공정단위 실제 부재를 황색 강조 (증분: 그룹이 바뀔 때만 재색칠) ──
   // 박스(AABB)는 U자 형상에서 겹쳐 부정확 → 실제 부재를 칠해 정확한 공정 범위를 보인다.
