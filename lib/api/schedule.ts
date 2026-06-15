@@ -445,6 +445,36 @@ export async function inferScheduleContext(req: {
   return (await res.json()) as InferContextResult;
 }
 
+// ── IFC → S3 → 서버 work_unit 추출 (C-1) — 대용량 IFC 브라우저 부담 0 ───────────
+export interface IfcWorkUnitsResult {
+  work_units: { zone: string; storey: string; element_type: string; count: number }[];
+  zones: string[];
+  storeys: string[];
+  trade_summary: { trade: string; count: number }[];
+  element_summary: { type: string; count: number; names?: string[] }[];
+  element_count: number;
+}
+
+/** presigned URL 발급 → S3 직접 업로드 → 서버 추출. 실패 시 throw(호출측이 클라 파싱 폴백). */
+export async function extractIfcWorkUnitsViaS3(file: File): Promise<IfcWorkUnitsResult> {
+  const pres = await fetch(`${API_BASE}/schedule/ifc/presign`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, content_type: file.type || "application/octet-stream" }),
+  });
+  if (!pres.ok) throw new Error(`presign 실패 (${pres.status})`);
+  const { object_key, upload_url, headers } = (await pres.json()) as {
+    object_key: string; upload_url: string; headers: Record<string, string>;
+  };
+  const put = await fetch(upload_url, { method: "PUT", body: file, headers });
+  if (!put.ok) throw new Error(`S3 업로드 실패 (${put.status})`);
+  const ext = await fetch(`${API_BASE}/schedule/ifc/workunits`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ object_key }),
+  });
+  if (!ext.ok) throw new Error(`서버 추출 실패 (${ext.status})`);
+  return (await ext.json()) as IfcWorkUnitsResult;
+}
+
 // ═══ PM 4단계 단계별 계획 (휴먼인더루프) — /schedule/plan/* ═══════════════════
 
 export type PlanStage =

@@ -13,7 +13,8 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, getPlan, inferScheduleContext, planP6XmlUrl, savePlanActivities, startPlan,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, planP6XmlUrl,
+  savePlanActivities, startPlan,
   type GanttTask, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
@@ -140,6 +141,30 @@ export default function SchedulePlanWizard() {
   const onBim = async (file: File) => {
     setBimBusy(true); setErr(null);
     try {
+      // ① 서버 경로(C-1) — IFC 를 S3 에 직접 업로드 후 서버가 work_unit 추출.
+      //    대용량 IFC 가 브라우저 메모리를 압박하지 않음. S3 미설정/실패 시 ②로 폴백.
+      try {
+        const r = await extractIfcWorkUnitsViaS3(file);
+        setWorkUnits(r.work_units as GenWorkUnit[]);
+        setZones(r.zones); setStoreys(r.storeys);
+        setBimName(`${file.name} — ${r.element_count.toLocaleString()}부재 → ${r.work_units.length} 워크패키지 (서버)`);
+        void inferScheduleContext({
+          storeys: r.storeys, zones: r.zones,
+          element_summary: r.element_summary,
+          trade_summary: r.trade_summary,
+          total_count: r.element_count,
+        }).then((ctx) => {
+          if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
+          if (ctx.scope && !scope) setScope(ctx.scope);
+          if (ctx.structure_type) setStructureType(ctx.structure_type);
+          if (ctx.reason) setInferReason(ctx.reason);
+        });
+        setBimBusy(false);
+        return;
+      } catch (serverErr) {
+        console.warn("[BIM] 서버 추출 실패 → 클라이언트 파싱 폴백:", serverErr);
+      }
+      // ② 폴백: 클라이언트 파싱(기존) — S3 미설정·소형 파일·오프라인 시
       const { parseIfc } = await import("../../../../lib/fourd/ifc");
       const parsed = await parseIfc(await file.arrayBuffer());
       const agg = new Map<string, GenWorkUnit>();
