@@ -10,11 +10,14 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 
-// three-mesh-bvh — 레이캐스트 O(삼각형수)→O(log) 가속. 대용량 단일 지오메트리 hover 렉 해소.
+// three-mesh-bvh — 레이캐스트 O(삼각형수)→O(log) 가속. 인스턴싱 그룹 지오메트리 hover 렉 해소.
+// InstancedMesh.raycast 도 acceleratedRaycast 로 교체(인스턴스 행렬 역변환 + BVH). 미지원 빌드는
+// 기본 InstancedMesh raycast 로 폴백되도록 try/catch 로 computeBoundsTree 만 보호.
 type BvhGeom = THREE.BufferGeometry & { computeBoundsTree: () => void; disposeBoundsTree: () => void };
 (THREE.BufferGeometry.prototype as unknown as { computeBoundsTree: unknown }).computeBoundsTree = computeBoundsTree;
 (THREE.BufferGeometry.prototype as unknown as { disposeBoundsTree: unknown }).disposeBoundsTree = disposeBoundsTree;
 (THREE.Mesh.prototype as unknown as { raycast: unknown }).raycast = acceleratedRaycast;
+(THREE.InstancedMesh.prototype as unknown as { raycast: unknown }).raycast = acceleratedRaycast;
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, canonStorey, classifyIfcType, type MatchResult } from "../../lib/fourd/match";
@@ -106,20 +109,6 @@ function procLabel(el: ParsedElement, via: string): string {
   return `${cleanStorey(el.storeyName)} ${workKo(el.wt, via)}`;
 }
 
-/** 정점 인덱스 → 소속 요소 (elements 는 vStart 오름차순 → 이진탐색). */
-function findElementByVertex(els: ParsedElement[], vIdx: number): ParsedElement | null {
-  let lo = 0;
-  let hi = els.length - 1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    const e = els[mid];
-    if (vIdx < e.vStart) hi = mid - 1;
-    else if (vIdx >= e.vStart + e.vCount) lo = mid + 1;
-    else return e;
-  }
-  return null;
-}
-
 /** 미매칭 사유 → 정확한 한글 설명 (via + 공간 층이름 기반). */
 function unmatchedReason(via: string, storeyName: string | null): string {
   if (storeyName && storeyName.includes("주차장"))
@@ -137,7 +126,7 @@ const C_ACTIVE = [0.133, 0.827, 0.933]; // cyan
 const C_PLANNED = [0.376, 0.647, 0.98]; // blue
 const C_GHOST = [0.32, 0.34, 0.4]; // 미매칭 (어두운 회색)
 const C_HILITE = [1.0, 0.85, 0.2]; // hover 공정단위 강조 (황색)
-const BLACK_HIDDEN = [0, 0, 0]; // 가설(TW) 토글 off 시 알파 0 으로 숨김용 색
+// (인스턴싱 전환: 숨김은 zero-scale 행렬로 처리 — 별도 '숨김색' 불필요)
 // AI 정책매칭 = '추정'(확정 아님). 상태 무관하게 보라 계열(명도로 완료>진행>미착수 구분) → "AI=보라" 일관.
 const C_EST_DONE = [0.55, 0.30, 0.88]; // 추정 완료 (진보라)
 const C_EST_ACTIVE = [0.70, 0.50, 0.95]; // 추정 진행 (중보라)
@@ -247,14 +236,69 @@ function colorForElement(
   return { c: gradientColor(dateMs, range), a: 1 }; // 확정 — 시공 웨이브
 }
 
-/** 요소 정점 범위에 RGBA 채우기. */
-function paintElement(arr: Float32Array, el: ParsedElement, c: number[], a: number) {
-  const end = (el.vStart + el.vCount) * 4;
-  for (let i = el.vStart * 4; i < end; i += 4) {
-    arr[i] = c[0];
-    arr[i + 1] = c[1];
-    arr[i + 2] = c[2];
-    arr[i + 3] = a;
+/**
+ * 요소의 모든 인스턴스에 색을 입힌다 (InstancedMesh.instanceColor).
+ * 정점 RGBA 시절의 alpha 는 인스턴스 색엔 없으므로 가시성으로 환산:
+ *   a <= 0 → 인스턴스 숨김(zero-scale), a > 0 → 표시(원래 행렬 복원) + 색 적용.
+ * touched: needsUpdate 를 마지막에 1회만 올리려 그룹 index 를 모은다.
+ */
+function paintElement(
+  meshes: THREE.InstancedMesh[],
+  baseMats: Float32Array[],
+  el: ParsedElement,
+  c: number[],
+  a: number,
+  col: THREE.Color,
+  touchedColor: Set<number>,
+  touchedMatrix: Set<number>,
+) {
+  col.setRGB(c[0], c[1], c[2]);
+  for (const r of el.inst) {
+    const mesh = meshes[r.g];
+    if (!mesh) continue;
+    setInstanceVisible(mesh, baseMats[r.g], r.i, a > 0, touchedMatrix);
+    if (a > 0) {
+      mesh.setColorAt(r.i, col);
+      touchedColor.add(r.g);
+    }
+  }
+}
+
+const _zeroMat = new THREE.Matrix4().makeScale(0, 0, 0);
+const _restoreMat = new THREE.Matrix4();
+/** 인스턴스 슬롯 가시성 토글 — 보임=원래 행렬 복원, 숨김=zero-scale(렌더·레이캐스트에서 사라짐). */
+function setInstanceVisible(
+  mesh: THREE.InstancedMesh,
+  base: Float32Array,
+  i: number,
+  visible: boolean,
+  touchedMatrix: Set<number>,
+) {
+  const g = (mesh.userData.g as number) ?? -1;
+  if (visible) {
+    _restoreMat.fromArray(base, i * 16);
+    mesh.setMatrixAt(i, _restoreMat);
+  } else {
+    mesh.setMatrixAt(i, _zeroMat);
+  }
+  if (g >= 0) touchedMatrix.add(g);
+}
+
+/** 변경된 그룹만 instanceColor/instanceMatrix needsUpdate 1회씩 — 매 인스턴스마다 올리는 비용 회피. */
+function flushTouched(
+  meshes: THREE.InstancedMesh[],
+  touchedColor: Set<number> | undefined,
+  touchedMatrix: Set<number>,
+) {
+  if (touchedColor) {
+    for (const g of touchedColor) {
+      const im = meshes[g];
+      if (im?.instanceColor) im.instanceColor.needsUpdate = true;
+    }
+  }
+  for (const g of touchedMatrix) {
+    const im = meshes[g];
+    if (im) im.instanceMatrix.needsUpdate = true;
   }
 }
 
@@ -297,10 +341,11 @@ function fmt(ms: number): string {
 
 export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [], codeToName, onGenerateDaily, dailyBusy = false, onDateChange, geoBoreholes, skippedTrades = [], onLoadLayer }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const colorAttrRef = useRef<THREE.BufferAttribute | null>(null);
+  const meshesRef = useRef<THREE.InstancedMesh[]>([]); // 인스턴싱 그룹별 InstancedMesh
+  const baseMatsRef = useRef<Float32Array[]>([]); // 그룹별 원본 행렬(숨김→복원용 사본)
+  const bimGroupRef = useRef<THREE.Group | null>(null); // 모든 InstancedMesh 를 담는 정합 이동용 그룹
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
-  const meshRef = useRef<THREE.Mesh | null>(null); // BIM 건물 메시 (정합 이동용)
   const gridRef = useRef<THREE.GridHelper | null>(null);
   const groundRef = useRef<THREE.Mesh | null>(null);
   const hiliteViaRef = useRef<string | null>(null); // 현재 강조 키 (유닛=via / 객체=globalId)
@@ -373,9 +418,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const r = parsed.radius || 50;
     camera.position.set(parsed.center.x + r * 1.4, parsed.center.y + r * 1.2, parsed.center.z + r * 1.4);
 
-    // 대용량(토목 비계 등 80만 정점+) 감지 → fill 비용 절감(AA off, 1x 렌더).
-    const vtxCount = (parsed.geometry.getAttribute("position")?.count as number) ?? 0;
-    const heavy = vtxCount > 800_000;
+    // 대용량(토목 비계 등) 감지 → fill 비용 절감(AA off, 1x 렌더). 인스턴싱 후엔 유니크 정점이
+    // 적으므로 총 인스턴스 수로 판단(=화면 draw 부하 근사).
+    const instCount = parsed.groups.reduce((s, g) => s + g.count, 0);
+    const heavy = instCount > 200_000;
     const renderer = new THREE.WebGLRenderer({
       antialias: !heavy,                     // 대용량은 MSAA 끔 (GPU fill 절감)
       powerPreference: "high-performance",   // 외장(고성능) GPU 우선 — 노트북 내장 GPU 회피
@@ -448,10 +494,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const firstBlockingHit = (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number) => {
       collRay.set(origin, dir);
       collRay.far = maxDist;
-      const hits = collRay.intersectObject(mesh, false);
+      const hits = collRay.intersectObjects(meshes, false); // 전 InstancedMesh
       for (const h of hits) {
-        const vp = h.face ? h.face.a : (h.faceIndex ?? 0) * 3;
-        const el = findElementByVertex(parsed.elements, vp);
+        const gi = (h.object.userData.g as number) ?? -1;
+        const ei = gi >= 0 && h.instanceId != null ? parsed.groups[gi]?.elementIdx[h.instanceId] : undefined;
+        const el = ei != null && ei >= 0 ? parsed.elements[ei] : null;
         if (!el) continue; // 미상 부재 → 통과(fail-open)
         if (OPENING.has(el.ifcType)) return null; // 개구부 포털 → 통과
         if (BLOCKING.has(el.ifcType)) return h;    // 구조 → 차단
@@ -477,7 +524,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const floorBelowY = (origin: THREE.Vector3): number | null => {
       downRay.set(origin, DOWN);
       downRay.far = R * 4;
-      const h = downRay.intersectObject(mesh, false);
+      const h = downRay.intersectObjects(meshes, false);
       return h.length > 0 ? h[0].point.y : null;
     };
 
@@ -489,23 +536,60 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     dir2.position.set(-1, 1, -1);
     scene.add(dir2);
 
-    // alphaTest: 정점 alpha 0(미완성)인 조각은 버려 완전 투명·깊이미기록 → 깔끔한 성장 효과
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(parsed.geometry, material);
-    scene.add(mesh);
-    meshRef.current = mesh;
-    colorAttrRef.current = parsed.geometry.getAttribute("color") as THREE.BufferAttribute;
-    // BVH 빌드(1회) — 이후 hover 레이캐스트가 즉시 응답
-    try {
-      (parsed.geometry as BvhGeom).computeBoundsTree();
-    } catch {
-      /* BVH 빌드 실패 시 일반 레이캐스트 폴백 */
-    }
+    // ── GPU 인스턴싱 — 유니크 지오메트리 그룹마다 InstancedMesh 1개 ──
+    // 색은 인스턴스별 instanceColor. side=DoubleSide(내부 워크스루 시 뒷면 보임).
+    // 정점 RGBA·alphaTest 시절의 '미완성 투명'은 인스턴스엔 alpha 가 없으므로 가시성(zero-scale)으로 환산.
+    const material = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
+    const bimGroup = new THREE.Group(); // 모든 InstancedMesh 묶음 — 지반 정합 이동 단위
+    const meshes: THREE.InstancedMesh[] = [];
+    const baseMats: Float32Array[] = [];
+    const _m = new THREE.Matrix4();
+    const _initCol = new THREE.Color(0.6, 0.6, 0.6); // 초기 회색
+    parsed.groups.forEach((gr, gi) => {
+      const im = new THREE.InstancedMesh(gr.geometry, material, gr.count);
+      im.userData.g = gi; // 역참조(가시성 토글 시 그룹 식별)
+      im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); // 숨김 토글로 자주 갱신
+      for (let i = 0; i < gr.count; i++) {
+        _m.fromArray(gr.matrices, i * 16);
+        im.setMatrixAt(i, _m);
+      }
+      im.instanceMatrix.needsUpdate = true;
+      // instanceColor 보장 — setColorAt 으로 초기 회색 채워 인스턴스색 버퍼 생성.
+      for (let i = 0; i < gr.count; i++) im.setColorAt(i, _initCol);
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      // BVH 빌드(1회) — InstancedMesh 도 acceleratedRaycast 가 그룹 geometry BVH 사용.
+      try {
+        (gr.geometry as BvhGeom).computeBoundsTree();
+      } catch {
+        /* BVH 빌드 실패 시 기본 InstancedMesh raycast 폴백 */
+      }
+      meshes.push(im);
+      baseMats.push(gr.matrices); // 원본 행렬 사본(parseIfc 가 새 Float32Array 로 소유 — 복원용)
+      bimGroup.add(im);
+    });
+    scene.add(bimGroup);
+    meshesRef.current = meshes;
+    baseMatsRef.current = baseMats;
+    bimGroupRef.current = bimGroup;
+
+    // 전 InstancedMesh 레이캐스트 → 최근접 히트 + 소속 요소(instanceId → group.elementIdx). 정렬해 반환.
+    const rayHit = (rc: THREE.Raycaster): { el: ParsedElement | null; hit: THREE.Intersection } | null => {
+      const hits = rc.intersectObjects(meshes, false);
+      if (!hits.length) return null;
+      const h = hits[0]; // intersectObjects 가 거리순 정렬
+      const gi = (h.object.userData.g as number) ?? -1;
+      const inst = h.instanceId;
+      let el: ParsedElement | null = null;
+      if (gi >= 0 && inst != null) {
+        const ei = parsed.groups[gi]?.elementIdx[inst];
+        if (ei != null && ei >= 0) el = parsed.elements[ei] ?? null;
+      }
+      return { el, hit: h };
+    };
 
     // 바닥 그리드 — 건물 실제 바닥(bbox.min.y)에 맞춰 띄움 방지. radius(구 반지름)는 넓은 U자에서
-    // 높이보다 훨씬 커 바닥이 한참 내려감 → 건물이 떠 보이던 원인.
-    parsed.geometry.computeBoundingBox();
-    const groundY = parsed.geometry.boundingBox?.min.y ?? parsed.center.y - parsed.radius;
+    // 높이보다 훨씬 커 바닥이 한참 내려감 → 건물이 떠 보이던 원인. (병합 geometry 대신 parsed.bbox)
+    const groundY = parsed.bbox.min.y ?? parsed.center.y - parsed.radius;
     const gridSize = parsed.radius * 4;
     const grid = new THREE.GridHelper(gridSize, 40, 0x4ade80, 0x15803d); // 초원 그린
     grid.position.set(parsed.center.x, groundY, parsed.center.z);
@@ -621,12 +705,11 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         if (ts - lastWalkRC > 120) {
           lastWalkRC = ts;
           ray.setFromCamera(CENTER, camera);
-          const wh = ray.intersectObject(mesh, false)[0];
-          if (!wh) {
+          const wr = rayHit(ray);
+          if (!wr) {
             if (lastWalkId !== null) { lastWalkId = null; setHover(null); }
           } else {
-            const vp = wh.face ? wh.face.a : (wh.faceIndex ?? 0) * 3;
-            const wel = findElementByVertex(parsed.elements, vp);
+            const wel = wr.el;
             if (wel && wel.globalId !== lastWalkId) {
               lastWalkId = wel.globalId;
               const rc = renderer.domElement.getBoundingClientRect();
@@ -688,16 +771,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
       ray.setFromCamera(mouse, camera);
-      const hits = ray.intersectObject(mesh, false);
-      const hit = hits[0];
-      if (!hit) {
-        setHover(null);
-        return;
-      }
-      // three-mesh-bvh 가 BVH 생성 시 geometry 에 index 를 추가 → faceIndex*3 은 더 이상
-      // position 인덱스가 아님(언싱크 원인). face.a 는 index 해석된 실제 정점 인덱스라 안전.
-      const vPos = hit.face ? hit.face.a : (hit.faceIndex ?? 0) * 3;
-      const el = findElementByVertex(parsed.elements, vPos);
+      // 인스턴싱: 히트의 instanceId → group.elementIdx → 요소 (정점 이진탐색 대체).
+      const hr = rayHit(ray);
+      const el = hr?.el ?? null;
       setHover(el ? { x: ev.clientX - rect.left, y: ev.clientY - rect.top, el } : null);
     };
     const onLeave = () => setHover(null);
@@ -727,11 +803,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       } catch {
         /* noop */
       }
-      try {
-        (parsed.geometry as BvhGeom).disposeBoundsTree();
-      } catch {
-        /* noop */
+      // 인스턴싱 그룹별 BVH·geometry·InstancedMesh GPU 리소스 해제.
+      for (const im of meshes) {
+        try { (im.geometry as BvhGeom).disposeBoundsTree(); } catch { /* noop */ }
+        im.geometry.dispose();
+        im.dispose();
       }
+      material.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
   }, [parsed]);
@@ -748,8 +826,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       return;
     }
     const { group, width, depthY, maxEl } = build;
-    parsed.geometry.computeBoundingBox();
-    const bb = parsed.geometry.boundingBox;
+    const bb = parsed.bbox; // 병합 geometry 대신 parseIfc 의 월드 bbox
     const groundY = bb?.min.y ?? parsed.center.y - parsed.radius;
     // 실제 규격 정합 — 지반은 미터 단위. 건물 단위(m vs mm) 자동판별 후 그에 맞춤.
     //   건물 footprint 가 1만(=10km in m / 10m in mm)보다 크면 mm 모델 → ×1000, 아니면 m → ×1.
@@ -767,11 +844,12 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   }, [geoBoreholes, geoOn, parsed]);
 
   // ── BIM 건물 정합 이동 (지반에 맞추기) — 단위 무관: 슬라이더 = 건물 반경의 % ──
+  // 모든 InstancedMesh 를 담는 bimGroup 를 이동(개별 mesh 가 아니라 그룹 단위).
   useEffect(() => {
-    const m = meshRef.current;
-    if (!m) return;
+    const g = bimGroupRef.current;
+    if (!g) return;
     const u = (parsed.radius || 50) / 100; // 슬라이더 1 = 반경의 1%
-    m.position.set(bimOffset.x * u, bimOffset.y * u, bimOffset.z * u);
+    g.position.set(bimOffset.x * u, bimOffset.y * u, bimOffset.z * u);
   }, [bimOffset, parsed]);
 
   // 지반 ON 이면 BIM 자체 바닥 그리드·초원 숨김 (지반과 겹침 방지)
@@ -794,22 +872,24 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   }, [walk]);
 
   // ── 날짜 변경 → 색상 갱신 (RAF 스로틀) ──
-  // 드래그 중 onChange 가 프레임당 수십 번 발생하면 10,890개 정점색 재계산이 동기로
-  // 쌓여 React 19 가 업데이트 폭주(#185)로 판단할 수 있다. 직전 프레임을 취소하고
-  // 마지막 값만 계산해 프레임당 1회로 합친다.
+  // 드래그 중 onChange 가 프레임당 수십 번 발생하면 색 재계산이 동기로 쌓여 React 19 가
+  // 업데이트 폭주(#185)로 판단할 수 있다. 직전 프레임을 취소하고 마지막 값만 계산해 프레임당 1회로 합친다.
   useEffect(() => {
-    const attr = colorAttrRef.current;
-    if (!attr) return;
+    const meshes = meshesRef.current;
+    const baseMats = baseMatsRef.current;
+    if (!meshes.length) return;
     const raf = requestAnimationFrame(() => {
-      const arr = attr.array as Float32Array;
       const realistic = realisticRef.current;
       const hk = hiliteViaRef.current;
       const hmode = hiliteModeRef.current;
       const counts = { done: 0, active: 0, planned: 0, ghost: 0, estimate: 0 };
+      const col = new THREE.Color();
+      const touchedColor = new Set<number>();
+      const touchedMatrix = new Set<number>();
       // 전체 재색칠 (정확성 우선 — 부분 업로드는 정합성 버그로 폐기)
       for (const el of parsed.elements) {
-        // 숨김 레이어(가설·MEP 등) → 색 루프에서 완전 skip (hide effect 가 알파0 으로 숨겨둠).
-        // 매 프레임 대용량 정점 재페인트를 피해 슬라이더 렉 제거. KPI 집계도 제외.
+        // 숨김 레이어(가설·MEP 등) → 색 루프에서 완전 skip (hide effect 가 zero-scale 로 숨겨둠).
+        // KPI 집계도 제외.
         if (el.trade && hiddenRef.current.has(el.trade)) continue;
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
@@ -821,13 +901,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         else if (st === 1) counts.active++;
         else counts.planned++;
         const isHi = hk != null && (hmode === "object" ? el.globalId === hk : mr?.via === hk);
-        if (isHi) paintElement(arr, el, C_HILITE, 1);
+        if (isHi) paintElement(meshes, baseMats, el, C_HILITE, 1, col, touchedColor, touchedMatrix);
         else {
           const { c, a } = colorForElement(el, mr?.via, dateMs, mr?.range ?? null, realistic);
-          paintElement(arr, el, c, a);
+          paintElement(meshes, baseMats, el, c, a, col, touchedColor, touchedMatrix);
         }
       }
-      attr.needsUpdate = true;
+      flushTouched(meshes, touchedColor, touchedMatrix);
       setKpi((prevK) =>
         prevK.done === counts.done &&
         prevK.active === counts.active &&
@@ -841,25 +921,29 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     return () => cancelAnimationFrame(raf);
   }, [dateMs, parsed, ranges, realistic, hidden]);
 
-  // 숨김 레이어 → 알파0 으로 1회 숨김(마운트·토글 off 시). 표시 레이어는 위 메인 루프가 칠함.
-  // 매 프레임 재페인트를 피하려 메인 루프는 숨김 레이어를 skip → 여기서만 hide 처리.
+  // 숨김 레이어 → zero-scale 로 1회 숨김(마운트·토글 off 시). 표시 레이어는 위 메인 루프가 칠함.
+  // 메인 루프가 숨김 레이어를 skip 하므로 여기서만 hide(zero-scale) 처리. (un-hide 복원은 메인 루프가 함)
   useEffect(() => {
-    const attr = colorAttrRef.current;
-    if (!attr) return;
-    const arr = attr.array as Float32Array;
+    const meshes = meshesRef.current;
+    if (!meshes.length) return;
+    const touchedMatrix = new Set<number>();
     for (const el of parsed.elements) {
-      if (el.trade && hidden.has(el.trade)) paintElement(arr, el, BLACK_HIDDEN, 0);
+      if (!el.trade || !hidden.has(el.trade)) continue;
+      for (const r of el.inst) {
+        const mesh = meshes[r.g];
+        if (mesh) setInstanceVisible(mesh, baseMatsRef.current[r.g], r.i, false, touchedMatrix);
+      }
     }
-    attr.needsUpdate = true;
+    flushTouched(meshes, undefined, touchedMatrix);
   }, [hidden, parsed]);
 
   // ── hover 한 공정단위 실제 부재를 황색 강조 (증분: 그룹이 바뀔 때만 재색칠) ──
   // 박스(AABB)는 U자 형상에서 겹쳐 부정확 → 실제 부재를 칠해 정확한 공정 범위를 보인다.
   const [hiliteCount, setHiliteCount] = useState(0);
   useEffect(() => {
-    const attr = colorAttrRef.current;
-    if (!attr) return;
-    const arr = attr.array as Float32Array;
+    const meshes = meshesRef.current;
+    const baseMats = baseMatsRef.current;
+    if (!meshes.length) return;
     const mode = hiliteMode;
     const mr = hover ? ranges.get(hover.el.globalId) : undefined;
     // 유닛 모드 = via 그룹 강조 / 객체 모드 = 그 부재 1개만 강조
@@ -869,6 +953,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     if (newKey === prevKey && mode === prevMode) return; // 변화 없음
 
     const realistic = realisticRef.current;
+    const col = new THREE.Color();
+    const touchedColor = new Set<number>();
+    const touchedMatrix = new Set<number>();
     const matches = (el: ParsedElement, key: string, m: "unit" | "object") =>
       m === "object" ? el.globalId === key : ranges.get(el.globalId)?.via === key;
 
@@ -877,13 +964,16 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       for (const el of parsed.elements) {
         if (!matches(el, prevKey, prevMode)) continue;
         if (el.trade && hiddenRef.current.has(el.trade)) {
-          paintElement(arr, el, BLACK_HIDDEN, 0); // 숨김 레이어 → 복원도 숨김 유지
+          // 숨김 레이어 → 복원도 숨김(zero-scale) 유지
+          for (const r of el.inst) {
+            const mesh = meshes[r.g];
+            if (mesh) setInstanceVisible(mesh, baseMats[r.g], r.i, false, touchedMatrix);
+          }
           continue;
         }
         const mr2 = ranges.get(el.globalId);
-        const st = statusAt(dateMs, mr2?.range ?? null);
         const { c, a } = colorForElement(el, mr2?.via, dateMs, mr2?.range ?? null, realistic);
-        paintElement(arr, el, c, a);
+        paintElement(meshes, baseMats, el, c, a, col, touchedColor, touchedMatrix);
       }
     }
     // 2) 새 강조 → 황색 (항상 보이게)
@@ -891,13 +981,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     if (newKey) {
       for (const el of parsed.elements) {
         if (!matches(el, newKey, mode)) continue;
-        paintElement(arr, el, C_HILITE, 1);
+        paintElement(meshes, baseMats, el, C_HILITE, 1, col, touchedColor, touchedMatrix);
         count++;
       }
     }
     hiliteViaRef.current = newKey;
     hiliteModeRef.current = mode;
-    attr.needsUpdate = true;
+    flushTouched(meshes, touchedColor, touchedMatrix);
     setHiliteCount(count);
   }, [hover, parsed, ranges, dateMs, hiliteMode]);
 

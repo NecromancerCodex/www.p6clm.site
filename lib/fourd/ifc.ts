@@ -1,9 +1,14 @@
 /**
- * 클라이언트 IFC 파서 (web-ifc WASM) → three.js 지오메트리 + 요소 메타.
+ * 클라이언트 IFC 파서 (web-ifc WASM) → three.js GPU 인스턴싱 지오메트리 + 요소 메타.
  *
- * 성능: 16k+ 요소를 개별 Mesh로 만들면 draw call 폭발 → 단일 BufferGeometry +
- * 정점색상(vertexColors) 으로 합치고, 요소별 정점 범위(vStart/vCount)를 기록해
- * 타임라인 변경 시 해당 범위 색만 갱신한다 (1 draw call).
+ * 성능: Revit 패밀리(IFC RepresentationMap/MappedItem)는 동일 지오메트리를 수백~수천 번
+ * 재사용한다. 과거엔 placed geometry 마다 정점을 단일 BufferGeometry 로 복제해 메모리가
+ * 폭발했다(예: 480k placed → 32M 정점). 이제는 geometryExpressID 로 묶어 '유니크 지오메트리'
+ * 만 1회 tessellate 하고, 각 인스턴스는 flatTransformation 행렬만 보관한다(InstancedMesh).
+ *   예: 480k placed / 19k unique → 4M 정점 (≈88% 절감).
+ *
+ * 요소(flatMesh)는 여러 placed geometry 를 가질 수 있어, 각 인스턴스 참조 {g,i}(그룹·슬롯)를
+ * 요소에 모두 기록한다. 타임라인 변경 시 요소의 인스턴스들 색만 setColorAt 으로 갱신한다.
  *
  * web-ifc wasm 은 /public/web-ifc/ 에서 서빙 (SetWasmPath).
  * 'use client' 컴포넌트에서만 동적 import 로 사용 (SSR 불가).
@@ -14,8 +19,7 @@ import { IfcAPI, IFCRELCONTAINEDINSPATIALSTRUCTURE, IFCRELDEFINESBYPROPERTIES } 
 import type { IfcElementMeta } from "./match";
 
 export interface ParsedElement extends IfcElementMeta {
-  vStart: number; // 정점 시작 인덱스
-  vCount: number; // 정점 개수
+  inst: { g: number; i: number }[]; // 이 요소의 인스턴스 참조 — g=그룹 index, i=그룹 내 슬롯 index
   cx: number; // bbox 중심 X (월드)
   cy: number; // bbox 중심 Y (월드, 수직)
   cz: number; // bbox 중심 Z (월드)
@@ -40,11 +44,23 @@ export interface SteelQto {
   count: number; // 부재 수
 }
 
+/**
+ * GPU 인스턴싱 그룹 — 동일 유니크 지오메트리(geometryExpressID)를 공유하는 인스턴스 묶음.
+ * 뷰어가 InstancedMesh(geometry, material, count) 1개로 렌더한다.
+ */
+export interface InstanceGroup {
+  geometry: THREE.BufferGeometry; // 로컬 indexed geometry (position + normal + index) — 1회만 생성
+  matrices: Float32Array; // count*16 — 인스턴스별 flatTransformation(column-major)
+  elementIdx: Int32Array; // count — 인스턴스 slot → elements 배열 index (hover 역참조)
+  count: number; // 인스턴스 개수
+}
+
 export interface ParsedIfc {
-  geometry: THREE.BufferGeometry; // position + normal + color(동적)
+  groups: InstanceGroup[]; // GPU 인스턴싱 그룹(유니크 지오메트리별) — 뷰어가 InstancedMesh 로 렌더
   elements: ParsedElement[];
   center: THREE.Vector3;
   radius: number;
+  bbox: THREE.Box3; // 전체 월드 bbox — 바닥 그리드 높이(min.y)·정합 등 (병합 geometry 부재 대체)
   steelQto?: SteelQto[]; // 철골 물량(있으면) — 자원 계획 BIM 자재추출 고도화
   skippedTrades?: string[]; // 메모리 절약 위해 기하 로드 안 한 trade(가설 등) — 패널이 '로드' 제공
 }
@@ -363,15 +379,24 @@ export async function parseIfc(
   const qtyMap = safeMap(() => buildQtyMap(api, modelID));
   const steelQto = (() => { try { return extractSteelQto(api, modelID); } catch { return []; } })();
 
-  // 누적 버퍼
-  const positions: number[] = [];
-  const normals: number[] = [];
+  // ── 인스턴싱 누적 구조 ──
+  // 유니크 지오메트리(geometryExpressID) → 그룹(빌더). 각 그룹은 로컬 정점/인덱스를 1회만 보관,
+  // 인스턴스 행렬·소속 요소 index 를 누적한다. 동일 패밀리 수백 회 재사용 시 정점 복제 제거.
+  interface GroupBuilder {
+    g: number; // 그룹 index (groups 배열 위치)
+    verts: Float32Array; // interleaved [px,py,pz,nx,ny,nz] — web-ifc 원본
+    idx: Uint32Array; // 인덱스
+    mats: number[]; // 인스턴스 행렬(16*n) 누적
+    elemIdx: number[]; // 인스턴스별 소속 요소 index 누적
+  }
+  const groupMap = new Map<number, GroupBuilder>(); // geometryExpressID → builder
+  const builders: GroupBuilder[] = [];
   const elements: ParsedElement[] = [];
   const skipped = new Set<string>(); // 기하 스킵된 trade(가설 등) 기록 — 패널이 '로드' 버튼 제공
   const tmp = new THREE.Matrix4();
   const v = new THREE.Vector3();
-  const n = new THREE.Vector3();
-  const normalMat = new THREE.Matrix3();
+  // 전체 월드 bbox(모든 인스턴스 정점) — 바닥 높이·정합·framing 용.
+  let wmnx = Infinity, wmny = Infinity, wmnz = Infinity, wmxx = -Infinity, wmxy = -Infinity, wmxz = -Infinity;
 
   onProgress?.(0.25, "지오메트리 스트리밍 중… (대용량 IFC는 1~2분)");
 
@@ -414,46 +439,75 @@ export async function parseIfc(
       }
     }
 
-    const vStart = positions.length / 3;
+    // 이 요소의 인스턴스 참조와 월드 bbox(전체 placed geometry 누적)
+    const elemIndex = elements.length;
+    const inst: { g: number; i: number }[] = [];
+    let mnx = Infinity, mny = Infinity, mnz = Infinity, mxx = -Infinity, mxy = -Infinity, mxz = -Infinity;
     // 깨진/비정상 지오메트리(가설·토목 모델에 흔함)가 GetVertexArray 등에서 "Invalid array length"를
-    // 던져 전체 파싱이 죽지 않도록 메시별 방어. 실패 시 부분 정점 롤백 후 이 메시만 스킵.
+    // 던져 전체 파싱이 죽지 않도록 메시별 방어. 실패 시 이 메시만 스킵(누적은 push 전이라 롤백 불요).
     try {
       const placed = flatMesh.geometries;
       for (let i = 0; i < placed.size(); i++) {
         const pg = placed.get(i);
-        const geom = api.GetGeometry(modelID, pg.geometryExpressID);
-        const verts = api.GetVertexArray(geom.GetVertexData(), geom.GetVertexDataSize());
-        const idx = api.GetIndexArray(geom.GetIndexData(), geom.GetIndexDataSize());
+        const gid = pg.geometryExpressID as number;
         const mat = pg.flatTransformation as number[];
+
+        // 유니크 지오메트리: 처음 보는 gid 만 tessellate(로컬 좌표·법선 그대로 보관). 이후 재사용.
+        let gb = groupMap.get(gid);
+        if (!gb) {
+          const geom = api.GetGeometry(modelID, gid);
+          const verts = api.GetVertexArray(geom.GetVertexData(), geom.GetVertexDataSize());
+          const idx = api.GetIndexArray(geom.GetIndexData(), geom.GetIndexDataSize());
+          // web-ifc 가 내부적으로 소유한 메모리를 가리키므로 안전하게 복사본을 보관.
+          gb = {
+            g: builders.length,
+            verts: new Float32Array(verts),
+            idx: new Uint32Array(idx),
+            mats: [],
+            elemIdx: [],
+          };
+          groupMap.set(gid, gb);
+          builders.push(gb);
+        }
+
+        // 인스턴스 슬롯 등록 — 행렬 + 소속 요소 index.
+        const slot = gb.elemIdx.length;
+        for (let j = 0; j < 16; j++) gb.mats.push(mat[j]);
+        gb.elemIdx.push(elemIndex);
+        inst.push({ g: gb.g, i: slot });
+
+        // 월드 bbox 누적 — 로컬 정점에 flatTransformation 적용(기존 per-mesh 결과와 동일).
+        // 인덱스가 아닌 유니크 정점을 직접 순회(같은 bbox, 중복 변환 제거).
         tmp.fromArray(mat);
-        normalMat.getNormalMatrix(tmp);
-        // web-ifc 정점 = [px,py,pz,nx,ny,nz] interleaved. 인덱스로 삼각형 전개(비인덱스).
-        for (let k = 0; k < idx.length; k++) {
-          const base = idx[k] * 6;
-          v.set(verts[base], verts[base + 1], verts[base + 2]).applyMatrix4(tmp);
-          n.set(verts[base + 3], verts[base + 4], verts[base + 5]).applyMatrix3(normalMat).normalize();
-          positions.push(v.x, v.y, v.z);
-          normals.push(n.x, n.y, n.z);
+        const verts = gb.verts;
+        for (let b = 0; b < verts.length; b += 6) {
+          v.set(verts[b], verts[b + 1], verts[b + 2]).applyMatrix4(tmp);
+          if (v.x < mnx) mnx = v.x;
+          if (v.x > mxx) mxx = v.x;
+          if (v.y < mny) mny = v.y;
+          if (v.y > mxy) mxy = v.y;
+          if (v.z < mnz) mnz = v.z;
+          if (v.z > mxz) mxz = v.z;
         }
       }
     } catch {
-      positions.length = vStart * 3; // 부분 정점 롤백
-      normals.length = vStart * 3;
+      // 이 메시의 일부 인스턴스가 이미 그룹에 push 됐을 수 있으나, 요소를 push 하지 않으면
+      // elementIdx 가 가리킬 요소가 없어진다 → 안전을 위해 이 요소가 등록한 인스턴스를 롤백.
+      for (const r of inst) {
+        const gb = builders[r.g];
+        gb.mats.length = r.i * 16;
+        gb.elemIdx.length = r.i;
+      }
       return; // 이 메시 스킵, 다음 메시 계속
     }
-    const vCount = positions.length / 3 - vStart;
-    if (vCount > 0) {
-      // bbox 중심 (월드) — 그리드 베이 배정용
-      let mnx = Infinity, mny = Infinity, mnz = Infinity, mxx = -Infinity, mxy = -Infinity, mxz = -Infinity;
-      for (let i = vStart * 3; i < positions.length; i += 3) {
-        const x = positions[i], y = positions[i + 1], z = positions[i + 2];
-        if (x < mnx) mnx = x;
-        if (x > mxx) mxx = x;
-        if (y < mny) mny = y;
-        if (y > mxy) mxy = y;
-        if (z < mnz) mnz = z;
-        if (z > mxz) mxz = z;
-      }
+    if (inst.length > 0 && mnx !== Infinity) {
+      // 전체 월드 bbox 갱신
+      if (mnx < wmnx) wmnx = mnx;
+      if (mxx > wmxx) wmxx = mxx;
+      if (mny < wmny) wmny = mny;
+      if (mxy > wmxy) wmxy = mxy;
+      if (mnz < wmnz) wmnz = mnz;
+      if (mxz > wmxz) wmxz = mxz;
       const pm = procMap.get(expressID);
       // 정량물량: **실제 IfcElementQuantity 만 신뢰.** bbox 체적은 비박스/대형 부재(토공·가설·굴착·proxy)에서
       // 실제의 수십~수백 배로 과대 → 물량 폭증·공기 왜곡. 없으면 undefined(=EA 로 gpt 상대 추정).
@@ -464,8 +518,7 @@ export async function parseIfc(
         ifcType: m.ifcType,
         name: m.name,
         storeyName: storeyMap.get(expressID) ?? null,
-        vStart,
-        vCount,
+        inst,
         cx: (mnx + mxx) / 2,
         cy: (mny + mxy) / 2,
         cz: (mnz + mxz) / 2,
@@ -525,32 +578,54 @@ export async function parseIfc(
       }
     }
   }
-  onProgress?.(0.92, "버퍼 구성 중…");
+  onProgress?.(0.92, "인스턴싱 그룹 구성 중…");
 
-  const geometry = new THREE.BufferGeometry();
-  const posArr = new Float32Array(positions);
-  geometry.setAttribute("position", new THREE.BufferAttribute(posArr, 3));
-  geometry.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(normals), 3));
-  // 색상 attribute — RGBA(투명도 포함, 동적 갱신). 초기 회색·불투명.
-  const numVerts = positions.length / 3;
-  const colArr = new Float32Array(numVerts * 4);
-  for (let i = 0; i < numVerts; i++) {
-    colArr[i * 4] = 0.6;
-    colArr[i * 4 + 1] = 0.6;
-    colArr[i * 4 + 2] = 0.6;
-    colArr[i * 4 + 3] = 1;
+  // ── 빌더 → InstanceGroup[] ──
+  // 각 유니크 지오메트리를 로컬 indexed BufferGeometry 로 만들고(정점/법선 분리 + 인덱스),
+  // 인스턴스 행렬/요소 index 를 타입드 배열로 고정. 색은 뷰어가 instanceColor 로 입힌다.
+  const groups: InstanceGroup[] = [];
+  for (const gb of builders) {
+    if (gb.elemIdx.length === 0) continue; // 인스턴스 없는 그룹(전부 롤백됨) 제외
+    const nv = gb.verts.length / 6;
+    const pos = new Float32Array(nv * 3);
+    const nrm = new Float32Array(nv * 3);
+    for (let i = 0; i < nv; i++) {
+      const b = i * 6;
+      pos[i * 3] = gb.verts[b];
+      pos[i * 3 + 1] = gb.verts[b + 1];
+      pos[i * 3 + 2] = gb.verts[b + 2];
+      nrm[i * 3] = gb.verts[b + 3];
+      nrm[i * 3 + 1] = gb.verts[b + 4];
+      nrm[i * 3 + 2] = gb.verts[b + 5];
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geometry.setAttribute("normal", new THREE.BufferAttribute(nrm, 3));
+    geometry.setIndex(new THREE.BufferAttribute(gb.idx, 1));
+    groups.push({
+      geometry,
+      matrices: new Float32Array(gb.mats),
+      elementIdx: Int32Array.from(gb.elemIdx),
+      count: gb.elemIdx.length,
+    });
   }
-  geometry.setAttribute("color", new THREE.BufferAttribute(colArr, 4));
 
-  geometry.computeBoundingSphere();
-  const bs = geometry.boundingSphere!;
+  // ── 전체 bbox/center/radius — 스트림에서 누적한 월드 bbox 로 산출(병합 geometry 대체) ──
+  const has = elements.length > 0 && wmnx !== Infinity;
+  const bbox = has
+    ? new THREE.Box3(new THREE.Vector3(wmnx, wmny, wmnz), new THREE.Vector3(wmxx, wmxy, wmxz))
+    : new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
+  const center = bbox.getCenter(new THREE.Vector3());
+  // 기존 boundingSphere.radius 와 호환되게 대각선 절반(외접구 반지름)으로 산출.
+  const radius = has ? bbox.getSize(new THREE.Vector3()).length() / 2 || 50 : 50;
   onProgress?.(1, `완료 — 요소 ${elements.length}개`);
 
   return {
-    geometry,
+    groups,
     elements,
-    center: bs.center.clone(),
-    radius: bs.radius,
+    center,
+    radius,
+    bbox,
     steelQto: steelQto.length ? steelQto : undefined,
     skippedTrades: skipped.size ? [...skipped] : undefined,
   };
