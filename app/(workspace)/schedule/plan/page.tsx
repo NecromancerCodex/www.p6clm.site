@@ -14,7 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, planP6XmlUrl,
-  savePlanActivities, startPlan,
+  savePlanActivities, startPlan, ScheduleApiError,
   type GanttTask, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
@@ -120,9 +120,19 @@ export default function SchedulePlanWizard() {
       if (p.stage === "error") setErr(p.payload.error ?? p.progress ?? "오류");
       // 체크포인트는 done 에도 유지 — '새 계획 시작' 누를 때까지 새로고침/이동 후 복원 보장.
     } catch (e) {
+      // 좀비 플랜 정리 — 삭제/없는 플랜(404)을 체크포인트·URL이 가리켜 무한 폴링하던 것 차단.
+      // 폴링 중단 + 체크포인트·URL 정리 + 위저드 복귀('새 계획 시작'과 동일).
+      if (e instanceof ScheduleApiError && e.status === 404) {
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        if (typeof window !== "undefined") localStorage.removeItem(PLAN_CKPT);
+        setPlan(null);
+        setErr(null);
+        router.replace("/schedule/plan");
+        return;
+      }
       setErr(e instanceof Error ? e.message : String(e));
     }
-  }, [dirty]);
+  }, [dirty, router]);
 
 
   useEffect(() => {
