@@ -31,7 +31,7 @@ const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; 
   { key: "종합", label: "종합", icon: "🗂️", active: true, hint: "전 공종 1파일(REV 등) — 자동 분리" },
   { key: "토목", label: "토목", icon: "🏗️", active: true, hint: "굴착·흙막이" },
   { key: "구조", label: "구조", icon: "🏢", active: true, hint: "골조" },
-  { key: "건축", label: "건축", icon: "🧱", active: false, hint: "마감" },
+  { key: "건축", label: "건축", icon: "🧱", active: true, hint: "마감(조적·창호·타일·도장…)" },
   { key: "MEP", label: "MEP", icon: "🔧", active: false, hint: "기계·소방·전기·통신" },
   { key: "조경", label: "조경", icon: "🌳", active: false, hint: "조경" },
   { key: "가설", label: "가설", icon: "🚧", active: false, hint: "비계·거푸집(오버레이)" },
@@ -254,10 +254,10 @@ export default function SchedulePlanWizard() {
       for (const [disc, file] of entries) {
         setInferReason(`분석 중 — ${disc} (${file.name})…`);
         const r = await analyzeSlotFile(file);
-        // PSet 복합 파일(REV — Lv.2 Trade 있음)은 슬롯으로 덮어쓰지 않고 PSet Trade 분류(ST/MO→구조·
-        // TW→가설·CV→토목) 유지. 무태그 분리 파일(토목.ifc 등)만 슬롯 공종으로 확정.
-        const hasPSet = (r.trade_summary?.length ?? 0) > 0;
-        allWu.push(...(hasPSet
+        // 슬롯이 진실: 종합 슬롯만 분류기로 전 공종 분리(PSet Trade+IFC타입), 나머지(토목/구조/건축)는
+        // 슬롯 공종으로 강제 → "토목은 토목만, 구조는 구조만, 건축은 건축만". 혼합 파일은 종합 슬롯 사용.
+        const comprehensive = disc === "종합";
+        allWu.push(...(comprehensive
           ? (r.work_units as GenWorkUnit[])
           : (r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))));
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
