@@ -196,8 +196,15 @@ export default function SchedulePlanWizard() {
       //    대용량 IFC 가 브라우저 메모리를 압박하지 않음. S3 미설정/실패 시 ②로 폴백.
       try {
         const r = await extractIfcWorkUnitsViaS3(file);
-        setWorkUnits(r.work_units as GenWorkUnit[]);
-        setZones(r.zones); setStoreys(r.storeys);
+        const wu = r.work_units as GenWorkUnit[];
+        // 멀티파싱 누적 — 슬롯 업로드면 그 공종 분량만 교체하고 다른 공종은 보존(여러 공종 결합 → 병합 생성).
+        if (fixedDiscipline) {
+          setWorkUnits((prev) => [...prev.filter((w) => w.discipline !== fixedDiscipline), ...wu]);
+          setZones((prev) => [...new Set([...prev, ...r.zones])]);
+          setStoreys((prev) => [...new Set([...prev, ...r.storeys])]);
+        } else {
+          setWorkUnits(wu); setZones(r.zones); setStoreys(r.storeys);
+        }
         setBimName(`${file.name} — ${r.element_count.toLocaleString()}부재 → ${r.work_units.length} 워크패키지 (서버)`);
         if (fixedDiscipline) {
           const warn = validateSlot(fixedDiscipline, r.discipline_summary); // 분리 QA — 슬롯↔파일 공종 대조
@@ -444,8 +451,8 @@ export default function SchedulePlanWizard() {
             </div>
             {bimBusy && <p style={{ fontSize: 12, color: "#2563eb", margin: "8px 0 0" }}>BIM 분석 중…</p>}
             {Object.keys(slots).length > 1 && (
-              <p style={{ fontSize: 12, color: "#b45309", margin: "8px 0 0" }}>
-                ⚠️ 복수 공종 병합 생성은 2·3단계에서 구현됩니다 — 현재는 마지막 업로드 공종({discipline}) 기준으로 생성됩니다.
+              <p style={{ fontSize: 12, color: "#15803d", margin: "8px 0 0" }}>
+                🔗 복수 공종 병합 — {Object.keys(slots).join(" + ")}을(를) 시공순서로 연결해 1개 공정표로 생성합니다.
               </p>
             )}
             {inferReason && <p style={{ fontSize: 12, color: "#7c3aed", margin: "8px 0 0" }}>🤖 AI 판정: {inferReason}</p>}

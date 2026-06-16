@@ -450,7 +450,7 @@ export async function inferScheduleContext(req: {
 
 // ── IFC → S3 → 서버 work_unit 추출 (C-1) — 대용량 IFC 브라우저 부담 0 ───────────
 export interface IfcWorkUnitsResult {
-  work_units: { zone: string; storey: string; element_type: string; count: number }[];
+  work_units: { zone: string; storey: string; element_type: string; count: number; discipline?: string }[];
   zones: string[];
   storeys: string[];
   trade_summary: { trade: string; count: number }[];
