@@ -110,6 +110,8 @@ export default function SchedulePlanWizard() {
   const [wdpw, setWdpw] = useState(6);
   const [towerCranes, setTowerCranes] = useState(2);
   const [workCrews, setWorkCrews] = useState(3);
+  const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
+  const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
   const [constraints, setConstraints] = useState("");
   const [strategy, setStrategy] = useState("bottom_up");
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
@@ -210,6 +212,7 @@ export default function SchedulePlanWizard() {
           const warn = validateSlot(fixedDiscipline, r.discipline_summary); // 분리 QA — 슬롯↔파일 공종 대조
           setSlots((s) => ({ ...s, [fixedDiscipline]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn } }));
         }
+        if (r.civil_quantities) setCivilQty(r.civil_quantities); // 토목 물량(서버 도출) → 기간 산정·표시
         void inferScheduleContext({
           storeys: r.storeys, zones: r.zones,
           element_summary: r.element_summary,
@@ -286,6 +289,7 @@ export default function SchedulePlanWizard() {
         zones, storeys, work_units: workUnits, methods: [],
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
+        civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         constraints: constraints.trim() || undefined,
         strategy,
       });
@@ -504,13 +508,25 @@ export default function SchedulePlanWizard() {
                 </select>
               </div>
             </Field>
-            <Field label="④ 자원 — 타워크레인 / 작업조">
+            <Field label="④ 자원 — 타워크레인 / 작업조 / 토목 투입조">
               <div style={{ display: "flex", gap: 8 }}>
                 <label className="wz-sub">크레인(대)
                   <input type="number" min={0} className="wz-in" value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
                 <label className="wz-sub">작업조(조)
                   <input type="number" min={1} className="wz-in" value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
+                {slots["토목"] && (
+                  <label className="wz-sub" title="굴착기·CIP장비 등 토목 투입 장비조 수 — 토목 기간 = 물량 ÷ (표준품셈 생산성 × 투입조)">토목 투입조(대)
+                    <input type="number" min={1} className="wz-in" value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} /></label>
+                )}
               </div>
+              {slots["토목"] && civilQty && (
+                <p style={{ fontSize: 11, color: "#0369a1", margin: "6px 0 0" }}>
+                  🏗️ 토목 물량(BIM 도출): 굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
+                  · 굴착체적 ≈ {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥
+                  · 흙막이 {(civilQty.pile_count ?? 0).toLocaleString()}공/둘레 {civilQty.perimeter_m}m
+                  <br />→ 투입조 {civilEquip}대 기준으로 토목 기간 자동 산정 (생성 후 활동별 수정 가능)
+                </p>
+              )}
             </Field>
             <Field label="⑤ 현장 조건·제약 — BIM에 없는 정보를 알려주세요 (AI가 공정에 반영)">
               <input className="wz-in" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한, 암반 굴착, 도심 반입 제한" />

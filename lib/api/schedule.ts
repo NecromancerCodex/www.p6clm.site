@@ -370,6 +370,8 @@ export interface GenerateScheduleRequest {
   work_days_per_week: number;
   tower_cranes: number;        // 타워크레인 수 — 동시 양중 한계(스태거)
   work_crews: number;          // 작업조 수 — 동시 동일공종 한계
+  civil_equipment?: number;    // 토목 투입조(굴착기·CIP장비 대수) — 토목 기간 = 물량 ÷ (생산성 × 투입조)
+  civil_quantities?: { depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number }; // 토목 물량(서버 도출)
   constraints?: string;
   strategy?: string;   // bottom_up(순타)|top_down(역타) — BIM에 없는 발주·부지 조건(사람 선택)
 }
@@ -455,6 +457,7 @@ export interface IfcWorkUnitsResult {
   storeys: string[];
   trade_summary: { trade: string; count: number }[];
   discipline_summary?: { discipline: string; count: number }[];   // 공종 분포(흙막이 보정 후)
+  civil_quantities?: { depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number }; // 토목 물량(서버 placement 도출)
   element_summary: { type: string; count: number; names?: string[] }[];
   element_count: number;
 }
