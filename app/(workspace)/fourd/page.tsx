@@ -22,6 +22,7 @@ import {
   buildCandidates,
   buildCodeIndex,
   buildScheduleIndex,
+  canonStorey,
   classifyIfcType,
   decodeActId,
   expandModularUnits,
@@ -298,6 +299,25 @@ export default function FourDPage() {
         ({ ranges, summary } = matchAll(parsed.elements, sidx));
         minDate = codeIndex ? Math.min(codeIndex.minDate, sidx.minDate) : sidx.minDate;
         maxDate = codeIndex ? Math.max(codeIndex.maxDate, sidx.maxDate) : sidx.maxDate;
+      }
+      // 토목 단계 굴착 — 토목 부재(disc/CV/TW)를 earthworkWindow 안에서 층(canonStorey)별로 순차 배치.
+      // (earthworkWindow 한 칸에 다 넣으면 "한번에 완성" — 층별로 나눠 굴착 순서 복원). 굴착 top-down:
+      // 얕은 지하(B1) 먼저 → 깊은 지하(B5) 나중. 부재 없는 기간은 비고, 형상은 층 순서대로 등장.
+      if (codeIndex?.earthworkWindow) {
+        const ew = codeIndex.earthworkWindow;
+        const bnum = (s: string) => { const m = /B\s*0*(\d+)/i.exec(s); return m ? parseInt(m[1], 10) : 0; };
+        const civilEls = parsed.elements.filter((e) => e.disc === "토목" || e.trade === "CV" || e.trade === "TW");
+        const stoSet = [...new Set(civilEls.map((e) => canonStorey(e.storey4d ?? e.storeyName ?? "") || "").filter(Boolean))];
+        stoSet.sort((a, b) => bnum(a) - bnum(b)); // B1 → B5 (굴착 top-down)
+        if (stoSet.length > 1 && ew.end > ew.start) {
+          const span = (ew.end - ew.start) / stoSet.length;
+          const ord = new Map(stoSet.map((s, i) => [s, i]));
+          for (const e of civilEls) {
+            const s = canonStorey(e.storey4d ?? e.storeyName ?? "") || "";
+            const i = ord.get(s) ?? 0;
+            ranges.set(e.globalId, { range: { start: ew.start + i * span, end: ew.start + (i + 1) * span }, via: `earthwork:${s || "토목"}` });
+          }
+        }
       }
       // 4D 타임라인 = 전체 공정표 범위(모든 task). 코드/키워드 인덱스에 안 잡히는 활동(지반개량 등)도
       // 포함 → 슬라이더가 진짜 착공일(첫 활동)부터 시작. (안 그러면 흙막이부터 시작해 6~7월 공백)
