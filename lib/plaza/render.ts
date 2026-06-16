@@ -126,17 +126,67 @@ export function drawChibi(ctx: CanvasRenderingContext2D, o: ChibiOpts) {
   if (look.hat) drawHat(ctx, getItem(look.hat)!, o.x, headCY, 1, dir);
 
   // 이름표
-  ctx.font = "600 12px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  const tw = ctx.measureText(o.name).width;
-  ctx.fillStyle = "rgba(0,0,0,0.55)";
-  roundRect(ctx, o.x - tw / 2 - 6, feetY + 5, tw + 12, 17, 8); ctx.fill();
-  ctx.fillStyle = o.isMe ? "#ffe066" : "#fff";
-  ctx.fillText(o.name, o.x, feetY + 17);
+  drawNameTag(ctx, o.x, feetY, o.name, !!o.isMe);
 
   // 말풍선
   if (o.bubble) drawBubble(ctx, o.x, headCY - HEAD_R - 8, o.bubble.text);
 
+  ctx.restore();
+}
+
+function drawNameTag(ctx: CanvasRenderingContext2D, x: number, feetY: number, name: string, isMe: boolean) {
+  ctx.font = "600 12px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  const tw = ctx.measureText(name).width;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  roundRect(ctx, x - tw / 2 - 6, feetY + 5, tw + 12, 17, 8); ctx.fill();
+  ctx.fillStyle = isMe ? "#ffe066" : "#fff";
+  ctx.fillText(name, x, feetY + 17);
+}
+
+// ── 스프라이트시트 애니메이션 캐릭터 ─────────────────────────────────────────────
+// char.png = MV Platformer Male (MoikMellah, OpenGameArt, CC0/public domain).
+// 320×640, 32×64 프레임, 10열. 오른쪽 바라봄(왼쪽 향할 때 좌우 반전).
+const FRAME_W = 32;
+const FRAME_H = 64;
+const SHEET_COLS = 10;
+const SPRITE_H = 84; // 화면 표시 높이(px). 폭은 비율 유지.
+
+// 애니메이션별 프레임 [col,row] + 초당 프레임수. (frameGuide.png 기준)
+const ANIMS: Record<AnimState, { f: [number, number][]; fps: number }> = {
+  idle: { f: [[0, 0]], fps: 1 },
+  walk: { f: [[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]], fps: 11 },
+  jump: { f: [[7, 1], [8, 1], [9, 1]], fps: 8 },
+};
+
+export function drawSpriteChar(ctx: CanvasRenderingContext2D, o: ChibiOpts, sheet: HTMLImageElement) {
+  const a = ANIMS[o.st] || ANIMS.idle;
+  const fi = Math.floor(o.now / (1000 / a.fps)) % a.f.length;
+  const [c, r] = a.f[fi];
+  const sx = c * FRAME_W, sy = r * FRAME_H;
+  const scale = SPRITE_H / FRAME_H;
+  const dw = FRAME_W * scale, dh = SPRITE_H;
+  const feetY = o.y;
+  const topY = feetY - dh + 2; // 셀 하단 ≈ 발
+
+  ctx.save();
+  // 그림자
+  ctx.fillStyle = "rgba(0,0,0,0.2)";
+  ctx.beginPath(); ctx.ellipse(o.x, feetY, dw * 0.34, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.imageSmoothingEnabled = false; // 저해상 스프라이트 — 또렷하게
+  ctx.save();
+  if (o.facing === "l") { ctx.translate(o.x, 0); ctx.scale(-1, 1); ctx.translate(-o.x, 0); }
+  ctx.drawImage(sheet, sx, sy, FRAME_W, FRAME_H, o.x - dw / 2, topY, dw, dh);
+  ctx.restore();
+
+  if (o.isMe) { // 내 캐릭터 강조 링
+    ctx.strokeStyle = "rgba(255,224,102,0.7)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(o.x, feetY, dw * 0.36, 6, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  drawNameTag(ctx, o.x, feetY, o.name, !!o.isMe);
+  if (o.bubble) drawBubble(ctx, o.x, topY + 4, o.bubble.text);
   ctx.restore();
 }
 

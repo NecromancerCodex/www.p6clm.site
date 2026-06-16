@@ -21,7 +21,7 @@ import {
   type PlayerSnapshot,
   type Look,
 } from "../../lib/plaza/protocol";
-import { drawChibi, roundRect } from "../../lib/plaza/render";
+import { drawChibi, drawSpriteChar, roundRect } from "../../lib/plaza/render";
 import { usePlazaStore } from "../../stores/plazaStore";
 import { InventoryPanel } from "./InventoryPanel";
 import { EquipPanel } from "./EquipPanel";
@@ -129,17 +129,22 @@ export function PlazaCanvas() {
   const inputFocusedRef = useRef(false);
   const bgRef = useRef<HTMLImageElement | null>(null);
   const fgRef = useRef<HTMLImageElement | null>(null); // 선택: 전경 컷아웃 PNG
+  const charRef = useRef<HTMLImageElement | null>(null); // 캐릭터 스프라이트시트
   const myLookRef = useRef<Look>({}); // 내 장착 외형 (게임 루프용)
 
-  // ── 배경/전경 이미지 + 프로필 로드 ───────────────────────────────────────────
+  // ── 배경/전경/캐릭터 이미지 + 프로필 로드 ─────────────────────────────────────
   useEffect(() => {
     const img = new Image();
     img.src = "/plaza/town.png";
     img.onload = () => { bgRef.current = img; };
-    // 전경 컷아웃(있으면) — 없으면 onerror 로 조용히 무시하고 FG_SLICES 폴백 사용
+    // 전경 컷아웃(있으면) — 없으면 조용히 무시
     const fg = new Image();
     fg.onload = () => { fgRef.current = fg; };
     fg.src = "/plaza/town_fg.png";
+    // 캐릭터 스프라이트시트 (애니메이션) — 없으면 절차적 치비 폴백
+    const ch = new Image();
+    ch.onload = () => { charRef.current = ch; };
+    ch.src = "/plaza/char.png";
     void loadProfile();
   }, [loadProfile]);
 
@@ -303,17 +308,20 @@ export function PlazaCanvas() {
         }
       }
 
+      const sheet = charRef.current;
       for (const r of remotesRef.current.values()) {
-        drawChibi(ctx, {
+        const opts = {
           x: r.x, y: r.y, facing: r.facing, st: r.st, bodyColor: colorFor(r.id),
           name: r.name, now, look: r.look, bubble: bubbleFor(r.id, now),
-        });
+        };
+        if (sheet) drawSpriteChar(ctx, opts, sheet); else drawChibi(ctx, opts);
       }
       const LL = localRef.current;
-      drawChibi(ctx, {
+      const myOpts = {
         x: LL.x, y: LL.y, facing: LL.facing, st: LL.st, bodyColor: colorFor(myIdRef.current),
         name: "나", now, look: myLookRef.current, isMe: true, bubble: bubbleFor(-1, now),
-      });
+      };
+      if (sheet) drawSpriteChar(ctx, myOpts, sheet); else drawChibi(ctx, myOpts);
 
       // ── 전경(foreground) — 투명 컷아웃 PNG(town_fg.png) 가 있을 때만 캐릭터 위에 덮음.
       //    (슬라이스 재드로 방식은 반투명 벽/레이어 아티팩트가 있어 제거함)
