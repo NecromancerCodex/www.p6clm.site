@@ -247,7 +247,12 @@ export default function SchedulePlanWizard() {
       for (const [disc, file] of entries) {
         setInferReason(`분석 중 — ${disc} (${file.name})…`);
         const r = await analyzeSlotFile(file);
-        allWu.push(...(r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))); // 공종=슬롯 확정
+        // PSet 복합 파일(REV — Lv.2 Trade 있음)은 슬롯으로 덮어쓰지 않고 PSet Trade 분류(ST/MO→구조·
+        // TW→가설·CV→토목) 유지. 무태그 분리 파일(토목.ifc 등)만 슬롯 공종으로 확정.
+        const hasPSet = (r.trade_summary?.length ?? 0) > 0;
+        allWu.push(...(hasPSet
+          ? (r.work_units as GenWorkUnit[])
+          : (r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))));
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
         if (r.civil_quantities) cq = r.civil_quantities;
         setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary) } }));
