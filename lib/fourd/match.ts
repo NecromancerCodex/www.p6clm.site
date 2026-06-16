@@ -234,6 +234,13 @@ export interface CodeIndex {
 const _EARTHWORK_KW = /흙막이|토공|굴착|터파기|차수|되메우|버림|토류|가시설|파일|말뚝/;
 // 되메우기·성토는 골조 후행(post) — 흙막이 부재 window 에서 제외(안 그러면 흙막이가 골조 끝까지 진행중).
 const _BACKFILL_KW = /되메우|성토|복구/;
+// 마감/FF&E/MEP 타입 — 골조(구조) 공정 부재가 아님. BIM 이 이들을 구조 코드(ST/MO·CR/MD)로 오태깅해도
+// IFC 타입이 진실 → 골조 매칭 제외(회색). 골조 scope 엔 마감 활동이 없음(있으면 추후 그쪽 매칭).
+const _FINISH_TYPES = new Set([
+  "IfcWindow", "IfcDoor", "IfcCovering", "IfcRailing", "IfcFurnishingElement", "IfcFurniture",
+  "IfcSystemFurnitureElement", "IfcFlowTerminal", "IfcFlowSegment", "IfcFlowFitting",
+  "IfcSanitaryTerminal", "IfcLightFixture", "IfcDistributionElement", "IfcDistributionFlowElement",
+]);
 
 // 스케줄 op(CR/MD/FT/PR) → 부재 카테고리. BIM 부재(classifyIfcType)와 같은 축으로 통일해
 // trade(ST/MO)·wt(WAL/SLB/COL) 코드 차이를 무시하고 구역 단위 매칭을 살린다.
@@ -462,6 +469,14 @@ export function matchAllHybrid(
   const byVia: Record<string, number> = {};
   let matched = 0;
   for (const el of elements) {
+    // 마감/FF&E/MEP 타입 — 골조 공정에 매칭 안 함(회색). BIM 이 구조 코드로 오태깅(창호=ST/CR 등)해도
+    // IFC 타입이 진실. 골조 scope 라 마감 활동 없음 → 미매칭. (창호가 기초·골조에 뜨던 논리오류 차단)
+    if (_FINISH_TYPES.has(el.ifcType)) {
+      const r0: MatchResult = { range: null, via: "finish:마감" };
+      ranges.set(el.globalId, r0);
+      byVia["마감"] = (byVia["마감"] ?? 0) + 1;
+      continue;
+    }
     let r = matchByCode(el, codeIdx);
     // 토목/가설 부재는 구조 폴백 금지 — 토목 활동(earthwork)에 못 붙었으면 미매칭(회색)으로 둔다.
     // (흙막이가 같은 층 구조 코어·골조로 잘못 매칭돼 "지하벽보다 늦게" 보이던 문제 차단)
