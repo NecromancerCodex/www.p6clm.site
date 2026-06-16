@@ -34,6 +34,29 @@ const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; 
   { key: "가설", label: "가설", icon: "🚧", active: false, hint: "비계·거푸집(오버레이)" },
 ];
 
+// 슬롯 검증 — 업로드 파일의 공종 분포(서버 discipline_summary, 흙막이 보정 후)가 슬롯과 맞는지.
+// 가설은 오버레이(납품물 아님)라 '주공종' 판정에서 제외 → 토목+가설 합본을 토목 슬롯에 넣어도 OK,
+// 가설 비중만 정보로 안내. 슬롯에 엉뚱한 파일(구조→토목 슬롯)이면 경고 = 분리 작업 QA 도구.
+const SCHEDULABLE = ["토목", "구조", "건축", "MEP", "조경"];
+function validateSlot(slot: string, summary?: { discipline: string; count: number }[]): string | null {
+  if (!summary || !summary.length) return null; // 클라 파싱 폴백 등 — 분포 없음 → 검증 생략
+  const m: Record<string, number> = {};
+  for (const d of summary) m[d.discipline] = d.count;
+  const schedTotal = SCHEDULABLE.reduce((s, k) => s + (m[k] || 0), 0);
+  const temp = m["가설"] || 0;
+  if (schedTotal === 0) return `⚠️ ${slot} 공정 부재가 없습니다 (가설/미상 위주) — 슬롯이 맞나요?`;
+  const slotN = m[slot] || 0;
+  const share = slotN / schedTotal;
+  if (share >= 0.5) {
+    return temp > schedTotal
+      ? `ℹ️ ${slot} ${slotN.toLocaleString()}개 + 가설 ${temp.toLocaleString()}개(오버레이)`
+      : null; // 슬롯 공종 우세 — 정상
+  }
+  let dom = slot, domN = slotN;
+  for (const k of SCHEDULABLE) if ((m[k] || 0) > domN) { dom = k; domN = m[k] || 0; }
+  return `⚠️ 이 파일은 ${dom} 위주입니다 (${slot} ${Math.round(share * 100)}%) — 슬롯이 맞나요?`;
+}
+
 let _ganttLoad: Promise<void> | null = null;
 function loadFrappeGantt(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
@@ -81,7 +104,7 @@ export default function SchedulePlanWizard() {
   const [scope, setScope] = useState("");
   const [structureType, setStructureType] = useState("");
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
-  const [slots, setSlots] = useState<Record<string, { name: string; count: number; wp: number }>>({}); // 공종별 업로드 현황(멀티파싱)
+  const [slots, setSlots] = useState<Record<string, { name: string; count: number; wp: number; warn?: string | null }>>({}); // 공종별 업로드 현황(멀티파싱)
   const [startDate, setStartDate] = useState("");
   const [durationMonths, setDurationMonths] = useState("");
   const [wdpw, setWdpw] = useState(6);
@@ -176,7 +199,10 @@ export default function SchedulePlanWizard() {
         setWorkUnits(r.work_units as GenWorkUnit[]);
         setZones(r.zones); setStoreys(r.storeys);
         setBimName(`${file.name} — ${r.element_count.toLocaleString()}부재 → ${r.work_units.length} 워크패키지 (서버)`);
-        if (fixedDiscipline) setSlots((s) => ({ ...s, [fixedDiscipline]: { name: file.name, count: r.element_count, wp: r.work_units.length } }));
+        if (fixedDiscipline) {
+          const warn = validateSlot(fixedDiscipline, r.discipline_summary); // 분리 QA — 슬롯↔파일 공종 대조
+          setSlots((s) => ({ ...s, [fixedDiscipline]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn } }));
+        }
         void inferScheduleContext({
           storeys: r.storeys, zones: r.zones,
           element_summary: r.element_summary,
@@ -404,6 +430,12 @@ export default function SchedulePlanWizard() {
                     <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {filled ? `${filled.count.toLocaleString()}부재 → ${filled.wp} WP` : `업로드 · ${d.hint}`}
                     </div>
+                    {filled?.warn && (
+                      <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.3, whiteSpace: "normal",
+                                    color: filled.warn.startsWith("⚠️") ? "#b91c1c" : "#0369a1" }}>
+                        {filled.warn}
+                      </div>
+                    )}
                     <input type="file" accept=".ifc" style={{ display: "none" }} disabled={bimBusy}
                            onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f, d.key); }} />
                   </label>
