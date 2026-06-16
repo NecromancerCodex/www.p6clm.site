@@ -22,6 +22,18 @@ import GanttChartRaw from "../../../../components/process/GanttChart";
 
 const GanttChart = GanttChartRaw as unknown as FC<{ tasks: GanttTask[]; height?: number; viewMode?: string; fillWidth?: boolean }>;
 
+// 멀티파싱 임포트 — 공종(디시플린) 슬롯. 순서 = 시공 시퀀스(토목→구조→건축→MEP→조경→가설).
+// active=공정 엔진 보유(토목 civil.py / 구조 타워·모듈러). 나머지는 잠금(🔒, Phase D)·가설은 오버레이.
+// 넣은 공종만 공정표에 반영(구독형) — 단일이면 그 공종, 복수면 병합(2·3단계).
+const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; hint: string }[] = [
+  { key: "토목", label: "토목", icon: "🏗️", active: true, hint: "굴착·흙막이" },
+  { key: "구조", label: "구조", icon: "🏢", active: true, hint: "골조(타워·모듈러)" },
+  { key: "건축", label: "건축", icon: "🧱", active: false, hint: "마감" },
+  { key: "MEP", label: "MEP", icon: "🔧", active: false, hint: "기계·소방·전기·통신" },
+  { key: "조경", label: "조경", icon: "🌳", active: false, hint: "조경" },
+  { key: "가설", label: "가설", icon: "🚧", active: false, hint: "비계·거푸집(오버레이)" },
+];
+
 let _ganttLoad: Promise<void> | null = null;
 function loadFrappeGantt(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
@@ -69,6 +81,7 @@ export default function SchedulePlanWizard() {
   const [scope, setScope] = useState("");
   const [structureType, setStructureType] = useState("");
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
+  const [slots, setSlots] = useState<Record<string, { name: string; count: number; wp: number }>>({}); // 공종별 업로드 현황(멀티파싱)
   const [startDate, setStartDate] = useState("");
   const [durationMonths, setDurationMonths] = useState("");
   const [wdpw, setWdpw] = useState(6);
@@ -152,8 +165,9 @@ export default function SchedulePlanWizard() {
   }, [stage]);
 
   // ── BIM 업로드 (generate 와 동일 집계 — 4D 매칭 표기 일치) ──
-  const onBim = async (file: File) => {
+  const onBim = async (file: File, fixedDiscipline?: string) => {
     setBimBusy(true); setErr(null);
+    if (fixedDiscipline) setDiscipline(fixedDiscipline); // 슬롯 업로드 = 명시적 공종(자동판정보다 우선)
     try {
       // ① 서버 경로(C-1) — IFC 를 S3 에 직접 업로드 후 서버가 work_unit 추출.
       //    대용량 IFC 가 브라우저 메모리를 압박하지 않음. S3 미설정/실패 시 ②로 폴백.
@@ -162,6 +176,7 @@ export default function SchedulePlanWizard() {
         setWorkUnits(r.work_units as GenWorkUnit[]);
         setZones(r.zones); setStoreys(r.storeys);
         setBimName(`${file.name} — ${r.element_count.toLocaleString()}부재 → ${r.work_units.length} 워크패키지 (서버)`);
+        if (fixedDiscipline) setSlots((s) => ({ ...s, [fixedDiscipline]: { name: file.name, count: r.element_count, wp: r.work_units.length } }));
         void inferScheduleContext({
           storeys: r.storeys, zones: r.zones,
           element_summary: r.element_summary,
@@ -171,7 +186,7 @@ export default function SchedulePlanWizard() {
           if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
           if (ctx.scope && !scope) setScope(ctx.scope);
           if (ctx.structure_type) setStructureType(ctx.structure_type);
-        if (ctx.discipline) setDiscipline(ctx.discipline);
+        if (ctx.discipline && !fixedDiscipline) setDiscipline(ctx.discipline);
           if (ctx.reason) setInferReason(ctx.reason);
         });
         setBimBusy(false);
@@ -209,6 +224,7 @@ export default function SchedulePlanWizard() {
       setWorkUnits([...agg.values()]);
       setZones([...zoneSet]); setStoreys([...storeySet]);
       setBimName(`${file.name} — ${parsed.elements.length.toLocaleString()}부재 → ${agg.size} 워크패키지`);
+      if (fixedDiscipline) setSlots((s) => ({ ...s, [fixedDiscipline]: { name: file.name, count: parsed.elements.length, wp: agg.size } }));
       void inferScheduleContext({
         storeys: [...storeySet], zones: [...zoneSet],
         element_summary: [...typeCount.entries()].sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count, names: [...(typeNames.get(type) ?? [])] })),
@@ -218,7 +234,7 @@ export default function SchedulePlanWizard() {
         if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
         if (ctx.scope && !scope) setScope(ctx.scope);
         if (ctx.structure_type) setStructureType(ctx.structure_type);
-        if (ctx.discipline) setDiscipline(ctx.discipline);
+        if (ctx.discipline && !fixedDiscipline) setDiscipline(ctx.discipline);
         if (ctx.reason) setInferReason(ctx.reason);
       });
     } catch (e) {
@@ -358,14 +374,47 @@ export default function SchedulePlanWizard() {
       {step === 0 && (
         <>
           <div className="wz-card">
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <label className="wz-bim">
-                {bimBusy ? "BIM 분석 중…" : "📦 BIM(IFC) 업로드 — 워크패키지 자동 집계"}
-                <input type="file" accept=".ifc" style={{ display: "none" }} disabled={bimBusy}
-                       onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f); }} />
-              </label>
-              {bimName && <span style={{ fontSize: 12, color: "#475569" }}>{bimName}</span>}
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+              📦 BIM(IFC) 업로드 — 공종별 멀티 임포트
             </div>
+            <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px" }}>
+              넣은 공종만 공정표에 반영됩니다 (예: 구조만 → 구조 공정표 / 토목+구조 → 합쳐서 1개). 시공 순서대로 자동 연결.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
+              {DISCIPLINES.map((d, i) => {
+                const filled = slots[d.key];
+                if (!d.active) {
+                  return (
+                    <div key={d.key} title="공정 엔진 준비 중 (Phase D)"
+                      style={{ border: "1px dashed #cbd5e1", borderRadius: 8, padding: "10px 12px",
+                               background: "#f8fafc", color: "#94a3b8", cursor: "not-allowed", position: "relative" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>🔒 {d.icon} {d.label}</div>
+                      <div style={{ fontSize: 11, marginTop: 2 }}>준비 중 · {d.hint}</div>
+                    </div>
+                  );
+                }
+                return (
+                  <label key={d.key} title={`${d.label} IFC 업로드 — ${d.hint}`}
+                    style={{ border: `1px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 8, padding: "10px 12px",
+                             background: filled ? "#f0fdf4" : "#eff6ff", cursor: bimBusy ? "wait" : "pointer", display: "block" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: filled ? "#15803d" : "#1d4ed8" }}>
+                      {filled ? "✓" : `${i + 1}.`} {d.icon} {d.label}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {filled ? `${filled.count.toLocaleString()}부재 → ${filled.wp} WP` : `업로드 · ${d.hint}`}
+                    </div>
+                    <input type="file" accept=".ifc" style={{ display: "none" }} disabled={bimBusy}
+                           onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f, d.key); }} />
+                  </label>
+                );
+              })}
+            </div>
+            {bimBusy && <p style={{ fontSize: 12, color: "#2563eb", margin: "8px 0 0" }}>BIM 분석 중…</p>}
+            {Object.keys(slots).length > 1 && (
+              <p style={{ fontSize: 12, color: "#b45309", margin: "8px 0 0" }}>
+                ⚠️ 복수 공종 병합 생성은 2·3단계에서 구현됩니다 — 현재는 마지막 업로드 공종({discipline}) 기준으로 생성됩니다.
+              </p>
+            )}
             {inferReason && <p style={{ fontSize: 12, color: "#7c3aed", margin: "8px 0 0" }}>🤖 AI 판정: {inferReason}</p>}
           </div>
 
