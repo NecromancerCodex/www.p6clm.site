@@ -4742,7 +4742,7 @@ select {
 }
 .plaza-charsel-card:hover { background: rgba(255,255,255,0.1); }
 .plaza-charsel-card.sel { border-color: #ffd75e; background: rgba(255,200,40,0.12); }
-.plaza-char-preview { width: 64px; height: 128px; image-rendering: pixelated; }
+.plaza-char-preview { width: 84px; height: 126px; }
 .plaza-charsel-name { font-size: 0.82rem; font-weight: 600; }
 .plaza-charsel-confirm {
   width: 100%; padding: 12px 0; border-radius: 10px; border: none;

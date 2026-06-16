@@ -21,7 +21,7 @@ import {
   type PlayerSnapshot,
   type Look,
 } from "../../lib/plaza/protocol";
-import { drawChibi, drawSpriteChar, roundRect } from "../../lib/plaza/render";
+import { drawChibi, drawStaticChar, roundRect } from "../../lib/plaza/render";
 import { CHARACTERS, DEFAULT_CHARACTER } from "../../lib/plaza/characters";
 import { usePlazaStore } from "../../stores/plazaStore";
 import { InventoryPanel } from "./InventoryPanel";
@@ -339,7 +339,7 @@ export function PlazaCanvas() {
           name: r.name, now, look: r.look, bubble: bubbleFor(r.id, now),
         };
         const sheet = sheets.get(r.character);
-        if (sheet) drawSpriteChar(ctx, opts, sheet); else drawChibi(ctx, opts);
+        if (sheet) drawStaticChar(ctx, opts, sheet); else drawChibi(ctx, opts);
       }
       const LL = localRef.current;
       const myOpts = {
@@ -347,7 +347,7 @@ export function PlazaCanvas() {
         name: "나", now, look: myLookRef.current, isMe: true, bubble: bubbleFor(-1, now),
       };
       const mySheet = sheets.get(myCharRef.current);
-      if (mySheet) drawSpriteChar(ctx, myOpts, mySheet); else drawChibi(ctx, myOpts);
+      if (mySheet) drawStaticChar(ctx, myOpts, mySheet); else drawChibi(ctx, myOpts);
 
       // ── 전경(foreground) — 투명 컷아웃 PNG(town_fg.png) 가 있을 때만 캐릭터 위에 덮음.
       //    (슬라이스 재드로 방식은 반투명 벽/레이어 아티팩트가 있어 제거함)

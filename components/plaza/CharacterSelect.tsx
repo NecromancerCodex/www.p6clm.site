@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { CHARACTERS, type CharacterDef } from "../../lib/plaza/characters";
 
-/** 캐릭터 1종의 idle 프레임(시트 좌상단 32×64)을 확대해 보여주는 미리보기. */
-function CharacterPreview({ src, size = 80 }: { src: string; size?: number }) {
+/** 캐릭터 전신 일러스트를 박스에 맞춰(contain) 보여주는 미리보기. */
+function CharacterPreview({ src, size = 96 }: { src: string; size?: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const c = ref.current;
@@ -15,15 +15,14 @@ function CharacterPreview({ src, size = 80 }: { src: string; size?: number }) {
     const img = new Image();
     img.onload = () => {
       ctx.clearRect(0, 0, c.width, c.height);
-      ctx.imageSmoothingEnabled = false;
-      const fw = 32, fh = 64;
-      const scale = c.height / fh;
-      const dw = fw * scale;
-      ctx.drawImage(img, 0, 0, fw, fh, (c.width - dw) / 2, 0, dw, c.height);
+      ctx.imageSmoothingEnabled = true;
+      const scale = Math.min(c.width / img.naturalWidth, c.height / img.naturalHeight);
+      const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+      ctx.drawImage(img, (c.width - dw) / 2, c.height - dh, dw, dh); // 하단 정렬
     };
     img.src = src;
   }, [src]);
-  return <canvas ref={ref} width={size} height={size * 2} className="plaza-char-preview" />;
+  return <canvas ref={ref} width={size} height={size * 1.5} className="plaza-char-preview" />;
 }
 
 /** 최초 입장 캐릭터 선택 모달 (1회). */
