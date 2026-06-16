@@ -50,6 +50,7 @@ export interface ChibiOpts {
   look?: Look;
   isMe?: boolean;
   bubble?: { text: string };
+  avatar?: HTMLImageElement | null; // 지정 시 절차적 치비 대신 스프라이트 렌더
 }
 
 interface Layout {
@@ -78,6 +79,21 @@ export function drawChibi(ctx: CanvasRenderingContext2D, o: ChibiOpts) {
   // 그림자
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.beginPath(); ctx.ellipse(o.x, feetY + 1, BODY_W * 0.5, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+  // ── 아바타 스프라이트 (지정 시 절차적 치비 대신) ──
+  if (o.avatar && o.avatar.complete && o.avatar.naturalWidth > 0) {
+    const dh = 80;
+    const dw = dh * (o.avatar.naturalWidth / o.avatar.naturalHeight);
+    const topY = feetY - dh - bob;
+    ctx.save();
+    if (o.facing === "l") { ctx.translate(o.x, 0); ctx.scale(-1, 1); ctx.translate(-o.x, 0); }
+    ctx.drawImage(o.avatar, o.x - dw / 2, topY, dw, dh);
+    ctx.restore();
+    drawNameTag(ctx, o.x, feetY, o.name, !!o.isMe);
+    if (o.bubble) drawBubble(ctx, o.x, topY - 4, o.bubble.text);
+    ctx.restore();
+    return;
+  }
 
   // 망토 (몸 뒤)
   if (look.cape) drawCape(ctx, getItem(look.cape)!, L, o.now);
@@ -126,18 +142,22 @@ export function drawChibi(ctx: CanvasRenderingContext2D, o: ChibiOpts) {
   if (look.hat) drawHat(ctx, getItem(look.hat)!, o.x, headCY, 1, dir);
 
   // 이름표
-  ctx.font = "600 12px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  const tw = ctx.measureText(o.name).width;
-  ctx.fillStyle = "rgba(0,0,0,0.55)";
-  roundRect(ctx, o.x - tw / 2 - 6, feetY + 5, tw + 12, 17, 8); ctx.fill();
-  ctx.fillStyle = o.isMe ? "#ffe066" : "#fff";
-  ctx.fillText(o.name, o.x, feetY + 17);
+  drawNameTag(ctx, o.x, feetY, o.name, !!o.isMe);
 
   // 말풍선
   if (o.bubble) drawBubble(ctx, o.x, headCY - HEAD_R - 8, o.bubble.text);
 
   ctx.restore();
+}
+
+function drawNameTag(ctx: CanvasRenderingContext2D, x: number, feetY: number, name: string, isMe: boolean) {
+  ctx.font = "600 12px system-ui, sans-serif";
+  ctx.textAlign = "center";
+  const tw = ctx.measureText(name).width;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  roundRect(ctx, x - tw / 2 - 6, feetY + 5, tw + 12, 17, 8); ctx.fill();
+  ctx.fillStyle = isMe ? "#ffe066" : "#fff";
+  ctx.fillText(name, x, feetY + 17);
 }
 
 function drawLeg(ctx: CanvasRenderingContext2D, x: number, topY: number, dy: number) {

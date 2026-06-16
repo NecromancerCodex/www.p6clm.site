@@ -157,17 +157,22 @@ export function PlazaCanvas() {
   const inputFocusedRef = useRef(false);
   const bgRef = useRef<HTMLImageElement | null>(null);
   const fgRef = useRef<HTMLImageElement | null>(null); // 선택: 전경 컷아웃 PNG
+  const avatarRef = useRef<HTMLImageElement | null>(null); // 내 캐릭터 스프라이트
   const myLookRef = useRef<Look>({}); // 내 장착 외형 (게임 루프용)
 
-  // ── 배경/전경 이미지 + 프로필 로드 ───────────────────────────────────────────
+  // ── 배경/전경/아바타 이미지 + 프로필 로드 ─────────────────────────────────────
   useEffect(() => {
     const img = new Image();
     img.src = "/plaza/town.png";
     img.onload = () => { bgRef.current = img; };
-    // 전경 컷아웃(있으면) — 없으면 onerror 로 조용히 무시하고 FG_SLICES 폴백 사용
+    // 전경 컷아웃(있으면) — 없으면 onerror 로 조용히 무시하고 FG_REGIONS 폴백 사용
     const fg = new Image();
     fg.onload = () => { fgRef.current = fg; };
     fg.src = "/plaza/town_fg.png";
+    // 내 캐릭터 아바타 스프라이트
+    const av = new Image();
+    av.onload = () => { avatarRef.current = av; };
+    av.src = "/plaza/avatar_me.png";
     void loadProfile();
   }, [loadProfile]);
 
@@ -341,6 +346,7 @@ export function PlazaCanvas() {
       drawChibi(ctx, {
         x: LL.x, y: LL.y, facing: LL.facing, st: LL.st, bodyColor: colorFor(myIdRef.current),
         name: "나", now, look: myLookRef.current, isMe: true, bubble: bubbleFor(-1, now),
+        avatar: avatarRef.current,
       });
 
       // ── 전경(foreground) — 캐릭터 위에 덮어 "건물 뒤로 숨김" 효과 ──
