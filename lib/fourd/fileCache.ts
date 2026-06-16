@@ -73,6 +73,44 @@ export async function loadFourdFiles(): Promise<CachedFourd | null> {
   }
 }
 
+// ── 플랜 슬롯 IFC(공종 태그째) — 위저드 임포트 시점의 공종을 4D 로 전달(파일명 추측 X) ──
+export interface PlanIfc { file: File; discipline: string }
+
+/** 위저드 생성 시 슬롯 파일들을 plan_id 로 보관 — /fourd?plan=X 가 공종 태그째 읽어 통합. */
+export async function savePlanIfcs(planId: string, ifcs: PlanIfc[]): Promise<void> {
+  if (!available() || !ifcs.length) return;
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put({ ifcs, savedAt: Date.now() }, `plan:${planId}`);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {
+    /* 캐시 실패는 무시 — 4D 는 수동 드롭으로 폴백 */
+  }
+}
+
+/** plan_id 의 슬롯 IFC(공종 태그) 로드. 없으면 빈 배열. */
+export async function loadPlanIfcs(planId: string): Promise<PlanIfc[]> {
+  if (!available()) return [];
+  try {
+    const db = await openDb();
+    const rec = await new Promise<{ ifcs?: PlanIfc[] } | undefined>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const r = tx.objectStore(STORE).get(`plan:${planId}`);
+      r.onsuccess = () => resolve(r.result as { ifcs?: PlanIfc[] } | undefined);
+      r.onerror = () => reject(r.error);
+    });
+    db.close();
+    return (rec?.ifcs ?? []).filter((x) => x.file instanceof File && x.discipline);
+  } catch {
+    return [];
+  }
+}
+
 /** 저장된 파일 삭제. */
 export async function clearFourdFiles(): Promise<void> {
   if (!available()) return;

@@ -18,6 +18,7 @@ import {
   type GanttTask, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
+import { savePlanIfcs } from "../../../../lib/fourd/fileCache";
 import GanttChartRaw from "../../../../components/process/GanttChart";
 
 const GanttChart = GanttChartRaw as unknown as FC<{ tasks: GanttTask[]; height?: number; viewMode?: string; fillWidth?: boolean }>;
@@ -105,6 +106,7 @@ export default function SchedulePlanWizard() {
   const [structureType, setStructureType] = useState("");
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
   const [slots, setSlots] = useState<Record<string, { name: string; count: number; wp: number; warn?: string | null }>>({}); // 공종별 업로드 현황(멀티파싱)
+  const slotFilesRef = useRef<Record<string, File>>({}); // 공종별 원본 IFC(File) — 4D 전달용(공종 태그 보존)
   const [startDate, setStartDate] = useState("");
   const [durationMonths, setDurationMonths] = useState("");
   const [wdpw, setWdpw] = useState(6);
@@ -193,7 +195,10 @@ export default function SchedulePlanWizard() {
   // ── BIM 업로드 (generate 와 동일 집계 — 4D 매칭 표기 일치) ──
   const onBim = async (file: File, fixedDiscipline?: string) => {
     setBimBusy(true); setErr(null);
-    if (fixedDiscipline) setDiscipline(fixedDiscipline); // 슬롯 업로드 = 명시적 공종(자동판정보다 우선)
+    if (fixedDiscipline) {
+      setDiscipline(fixedDiscipline); // 슬롯 업로드 = 명시적 공종(자동판정보다 우선)
+      slotFilesRef.current[fixedDiscipline] = file; // 원본 IFC 보관 → 4D 에 공종 태그째 전달
+    }
     try {
       // ① 서버 경로(C-1) — IFC 를 S3 에 직접 업로드 후 서버가 work_unit 추출.
       //    대용량 IFC 가 브라우저 메모리를 압박하지 않음. S3 미설정/실패 시 ②로 폴백.
@@ -296,6 +301,9 @@ export default function SchedulePlanWizard() {
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
+      // 슬롯 IFC(공종 태그째)를 plan_id 로 보관 → /fourd?plan=X 가 통합 4D 로 읽음(파일명 추측 X)
+      const planIfcs = Object.entries(slotFilesRef.current).map(([discipline, file]) => ({ file, discipline }));
+      if (planIfcs.length) void savePlanIfcs(r.plan_id, planIfcs);
       router.replace(`?plan=${r.plan_id}`);   // 새로고침해도 이어서 (plan_id 영속)
       localStorage.setItem(PLAN_CKPT, r.plan_id);   // 페이지 이동 후 돌아와도 이어서
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
@@ -713,6 +721,10 @@ export default function SchedulePlanWizard() {
               )}
               {planId && (
                 <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planP6XmlUrl(planId)}>P6 XML 다운로드</a>
+              )}
+              {planId && (
+                <a className="wz-btn" style={{ textDecoration: "none" }} href={`/fourd?plan=${planId}`}
+                   title="업로드한 IFC(공종 태그째) + 이 공정표로 통합 4D 시뮬레이션">🧊 4D로 보기</a>
               )}
               {stage === "done" && (
                 <button className="wz-btn" onClick={() => {

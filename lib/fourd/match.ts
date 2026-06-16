@@ -216,6 +216,7 @@ export interface ProcElement {
   mtype?: string;
   unit?: string;
   phase?: string;
+  disc?: string; // 공종(토목/구조/가설…) — 슬롯 임포트 시 확정(파일 단위). PSet trade 없어도 매칭 라우팅.
 }
 
 export interface CodeIndex {
@@ -384,10 +385,13 @@ export function buildCandidates(tasks: ScheduleTask[]): Candidate[] {
  *  ST 부재: ST|zone|storey|wt
  */
 export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
-  // 토목(CV) → 토공 window (굴착·흙막이 기간). 골조 전 초반에 표시. zone/storey 없어도 매칭.
-  if (el.trade === "CV") {
+  // 토목 — 토공 window(굴착·흙막이 기간, 골조 전). 공종 확정 출처 2가지:
+  //   ① 슬롯 임포트(el.disc==="토목") — PSet trade 없는 토목.ifc 도 슬롯이 공종 확정(추측 0)
+  //   ② PSet Lv.2 Trade=CV — 태그된 모델
+  // → 둘 중 하나면 토목으로 라우팅(구조 골조 폴백 방지 = 흙막이가 지하벽보다 먼저 표시).
+  if (el.disc === "토목" || el.trade === "CV") {
     return idx.earthworkWindow
-      ? { range: idx.earthworkWindow, via: "earthwork:CV" }
+      ? { range: idx.earthworkWindow, via: "earthwork:토목" }
       : { range: null, via: "no_earthwork" };
   }
   // 가설(TW) → 층별 골조 추종 (비계·동바리가 각 층 시공 시 등장). zone 체계 달라도 storey 기준.
@@ -456,15 +460,18 @@ export function matchAllHybrid(
   let matched = 0;
   for (const el of elements) {
     let r = matchByCode(el, codeIdx);
+    // 토목/가설 부재는 구조 폴백 금지 — 토목 활동(earthwork)에 못 붙었으면 미매칭(회색)으로 둔다.
+    // (흙막이가 같은 층 구조 코어·골조로 잘못 매칭돼 "지하벽보다 늦게" 보이던 문제 차단)
+    const nonStruct = el.disc === "토목" || el.disc === "가설" || el.trade === "CV" || el.trade === "TW";
     // 1차 폴백 — 구역+카테고리(trade/wt 코드 불일치 흡수, 구역은 유지). 슬래브 trade=ST↔스케줄 MO,
     // 벽 wt=WAL↔스케줄 CR 처럼 코드가 어긋나도 구역·층·부재종류로 제 구역에 정확 매칭(구역 미상 방지).
-    if (!r.range && el.zone && el.storey4d) {
+    if (!r.range && !nonStruct && el.zone && el.storey4d) {
       const zck = zoneCatKey(el.zone, el.storey4d, classifyIfcType(el.ifcType, el.name));
       const rz = codeIdx.byZoneCat.get(zck);
       if (rz) r = { range: rz, via: zck };
     }
-    // 2차 폴백 — 층 단위(zone 무시). 구역도 없을 때만.
-    if (!r.range) {
+    // 2차 폴백 — 층 단위(zone 무시). 구역도 없을 때만. 토목/가설은 구조 폴백 제외(위 nonStruct).
+    if (!r.range && !nonStruct) {
       const fb = matchElement(el, storeyIdx);
       if (fb.range) r = fb;
     }

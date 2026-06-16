@@ -16,7 +16,7 @@ import { loadBoreholes } from "../../../lib/api/earthwork";
 import type { Borehole } from "../../../lib/earthwork/model";
 import { DashboardSchedule } from "../../../components/fourd/DashboardSchedule";
 import { ScheduleFormView } from "../../../components/documents/DocumentFormViews";
-import { analyzeSchedule, uploadSchedule, type ScheduleReportDoc } from "../../../lib/api/schedule";
+import { analyzeSchedule, uploadSchedule, planP6XmlUrl, type ScheduleReportDoc } from "../../../lib/api/schedule";
 import { getUnitProgress, saveUnitProgress, type UnitStatus } from "../../../lib/api/fourdProgress";
 import {
   buildCandidates,
@@ -35,7 +35,7 @@ import {
   type ScheduleTask,
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
-import { saveFourdFiles, loadFourdFiles, clearFourdFiles, type CachedFourd } from "../../../lib/fourd/fileCache";
+import { saveFourdFiles, loadFourdFiles, clearFourdFiles, loadPlanIfcs, type CachedFourd } from "../../../lib/fourd/fileCache";
 import { DEFAULT_HIDDEN_TRADES } from "../../../lib/fourd/layers";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
 import { deriveWorkPackages, deriveActivityUnits, type DerivedPackage, type ActivityUnit } from "../../../lib/fourd/workpackage";
@@ -200,9 +200,12 @@ export default function FourDPage() {
   useEffect(() => {
     void loadFourdFiles().then(setCached);
   }, []);
+  const planLoadedRef = useRef(false);
 
   // C-2: 무거운 숨김 레이어(가설 등) 기하는 기본 미로드(브라우저 메모리 절약). 사용자가 '로드'하면 추가.
   const loadExtraRef = useRef<Set<string>>(new Set());
+  // 파일명 → 공종(disc). 위저드 플랜 모드에서 슬롯 공종을 전달(파일명 추측 X) → 부재 disc 태그 → 토목 매칭.
+  const ifcDiscRef = useRef<Record<string, string>>({});
 
   const run = useCallback(async (sFile?: File, iFilesArg?: File[]) => {
     // 명시 인자(복원 시) 우선, 없으면 state. setState 는 비동기라 복원 직후 호출에 인자 전달.
@@ -260,7 +263,11 @@ export default function FourDPage() {
       for (let fi = 0; fi < infs.length; fi++) {
         const buf = await infs[fi].arrayBuffer();
         const tag = infs.length > 1 ? `[${fi + 1}/${infs.length}] ${infs[fi].name} — ` : "";
-        parsedList.push(await parseIfc(buf, (p, msg) => setProgress({ p, msg: tag + msg }), skipTrades));
+        const p = await parseIfc(buf, (pr, msg) => setProgress({ p: pr, msg: tag + msg }), skipTrades);
+        // 공종 태그(슬롯/플랜) — 토목.ifc 부재는 disc=토목 → 토공 window 매칭(구조 폴백 방지).
+        const disc = ifcDiscRef.current[infs[fi].name];
+        if (disc) for (const el of p.elements) el.disc = disc;
+        parsedList.push(p);
       }
       const parsed = mergeParsed(parsedList);
 
@@ -330,6 +337,34 @@ export default function FourDPage() {
   const onLoadLayer = useCallback((trade: string) => {
     loadExtraRef.current = new Set([...loadExtraRef.current, trade]);
     void run();
+  }, [run]);
+
+  /** 위저드 → 4D 핸드오프: ?plan=X 면 그 플랜의 P6 공정표 + 슬롯 IFC(공종 태그)를 자동 로드·분석. */
+  useEffect(() => {
+    if (planLoadedRef.current) return;
+    const planId = new URLSearchParams(window.location.search).get("plan");
+    if (!planId) return;
+    planLoadedRef.current = true;
+    void (async () => {
+      setBusy(true); setError(null); setProgress({ p: 0.02, msg: "플랜 IFC·공정표 로드 중…" });
+      try {
+        const planIfcs = await loadPlanIfcs(planId);
+        if (!planIfcs.length) {
+          setError("이 플랜의 IFC 캐시가 없습니다 — 공정표를 생성한 브라우저에서 '4D로 보기'를 눌렀는지 확인하세요. (또는 아래에서 직접 드롭)");
+          setBusy(false); setProgress(null); return;
+        }
+        const res = await fetch(planP6XmlUrl(planId), { credentials: "include" });
+        if (!res.ok) throw new Error(`공정표 로드 실패 (${res.status})`);
+        const xml = await res.text();
+        const schedFile = new File([xml], `plan-${planId}.xml`, { type: "application/xml" });
+        ifcDiscRef.current = Object.fromEntries(planIfcs.map((x) => [x.file.name, x.discipline])); // 파일명→공종
+        const files = planIfcs.map((x) => x.file);
+        setScheduleFile(schedFile); setIfcFiles(files);
+        void run(schedFile, files); // 공종 태그(ifcDiscRef) 적용 → 토목 부재는 토공 window 매칭
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e)); setBusy(false); setProgress(null);
+      }
+    })();
   }, [run]);
 
   /** 캐시된 파일로 이어서 분석 — state 세팅 + 명시 인자로 즉시 run. */

@@ -34,6 +34,7 @@ export interface ParsedElement extends IfcElementMeta {
   mtype?: string; // Lv.5 모델 타입 (36 | 46) — MO 유닛 매칭용
   unit?: string; // Lv.6 모듈 번호 (1~8)
   phase?: string; // Lv.8 단계 (RB/FM/CN/IN) — 단계별 날짜 매칭
+  disc?: string; // 공종(토목/구조/가설…) — 슬롯 임포트 시 파일 단위로 확정(매칭 라우팅). PSet trade 없어도 적용.
   recalibrated?: boolean; // PT 태그였으나 높이로 실제 층 보정됨
 }
 
