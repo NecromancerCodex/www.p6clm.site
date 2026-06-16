@@ -107,7 +107,7 @@ export default function SchedulePlanWizard() {
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
   const [slots, setSlots] = useState<Record<string, { name: string; count?: number; wp?: number; warn?: string | null }>>({}); // 공종별 업로드 현황(count/wp 는 생성 시 분석 후)
   const slotFilesRef = useRef<Record<string, File>>({}); // 공종별 원본 IFC(File) — 4D 전달용(공종 태그 보존)
-  const [startDate, setStartDate] = useState("");
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10)); // 오늘 기본 — 업로드+버튼 원클릭(필요시 수정)
   const [durationMonths, setDurationMonths] = useState("");
   const [wdpw, setWdpw] = useState(6);
   const [towerCranes, setTowerCranes] = useState(2);
@@ -234,14 +234,12 @@ export default function SchedulePlanWizard() {
     }
   };
 
-  const onStart = async () => {
+  // ── [버튼 1] 분석 & 추천 — 업로드한 슬롯 일괄 분석 → 공종·구조 판정·건물유형 추천(필드 채움). 생성은 별개. ──
+  const onAnalyze = async () => {
     const entries = Object.entries(slotFilesRef.current);
     if (!entries.length) { setErr("BIM 파일을 공종 슬롯에 올리세요"); return; }
-    if (!startDate) { setErr("착공일을 입력하세요"); return; }
-    // 건물유형은 비워도 됨 — 분석 후 자동 추천으로 채움(아래 ②)
-    setBusy(true); setBimBusy(true); setErr(null);
+    setBimBusy(true); setErr(null);
     try {
-      // ① 슬롯 파일들 일괄 분석(여기서 처음 서버추출) → work_unit 결합. 공종=슬롯으로 확정(분류기 무시).
       const allWu: GenWorkUnit[] = [];
       const zoneSet = new Set<string>(); const storeySet = new Set<string>();
       let cq = civilQty;
@@ -249,46 +247,52 @@ export default function SchedulePlanWizard() {
       for (const [disc, file] of entries) {
         setInferReason(`분석 중 — ${disc} (${file.name})…`);
         const r = await analyzeSlotFile(file);
-        allWu.push(...(r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))); // 슬롯=공종
+        allWu.push(...(r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))); // 공종=슬롯 확정
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
         if (r.civil_quantities) cq = r.civil_quantities;
         setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary) } }));
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
       setWorkUnits(allWu); setZones([...zoneSet]); setStoreys([...storeySet]); setCivilQty(cq);
-      // ② 자동 추천(생성 직전 1회) — 빈 칸만 채움(건물유형·범위·구조유형). 업로드 즉시성 유지하면서 추천 복원.
-      let bt = buildingType.trim(); let sc = scope.trim(); let st = structureType.trim();
-      if ((!bt || !sc || !st) && inferSrc) {
+      // 공종·구조·건물유형 추천 → 빈 칸 채움(사람이 검토·수정 후 생성)
+      if (inferSrc) {
         const ctx = await inferScheduleContext({
           storeys: [...storeySet], zones: [...zoneSet], element_summary: inferSrc.element_summary,
           trade_summary: inferSrc.trade_summary, discipline_summary: inferSrc.discipline_summary, total_count: inferSrc.element_count,
         });
-        if (!bt && ctx.building_type) { bt = ctx.building_type; setBuildingType(bt); }
-        if (!sc && ctx.scope) { sc = ctx.scope; setScope(sc); }
-        if (!st && ctx.structure_type) { st = ctx.structure_type; setStructureType(st); }
+        if (ctx.building_type && !buildingType.trim()) setBuildingType(ctx.building_type);
+        if (ctx.scope && !scope.trim()) setScope(ctx.scope);
+        if (ctx.structure_type && !structureType.trim()) setStructureType(ctx.structure_type);
         setInferReason(ctx.reason || null);
       } else { setInferReason(null); }
-      if (!bt) bt = "건물"; // 추론도 비면 안전 폴백
-      setBimBusy(false);
-      // ③ 생성
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBimBusy(false); }
+  };
+
+  // ── [버튼 2] 생성 — 분석된 work_unit + (검토한) 건물유형·공종·구조유형으로 공정표 생성. ──
+  const onStart = async () => {
+    if (!workUnits.length) { setErr("먼저 '분석 & 추천'을 실행하세요"); return; }
+    if (!startDate) { setErr("착공일을 입력하세요"); return; }
+    setBusy(true); setErr(null);
+    try {
       const r = await startPlan({
-        building_type: bt, scope: sc || undefined,
-        structure_type: st || undefined, discipline: discipline.trim() || undefined,
-        zones: [...zoneSet], storeys: [...storeySet], work_units: allWu, methods: [],
+        building_type: buildingType.trim() || "건물", scope: scope.trim() || undefined,
+        structure_type: structureType.trim() || undefined, discipline: discipline.trim() || undefined,
+        zones, storeys, work_units: workUnits, methods: [],
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
-        civil_equipment: civilEquip, civil_quantities: cq ?? undefined,
+        civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         constraints: constraints.trim() || undefined, strategy,
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
       // 슬롯 IFC(공종 태그째)를 plan_id 로 보관 → /fourd?plan=X 가 통합 4D 로 읽음(파일명 추측 X)
-      const planIfcs = entries.map(([discipline, file]) => ({ file, discipline }));
+      const planIfcs = Object.entries(slotFilesRef.current).map(([discipline, file]) => ({ file, discipline }));
       if (planIfcs.length) void savePlanIfcs(r.plan_id, planIfcs);
       router.replace(`?plan=${r.plan_id}`);
       localStorage.setItem(PLAN_CKPT, r.plan_id);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(false); setBimBusy(false); }
+    finally { setBusy(false); }
   };
 
   const onSaveActs = async () => {
@@ -563,12 +567,19 @@ export default function SchedulePlanWizard() {
                 <span style={{ fontSize: 12, color: "#475569" }}>
                   {workUnits.length > 0
                     ? <>📦 워크패키지 <b>{workUnits.length}</b> · 구역 {zones.length} · 층 {storeys.length}</>
-                    : <>📂 {Object.keys(slots).join("+")} 업로드됨 · 생성 시 분석</>}
+                    : <>📂 {Object.keys(slots).join("+")} 업로드됨 · [분석] 누르세요</>}
                 </span>
               )}
-              <button className="wz-btn" disabled={!Object.keys(slots).length || !startDate || busy} onClick={() => void onStart()}>
-                {busy ? (bimBusy ? "BIM 분석 중…" : "생성 중…") : "P1 스코프 확정 → P2 액티비티 생성"}
-              </button>
+              {workUnits.length === 0 ? (
+                <button className="wz-btn" disabled={!Object.keys(slots).length || bimBusy} onClick={() => void onAnalyze()}
+                        title="업로드한 IFC 를 분석해 공종·구조유형 판정 + 건물유형을 추천합니다">
+                  {bimBusy ? "분석 중…" : "📊 분석 — 공종·구조 판정 & 건물유형 추천"}
+                </button>
+              ) : (
+                <button className="wz-btn" disabled={!startDate || busy} onClick={() => void onStart()}>
+                  {busy ? "생성 중…" : "P1 스코프 확정 → P2 액티비티 생성"}
+                </button>
+              )}
             </div>
           </div>
         </>
