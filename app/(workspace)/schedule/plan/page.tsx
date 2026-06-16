@@ -152,7 +152,8 @@ export default function SchedulePlanWizard() {
     try {
       const p = await getPlan(id);
       setPlan(p);
-      if (p.payload.scope) setScopeWbs(p.payload.scope);
+      // scope 는 PlanScopeWbs 객체여야 함 — 문자열 등 비정상이면 무시(렌더 .length 크래시 방어)
+      if (p.payload.scope && Array.isArray((p.payload.scope as PlanScopeWbs).wbs)) setScopeWbs(p.payload.scope);
       const serverActs = p.payload.activities_user ?? p.payload.activities;
       if (serverActs && !dirty) setActs(serverActs);
       if (p.stage === "error") setErr(p.payload.error ?? p.progress ?? "오류");
