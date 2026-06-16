@@ -118,33 +118,37 @@ function Dropzone({
   label,
   accept,
   file,
+  files,
   onFile,
+  onFiles,
+  multiple,
 }: {
   label: string;
   accept: string;
-  file: File | null;
-  onFile: (f: File) => void;
+  file?: File | null;
+  files?: File[];          // 멀티 모드 — 누적된 파일 목록
+  onFile?: (f: File) => void;
+  onFiles?: (fs: File[]) => void;  // 멀티 모드 — 드롭/선택한 파일들(append 는 호출측)
+  multiple?: boolean;
 }) {
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const has = multiple ? !!files?.length : !!file;
+  const take = (fl: FileList | null) => {
+    if (!fl?.length) return;
+    if (multiple) onFiles?.(Array.from(fl));
+    else onFile?.(fl[0]);
+  };
   return (
     <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setOver(true);
-      }}
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f) onFile(f);
-      }}
+      onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files); }}
       onClick={() => inputRef.current?.click()}
       style={{
         flex: 1,
         minHeight: 120,
-        border: `2px dashed ${over ? "#60a5fa" : file ? "#10b981" : "#cbd5e1"}`,
+        border: `2px dashed ${over ? "#60a5fa" : has ? "#10b981" : "#cbd5e1"}`,
         borderRadius: 10,
         display: "flex",
         flexDirection: "column",
@@ -152,24 +156,24 @@ function Dropzone({
         justifyContent: "center",
         gap: 6,
         cursor: "pointer",
-        background: over ? "#eff6ff" : file ? "#f0fdf4" : "#f8fafc",
+        background: over ? "#eff6ff" : has ? "#f0fdf4" : "#f8fafc",
         padding: 16,
         textAlign: "center",
       }}
     >
       <strong>{label}</strong>
       <span style={{ fontSize: 13, color: "#64748b" }}>
-        {file ? `✓ ${file.name}` : "드래그앤드롭 또는 클릭"}
+        {multiple
+          ? (files?.length ? `✓ ${files.map((f) => f.name).join(", ")} (${files.length}개)` : "토목·구조 등 여러 IFC 드래그앤드롭/선택")
+          : (file ? `✓ ${file.name}` : "드래그앤드롭 또는 클릭")}
       </span>
       <input
         ref={inputRef}
         type="file"
         accept={accept}
         hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onFile(f);
-        }}
+        multiple={multiple}
+        onChange={(e) => take(e.target.files)}
       />
     </div>
   );
@@ -177,7 +181,7 @@ function Dropzone({
 
 export default function FourDPage() {
   const [scheduleFile, setScheduleFile] = useState<File | null>(null);
-  const [ifcFile, setIfcFile] = useState<File | null>(null);
+  const [ifcFiles, setIfcFiles] = useState<File[]>([]); // 멀티 디시플린 IFC(토목+구조…) — 통합 4D
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ p: number; msg: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -200,11 +204,11 @@ export default function FourDPage() {
   // C-2: 무거운 숨김 레이어(가설 등) 기하는 기본 미로드(브라우저 메모리 절약). 사용자가 '로드'하면 추가.
   const loadExtraRef = useRef<Set<string>>(new Set());
 
-  const run = useCallback(async (sFile?: File, iFile?: File) => {
+  const run = useCallback(async (sFile?: File, iFilesArg?: File[]) => {
     // 명시 인자(복원 시) 우선, 없으면 state. setState 는 비동기라 복원 직후 호출에 인자 전달.
     const sf = sFile ?? scheduleFile;
-    const inf = iFile ?? ifcFile;
-    if (!sf || !inf) return;
+    const infs = iFilesArg ?? ifcFiles;
+    if (!sf || !infs.length) return;
     setBusy(true);
     setError(null);
     setReady(null);
@@ -250,9 +254,15 @@ export default function FourDPage() {
       // C-2: 무거운 숨김 레이어(가설 TW·MEP)는 기하 미로드 → 브라우저 메모리 절약(토목 ~80%↓).
       //      사용자가 '로드'한 레이어(loadExtraRef)는 스킵 대상에서 제외.
       const skipTrades = new Set([...DEFAULT_HIDDEN_TRADES].filter((t) => !loadExtraRef.current.has(t)));
-      const { parseIfc } = await import("../../../lib/fourd/ifc");
-      const buf = await inf.arrayBuffer();
-      const parsed = await parseIfc(buf, (p, msg) => setProgress({ p, msg }), skipTrades);
+      const { parseIfc, mergeParsed } = await import("../../../lib/fourd/ifc");
+      // 멀티 디시플린 통합 — 각 IFC(토목·구조…) 파싱 후 한 씬으로 병합(좌표계 동일 가정).
+      const parsedList: ParsedIfc[] = [];
+      for (let fi = 0; fi < infs.length; fi++) {
+        const buf = await infs[fi].arrayBuffer();
+        const tag = infs.length > 1 ? `[${fi + 1}/${infs.length}] ${infs[fi].name} — ` : "";
+        parsedList.push(await parseIfc(buf, (p, msg) => setProgress({ p, msg: tag + msg }), skipTrades));
+      }
+      const parsed = mergeParsed(parsedList);
 
       // 3) 매칭 — 공정 PSet(REV) 있으면 코드매칭(zone 정확), 없으면 층근사 폴백
       setProgress({ p: 1, msg: "매칭 중…" });
@@ -307,14 +317,14 @@ export default function FourDPage() {
         diag: { procCount, topVia },
       });
       // 분석 성공 → 원본 파일을 IndexedDB에 기억(다음 방문 시 재업로드 불필요).
-      void saveFourdFiles(sf, inf);
+      void saveFourdFiles(sf, infs);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
       setProgress(null);
     }
-  }, [scheduleFile, ifcFile]);
+  }, [scheduleFile, ifcFiles]);
 
   /** 스킵된 레이어(가설 등) 로드 요청 — 해당 trade 를 추가하고 재파싱(기하 포함). */
   const onLoadLayer = useCallback((trade: string) => {
@@ -325,10 +335,11 @@ export default function FourDPage() {
   /** 캐시된 파일로 이어서 분석 — state 세팅 + 명시 인자로 즉시 run. */
   const restoreCached = useCallback(() => {
     if (!cached) return;
+    const ifcs = cached.ifcs?.length ? cached.ifcs : [cached.ifc]; // 구버전 캐시(ifc 단일) 호환
     setScheduleFile(cached.schedule);
-    setIfcFile(cached.ifc);
+    setIfcFiles(ifcs);
     setCached(null);
-    void run(cached.schedule, cached.ifc);
+    void run(cached.schedule, ifcs);
   }, [cached, run]);
 
   /** 기억된 파일 삭제 + 배너 숨김. */
@@ -717,7 +728,7 @@ export default function FourDPage() {
               <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: "#1e3a8a" }}>
                 <strong>최근 파일이 기억되어 있습니다</strong>
                 <div style={{ color: "#475569", marginTop: 2 }}>
-                  {cached.schedule.name} · {cached.ifc.name} ({Math.round(cached.ifc.size / 1024 / 1024)}MB)
+                  {cached.schedule.name} · {(cached.ifcs?.length ? cached.ifcs : [cached.ifc]).map((f) => f.name).join(", ")}
                 </div>
                 <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }}>
                   {new Date(cached.savedAt).toLocaleString("ko-KR")} 저장 · 이 브라우저에만
@@ -739,28 +750,42 @@ export default function FourDPage() {
           )}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <Dropzone label="① 공정표 (.xer / .xml)" accept=".xer,.xml" file={scheduleFile} onFile={setScheduleFile} />
-            <Dropzone label="② BIM (.ifc)" accept=".ifc" file={ifcFile} onFile={setIfcFile} />
+            <Dropzone label="② BIM (.ifc) — 토목·구조 등 여러 개" accept=".ifc" files={ifcFiles} multiple
+                      onFiles={(fs) => setIfcFiles((prev) => {
+                        const names = new Set(prev.map((f) => f.name));
+                        return [...prev, ...fs.filter((f) => !names.has(f.name))]; // 중복 파일명 제외하고 누적
+                      })} />
           </div>
+          {ifcFiles.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
+              {ifcFiles.map((f) => (
+                <span key={f.name} style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 8px", color: "#15803d" }}>
+                  {f.name} ({Math.round(f.size / 1024 / 1024)}MB)
+                  <button onClick={() => setIfcFiles((prev) => prev.filter((x) => x.name !== f.name))}
+                          style={{ marginLeft: 6, border: "none", background: "none", color: "#dc2626", cursor: "pointer", fontWeight: 700 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
           <button
             onClick={() => run()}
-            disabled={!scheduleFile || !ifcFile || busy}
+            disabled={!scheduleFile || !ifcFiles.length || busy}
             style={{
               padding: "12px 20px",
               borderRadius: 8,
               border: "none",
-              background: !scheduleFile || !ifcFile || busy ? "#cbd5e1" : "#2563eb",
+              background: !scheduleFile || !ifcFiles.length || busy ? "#cbd5e1" : "#2563eb",
               color: "#fff",
               fontSize: 15,
               fontWeight: 600,
-              cursor: !scheduleFile || !ifcFile || busy ? "default" : "pointer",
+              cursor: !scheduleFile || !ifcFiles.length || busy ? "default" : "pointer",
             }}
           >
             {busy ? "분석 중…" : "분석 & 4D 생성"}
           </button>
-          {ifcFile && ifcFile.size > 40 * 1024 * 1024 && (
+          {ifcFiles.reduce((s, f) => s + f.size, 0) > 40 * 1024 * 1024 && (
             <p style={{ color: "#d97706", fontSize: 13, margin: 0 }}>
-              ⚠ IFC {Math.round(ifcFile.size / 1024 / 1024)}MB — 브라우저 파싱·공정속성 분석에{" "}
-              {ifcFile.size > 80 * 1024 * 1024 ? "2~4분" : "1~2분"} + 메모리 소요. (REV 파일이 zone 정확 매칭됩니다)
+              ⚠ IFC 합계 {Math.round(ifcFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024)}MB — 브라우저 파싱·공정속성 분석에 시간·메모리 소요. (REV 파일이 zone 정확 매칭됩니다)
             </p>
           )}
           {progress && (
@@ -787,7 +812,7 @@ export default function FourDPage() {
               onClick={() => {
                 setReady(null);
                 setScheduleFile(null);
-                setIfcFile(null);
+                setIfcFiles([]);
               }}
               style={{ marginLeft: 12, fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer" }}
             >

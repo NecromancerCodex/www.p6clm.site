@@ -14,8 +14,9 @@ const KEY = "last"; // 단일 슬롯 — 가장 최근 분석한 파일 한 쌍
 
 export interface CachedFourd {
   schedule: File;
-  ifc: File;
-  savedAt: number; // epoch ms
+  ifc: File;        // 하위호환(첫 IFC) — 구버전 캐시 로드용
+  ifcs?: File[];    // 멀티 디시플린 IFC(토목+구조…) — 통합 4D
+  savedAt: number;  // epoch ms
 }
 
 function available(): boolean {
@@ -35,15 +36,15 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-/** 분석 성공 시 원본 두 파일을 저장(덮어쓰기). 실패해도 분석 흐름은 막지 않음. */
-export async function saveFourdFiles(schedule: File, ifc: File): Promise<void> {
-  if (!available()) return;
+/** 분석 성공 시 원본 파일(공정표 + IFC 1~N개)을 저장(덮어쓰기). 실패해도 분석 흐름은 막지 않음. */
+export async function saveFourdFiles(schedule: File, ifcs: File[]): Promise<void> {
+  if (!available() || !ifcs.length) return;
   try {
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE, "readwrite");
-      // File 은 structured clone 으로 그대로 저장된다(이름·타입·바이트 보존).
-      tx.objectStore(STORE).put({ schedule, ifc, savedAt: Date.now() } satisfies CachedFourd, KEY);
+      // File 은 structured clone 으로 그대로 저장된다(이름·타입·바이트 보존). ifc=첫개(구버전 호환)+ifcs 전체.
+      tx.objectStore(STORE).put({ schedule, ifc: ifcs[0], ifcs, savedAt: Date.now() } satisfies CachedFourd, KEY);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });

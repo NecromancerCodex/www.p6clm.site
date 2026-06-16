@@ -635,3 +635,46 @@ export async function parseIfc(
     skippedTrades: skipped.size ? [...skipped] : undefined,
   };
 }
+
+/**
+ * 멀티 디시플린 IFC 통합 — 여러 ParsedIfc 를 **하나의 4D 씬**으로 병합(토목+구조+…).
+ * 같은 프로젝트 export 라 좌표계 동일 가정(원점 공유) → 기하 그대로 합치면 공간 정합.
+ *   · elements 는 단순 concat 하되 el.inst.g(그룹 index)를 그룹 오프셋만큼 이동.
+ *   · groups 도 concat 하되 elementIdx(요소 index)를 요소 오프셋만큼 이동.
+ *   · bbox/center/radius 는 합집합으로 재산출. skippedTrades/steelQto 합침.
+ * FourDViewer 는 단일 ParsedIfc 만 받으면 되므로 뷰어 변경 없이 통합된다.
+ */
+export function mergeParsed(list: ParsedIfc[]): ParsedIfc {
+  const valid = list.filter((p) => p && p.elements);
+  if (valid.length <= 1) return valid[0] ?? list[0];
+  const elements: ParsedElement[] = [];
+  const groups: InstanceGroup[] = [];
+  const bbox = new THREE.Box3();
+  const skipped = new Set<string>();
+  const steel: SteelQto[] = [];
+  let elemOff = 0;
+  let groupOff = 0;
+  for (const p of valid) {
+    for (const el of p.elements) {
+      elements.push({ ...el, inst: el.inst.map((r) => ({ g: r.g + groupOff, i: r.i })) });
+    }
+    for (const g of p.groups) {
+      const ei = new Int32Array(g.elementIdx.length);
+      for (let k = 0; k < ei.length; k++) ei[k] = g.elementIdx[k] + elemOff;
+      groups.push({ geometry: g.geometry, matrices: g.matrices, elementIdx: ei, count: g.count });
+    }
+    if (p.bbox && !p.bbox.isEmpty()) bbox.union(p.bbox);
+    (p.skippedTrades ?? []).forEach((t) => skipped.add(t));
+    (p.steelQto ?? []).forEach((q) => steel.push(q));
+    elemOff += p.elements.length;
+    groupOff += p.groups.length;
+  }
+  const has = !bbox.isEmpty();
+  const center = has ? bbox.getCenter(new THREE.Vector3()) : new THREE.Vector3();
+  const radius = has ? bbox.getSize(new THREE.Vector3()).length() / 2 || 50 : 50;
+  return {
+    groups, elements, center, radius, bbox,
+    steelQto: steel.length ? steel : undefined,
+    skippedTrades: skipped.size ? [...skipped] : undefined,
+  };
+}
