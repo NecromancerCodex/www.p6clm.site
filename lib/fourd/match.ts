@@ -226,6 +226,7 @@ export interface CodeIndex {
   byZoneCat: Map<string, DateRange>; // 구역+카테고리: zone|storey|CORE|MOD|FOOT (trade/wt 코드 불일치 흡수)
   byStorey: Map<string, DateRange>; // 층(canonStorey)별 골조 window — 가설(TW) 층 추종용(zone 무관)
   earthworkWindow: DateRange | null; // 토공(흙막이/굴착/차수) 공통활동 기간 — 토목(CV) 매칭용
+  finishWindow: DateRange | null; // 마감(창호·문·마감재) 활동 기간 — 마감 부재(골조 후) 매칭용
   minDate: number;
   maxDate: number;
 }
@@ -234,6 +235,8 @@ export interface CodeIndex {
 const _EARTHWORK_KW = /흙막이|토공|굴착|터파기|차수|되메우|버림|토류|가시설|파일|말뚝/;
 // 되메우기·성토는 골조 후행(post) — 흙막이 부재 window 에서 제외(안 그러면 흙막이가 골조 끝까지 진행중).
 const _BACKFILL_KW = /되메우|성토|복구/;
+// 마감 공통활동(4D 코드 없음) — 마감 부재(창호·문·마감재)가 이 기간(골조 후)에 매칭. special.py 활동명.
+const _FINISH_KW = /창호|문 설치|마감|미장|도장|타일|방수|특수 부재|커튼월/;
 // 마감/FF&E/MEP 타입 — 골조(구조) 공정 부재가 아님. BIM 이 이들을 구조 코드(ST/MO·CR/MD)로 오태깅해도
 // IFC 타입이 진실 → 골조 매칭 제외(회색). 골조 scope 엔 마감 활동이 없음(있으면 추후 그쪽 매칭).
 const _FINISH_TYPES = new Set([
@@ -283,6 +286,8 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   const byStorey = new Map<string, DateRange>();
   let ewStart = Infinity;
   let ewEnd = -Infinity;
+  let fwStart = Infinity;
+  let fwEnd = -Infinity;
   let minD = Infinity;
   let maxD = -Infinity;
   for (const t of tasks) {
@@ -294,6 +299,13 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     if (_EARTHWORK_KW.test(t.name || "") && !_BACKFILL_KW.test(t.name || "")) {
       ewStart = Math.min(ewStart, s);
       ewEnd = Math.max(ewEnd, e);
+      minD = Math.min(minD, s);
+      maxD = Math.max(maxD, e);
+    }
+    // 마감 공통활동(창호·문·마감재 등, 4D 코드 없음) → finish window 누적 (마감 부재 매칭, 골조 후).
+    if (_FINISH_KW.test(t.name || "")) {
+      fwStart = Math.min(fwStart, s);
+      fwEnd = Math.max(fwEnd, e);
       minD = Math.min(minD, s);
       maxD = Math.max(maxD, e);
     }
@@ -321,6 +333,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     byZoneCat,
     byStorey,
     earthworkWindow: ewStart === Infinity ? null : { start: ewStart, end: ewEnd },
+    finishWindow: fwStart === Infinity ? null : { start: fwStart, end: fwEnd },
     minDate: minD === Infinity ? Date.now() : minD,
     maxDate: maxD === -Infinity ? Date.now() : maxD,
   };
@@ -469,12 +482,15 @@ export function matchAllHybrid(
   const byVia: Record<string, number> = {};
   let matched = 0;
   for (const el of elements) {
-    // 마감/FF&E/MEP 타입 — 골조 공정에 매칭 안 함(회색). BIM 이 구조 코드로 오태깅(창호=ST/CR 등)해도
-    // IFC 타입이 진실. 골조 scope 라 마감 활동 없음 → 미매칭. (창호가 기초·골조에 뜨던 논리오류 차단)
+    // 마감/FF&E/MEP 타입(창호·문·마감재) — 골조 아님. BIM 이 구조 코드로 오태깅해도 IFC 타입이 진실 →
+    // 건축(마감) 활동 기간(골조 후)에 매칭. finishWindow 없으면(마감 활동 미생성) 미매칭(회색).
     if (_FINISH_TYPES.has(el.ifcType)) {
-      const r0: MatchResult = { range: null, via: "finish:마감" };
+      const r0: MatchResult = codeIdx.finishWindow
+        ? { range: codeIdx.finishWindow, via: "finish:건축" }
+        : { range: null, via: "finish:no_act" };
       ranges.set(el.globalId, r0);
-      byVia["마감"] = (byVia["마감"] ?? 0) + 1;
+      if (r0.range) matched++;
+      byVia[r0.range ? "건축마감" : "마감무활동"] = (byVia[r0.range ? "건축마감" : "마감무활동"] ?? 0) + 1;
       continue;
     }
     let r = matchByCode(el, codeIdx);

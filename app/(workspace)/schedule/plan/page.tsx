@@ -27,9 +27,11 @@ const GanttChart = GanttChartRaw as unknown as FC<{ tasks: GanttTask[]; height?:
 // active=공정 엔진 보유(토목 civil.py / 구조 타워·모듈러). 나머지는 잠금(🔒, Phase D)·가설은 오버레이.
 // 넣은 공종만 공정표에 반영(구독형) — 단일이면 그 공종, 복수면 병합(2·3단계).
 const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; hint: string }[] = [
+  // 종합 = REV 같은 전 공종 1파일 → PSet Trade + IFC 타입으로 토목/구조/건축 자동 분리 후 순서대로 생성.
+  { key: "종합", label: "종합", icon: "🗂️", active: true, hint: "전 공종 1파일(REV 등) — 자동 분리" },
   { key: "토목", label: "토목", icon: "🏗️", active: true, hint: "굴착·흙막이" },
   { key: "구조", label: "구조", icon: "🏢", active: true, hint: "골조(타워·모듈러)" },
-  { key: "건축", label: "건축", icon: "🧱", active: false, hint: "마감" },
+  { key: "건축", label: "건축", icon: "🧱", active: false, hint: "마감(종합 파일이면 자동)" },
   { key: "MEP", label: "MEP", icon: "🔧", active: false, hint: "기계·소방·전기·통신" },
   { key: "조경", label: "조경", icon: "🌳", active: false, hint: "조경" },
   { key: "가설", label: "가설", icon: "🚧", active: false, hint: "비계·거푸집(오버레이)" },
@@ -40,6 +42,11 @@ const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; 
 // 가설 비중만 정보로 안내. 슬롯에 엉뚱한 파일(구조→토목 슬롯)이면 경고 = 분리 작업 QA 도구.
 const SCHEDULABLE = ["토목", "구조", "건축", "MEP", "조경"];
 function validateSlot(slot: string, summary?: { discipline: string; count: number }[]): string | null {
+  if (slot === "종합") { // 종합 = 전 공종 허용 → 경고 X. 구성만 정보로 안내.
+    if (!summary?.length) return null;
+    const top = [...summary].filter((d) => SCHEDULABLE.includes(d.discipline)).sort((a, b) => b.count - a.count);
+    return top.length ? `ℹ️ 종합 — ${top.map((d) => `${d.discipline} ${d.count.toLocaleString()}`).join(" · ")} (자동 분리)` : null;
+  }
   if (!summary || !summary.length) return null; // 클라 파싱 폴백 등 — 분포 없음 → 검증 생략
   const m: Record<string, number> = {};
   for (const d of summary) m[d.discipline] = d.count;
