@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, planP6XmlUrl,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, planP6XmlUrl, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError,
   type GanttTask, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
 } from "../../../../lib/api/schedule";
@@ -105,7 +105,7 @@ export default function SchedulePlanWizard() {
   const [scope, setScope] = useState("");
   const [structureType, setStructureType] = useState("");
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
-  const [slots, setSlots] = useState<Record<string, { name: string; count: number; wp: number; warn?: string | null }>>({}); // 공종별 업로드 현황(멀티파싱)
+  const [slots, setSlots] = useState<Record<string, { name: string; count?: number; wp?: number; warn?: string | null }>>({}); // 공종별 업로드 현황(count/wp 는 생성 시 분석 후)
   const slotFilesRef = useRef<Record<string, File>>({}); // 공종별 원본 IFC(File) — 4D 전달용(공종 태그 보존)
   const [startDate, setStartDate] = useState("");
   const [durationMonths, setDurationMonths] = useState("");
@@ -192,122 +192,100 @@ export default function SchedulePlanWizard() {
       loadFrappeGantt().then(() => setGanttReady(true)).catch(() => setGanttReady(false));
   }, [stage]);
 
-  // ── BIM 업로드 (generate 와 동일 집계 — 4D 매칭 표기 일치) ──
-  const onBim = async (file: File, fixedDiscipline?: string) => {
-    setBimBusy(true); setErr(null);
-    if (fixedDiscipline) {
-      setDiscipline(fixedDiscipline); // 슬롯 업로드 = 명시적 공종(자동판정보다 우선)
-      slotFilesRef.current[fixedDiscipline] = file; // 원본 IFC 보관 → 4D 에 공종 태그째 전달
-    }
+  // ── 슬롯 업로드 = 파일만 보관(즉시). 분석은 '생성' 클릭 시 일괄(onStart). 업로드마다 서버추출 안 함. ──
+  const onBim = (file: File, fixedDiscipline?: string) => {
+    if (!fixedDiscipline) return;
+    setErr(null);
+    setDiscipline(fixedDiscipline);
+    slotFilesRef.current[fixedDiscipline] = file; // 원본 IFC 보관(4D 핸드오프 + 생성 시 분석)
+    setSlots((s) => ({ ...s, [fixedDiscipline]: { name: file.name } })); // 대기 — 부재/WP 는 생성 시 채움
+  };
+
+  // 슬롯 파일 1개 분석 — 서버 추출(C-1), 실패 시 클라 파싱 폴백. work_unit/요약 반환(onStart 가 일괄 호출).
+  const analyzeSlotFile = async (file: File): Promise<IfcWorkUnitsResult> => {
     try {
-      // ① 서버 경로(C-1) — IFC 를 S3 에 직접 업로드 후 서버가 work_unit 추출.
-      //    대용량 IFC 가 브라우저 메모리를 압박하지 않음. S3 미설정/실패 시 ②로 폴백.
-      try {
-        const r = await extractIfcWorkUnitsViaS3(file);
-        const wu = r.work_units as GenWorkUnit[];
-        // 멀티파싱 누적 — 슬롯 업로드면 그 공종 분량만 교체하고 다른 공종은 보존(여러 공종 결합 → 병합 생성).
-        if (fixedDiscipline) {
-          setWorkUnits((prev) => [...prev.filter((w) => w.discipline !== fixedDiscipline), ...wu]);
-          setZones((prev) => [...new Set([...prev, ...r.zones])]);
-          setStoreys((prev) => [...new Set([...prev, ...r.storeys])]);
-        } else {
-          setWorkUnits(wu); setZones(r.zones); setStoreys(r.storeys);
-        }
-        setBimName(`${file.name} — ${r.element_count.toLocaleString()}부재 → ${r.work_units.length} 워크패키지 (서버)`);
-        if (fixedDiscipline) {
-          const warn = validateSlot(fixedDiscipline, r.discipline_summary); // 분리 QA — 슬롯↔파일 공종 대조
-          setSlots((s) => ({ ...s, [fixedDiscipline]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn } }));
-        }
-        if (r.civil_quantities) setCivilQty(r.civil_quantities); // 토목 물량(서버 도출) → 기간 산정·표시
-        void inferScheduleContext({
-          storeys: r.storeys, zones: r.zones,
-          element_summary: r.element_summary,
-          trade_summary: r.trade_summary,
-          discipline_summary: r.discipline_summary,
-          total_count: r.element_count,
-        }).then((ctx) => {
-          if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
-          if (ctx.scope && !scope) setScope(ctx.scope);
-          if (ctx.structure_type) setStructureType(ctx.structure_type);
-        if (ctx.discipline && !fixedDiscipline) setDiscipline(ctx.discipline);
-          if (ctx.reason) setInferReason(ctx.reason);
-        });
-        setBimBusy(false);
-        return;
-      } catch (serverErr) {
-        console.warn("[BIM] 서버 추출 실패 → 클라이언트 파싱 폴백:", serverErr);
-      }
-      // ② 폴백: 클라이언트 파싱(기존) — S3 미설정·소형 파일·오프라인 시
+      return await extractIfcWorkUnitsViaS3(file);
+    } catch (serverErr) {
+      console.warn("[BIM] 서버 추출 실패 → 클라 폴백:", serverErr);
       const { parseIfc } = await import("../../../../lib/fourd/ifc");
       const parsed = await parseIfc(await file.arrayBuffer());
       const agg = new Map<string, GenWorkUnit>();
       const zoneSet = new Set<string>(); const storeySet = new Set<string>();
-      const typeCount = new Map<string, number>();
-      const typeNames = new Map<string, Set<string>>();  // 구조 판정 신호 — type별 대표 부재명
-      const tradeCount = new Map<string, number>();       // 공정 PSet Lv.2 Trade(ST/MO) — 구조유형의 진실
+      const typeCount = new Map<string, number>(); const typeNames = new Map<string, Set<string>>();
+      const tradeCount = new Map<string, number>();
       for (const el of parsed.elements) {
         typeCount.set(el.ifcType, (typeCount.get(el.ifcType) ?? 0) + 1);
         if (el.trade) tradeCount.set(el.trade, (tradeCount.get(el.trade) ?? 0) + 1);
-        if (el.name) {
-          const ns = typeNames.get(el.ifcType) ?? new Set<string>();
-          if (ns.size < 3) { ns.add(el.name.slice(0, 30)); typeNames.set(el.ifcType, ns); }
-        }
-        const zone = el.zone ?? "-";
-        const storey = el.storey4d ?? normStorey(el.storeyName) ?? "-";
+        if (el.name) { const ns = typeNames.get(el.ifcType) ?? new Set<string>(); if (ns.size < 3) { ns.add(el.name.slice(0, 30)); typeNames.set(el.ifcType, ns); } }
+        const zone = el.zone ?? "-"; const storey = el.storey4d ?? normStorey(el.storeyName) ?? "-";
         const cat = classifyIfcType(el.ifcType, el.name);
-        if (el.zone) zoneSet.add(el.zone);
-        if (storey !== "-") storeySet.add(storey);
+        if (el.zone) zoneSet.add(el.zone); if (storey !== "-") storeySet.add(storey);
         const key = `${zone}|${storey}|${cat}`;
-        const u = agg.get(key) ?? { zone, storey, element_type: cat, count: 0, volume_m3: 0, area_m2: 0 };
-        u.count = (u.count ?? 0) + 1;
-        if (el.volM3) u.volume_m3 = (u.volume_m3 ?? 0) + el.volM3;
-        if (el.areaM2) u.area_m2 = (u.area_m2 ?? 0) + el.areaM2;
-        agg.set(key, u);
+        const u = agg.get(key) ?? { zone, storey, element_type: cat, count: 0 };
+        u.count = (u.count ?? 0) + 1; agg.set(key, u);
       }
-      setWorkUnits([...agg.values()]);
-      setZones([...zoneSet]); setStoreys([...storeySet]);
-      setBimName(`${file.name} — ${parsed.elements.length.toLocaleString()}부재 → ${agg.size} 워크패키지`);
-      if (fixedDiscipline) setSlots((s) => ({ ...s, [fixedDiscipline]: { name: file.name, count: parsed.elements.length, wp: agg.size } }));
-      void inferScheduleContext({
-        storeys: [...storeySet], zones: [...zoneSet],
-        element_summary: [...typeCount.entries()].sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count, names: [...(typeNames.get(type) ?? [])] })),
+      return {
+        work_units: [...agg.values()] as IfcWorkUnitsResult["work_units"],
+        zones: [...zoneSet], storeys: [...storeySet],
         trade_summary: [...tradeCount.entries()].map(([trade, count]) => ({ trade, count })),
-        total_count: parsed.elements.length,
-      }).then((ctx) => {
-        if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
-        if (ctx.scope && !scope) setScope(ctx.scope);
-        if (ctx.structure_type) setStructureType(ctx.structure_type);
-        if (ctx.discipline && !fixedDiscipline) setDiscipline(ctx.discipline);
-        if (ctx.reason) setInferReason(ctx.reason);
-      });
-    } catch (e) {
-      setErr(`BIM 파싱 실패: ${e instanceof Error ? e.message : String(e)}`);
-    } finally { setBimBusy(false); }
+        element_summary: [...typeCount.entries()].sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count, names: [...(typeNames.get(type) ?? [])] })),
+        element_count: parsed.elements.length,
+      };
+    }
   };
 
   const onStart = async () => {
-    setBusy(true); setErr(null);
+    const entries = Object.entries(slotFilesRef.current);
+    if (!entries.length) { setErr("BIM 파일을 공종 슬롯에 올리세요"); return; }
+    if (!buildingType.trim()) { setErr("건물유형을 입력하세요"); return; }
+    if (!startDate) { setErr("착공일을 입력하세요"); return; }
+    setBusy(true); setBimBusy(true); setErr(null);
     try {
+      // ① 슬롯 파일들 일괄 분석(여기서 처음 서버추출) → work_unit 결합. 공종=슬롯으로 확정(분류기 무시).
+      const allWu: GenWorkUnit[] = [];
+      const zoneSet = new Set<string>(); const storeySet = new Set<string>();
+      let cq = civilQty;
+      let inferSrc: IfcWorkUnitsResult | null = null;
+      for (const [disc, file] of entries) {
+        setInferReason(`분석 중 — ${disc} (${file.name})…`);
+        const r = await analyzeSlotFile(file);
+        allWu.push(...(r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))); // 슬롯=공종
+        r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
+        if (r.civil_quantities) cq = r.civil_quantities;
+        setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary) } }));
+        if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
+      }
+      setWorkUnits(allWu); setZones([...zoneSet]); setStoreys([...storeySet]); setCivilQty(cq);
+      // ② 구조유형 비었으면 1회 추론(생성 직전)
+      let st = structureType;
+      if (!st && inferSrc) {
+        const ctx = await inferScheduleContext({
+          storeys: [...storeySet], zones: [...zoneSet], element_summary: inferSrc.element_summary,
+          trade_summary: inferSrc.trade_summary, discipline_summary: inferSrc.discipline_summary, total_count: inferSrc.element_count,
+        });
+        if (ctx.structure_type) { st = ctx.structure_type; setStructureType(st); }
+        if (ctx.reason) setInferReason(ctx.reason); else setInferReason(null);
+      } else { setInferReason(null); }
+      setBimBusy(false);
+      // ③ 생성
       const r = await startPlan({
         building_type: buildingType.trim(), scope: scope.trim() || undefined,
-        structure_type: structureType.trim() || undefined,
-        discipline: discipline.trim() || undefined,
-        zones, storeys, work_units: workUnits, methods: [],
+        structure_type: st.trim() || undefined, discipline: discipline.trim() || undefined,
+        zones: [...zoneSet], storeys: [...storeySet], work_units: allWu, methods: [],
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
-        civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
-        constraints: constraints.trim() || undefined,
-        strategy,
+        civil_equipment: civilEquip, civil_quantities: cq ?? undefined,
+        constraints: constraints.trim() || undefined, strategy,
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
       // 슬롯 IFC(공종 태그째)를 plan_id 로 보관 → /fourd?plan=X 가 통합 4D 로 읽음(파일명 추측 X)
-      const planIfcs = Object.entries(slotFilesRef.current).map(([discipline, file]) => ({ file, discipline }));
+      const planIfcs = entries.map(([discipline, file]) => ({ file, discipline }));
       if (planIfcs.length) void savePlanIfcs(r.plan_id, planIfcs);
-      router.replace(`?plan=${r.plan_id}`);   // 새로고침해도 이어서 (plan_id 영속)
-      localStorage.setItem(PLAN_CKPT, r.plan_id);   // 페이지 이동 후 돌아와도 이어서
+      router.replace(`?plan=${r.plan_id}`);
+      localStorage.setItem(PLAN_CKPT, r.plan_id);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setBimBusy(false); }
   };
 
   const onSaveActs = async () => {
@@ -456,7 +434,7 @@ export default function SchedulePlanWizard() {
                       {filled ? "✓" : `${i + 1}.`} {d.icon} {d.label}
                     </div>
                     <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {filled ? `${filled.count.toLocaleString()}부재 → ${filled.wp} WP` : `업로드 · ${d.hint}`}
+                      {filled ? (filled.count ? `${filled.count.toLocaleString()}부재 → ${filled.wp} WP` : `${filled.name} · 생성 시 분석`) : `업로드 · ${d.hint}`}
                     </div>
                     {filled?.warn && (
                       <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.3, whiteSpace: "normal",
@@ -578,13 +556,15 @@ export default function SchedulePlanWizard() {
               </div>
             </Field>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end", gap: 10 }}>
-              {workUnits.length > 0 && (
+              {Object.keys(slots).length > 0 && (
                 <span style={{ fontSize: 12, color: "#475569" }}>
-                  📦 워크패키지 <b>{workUnits.length}</b> · 구역 {zones.length} · 층 {storeys.length}
+                  {workUnits.length > 0
+                    ? <>📦 워크패키지 <b>{workUnits.length}</b> · 구역 {zones.length} · 층 {storeys.length}</>
+                    : <>📂 {Object.keys(slots).join("+")} 업로드됨 · 생성 시 분석</>}
                 </span>
               )}
-              <button className="wz-btn" disabled={!buildingType.trim() || !startDate || busy} onClick={() => void onStart()}>
-                {busy ? "시작 중…" : "P1 스코프 확정 → P2 액티비티 생성"}
+              <button className="wz-btn" disabled={!Object.keys(slots).length || !buildingType.trim() || !startDate || busy} onClick={() => void onStart()}>
+                {busy ? (bimBusy ? "BIM 분석 중…" : "생성 중…") : "P1 스코프 확정 → P2 액티비티 생성"}
               </button>
             </div>
           </div>
