@@ -4520,3 +4520,95 @@ select {
 }
 .ws-logout-btn:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
 .ws-version { font-size: 0.72rem; color: var(--muted); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   광장(Plaza) — 2D 플랫포머 실시간 대화방
+   ───────────────────────────────────────────────────────────────────────────── */
+.plaza-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #0e1726;
+}
+
+.plaza-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(14, 23, 38, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e8edf4;
+  flex-wrap: wrap;
+}
+.plaza-title { font-weight: 700; font-size: 0.95rem; }
+.plaza-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #9aa6b5; flex: 0 0 auto;
+}
+.plaza-dot.open { background: #51cf66; box-shadow: 0 0 8px #51cf66; }
+.plaza-dot.connecting { background: #ffd43b; animation: plazaPulse 1s ease-in-out infinite; }
+.plaza-dot.closed { background: #ff6b6b; }
+@keyframes plazaPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+.plaza-status { font-size: 0.82rem; color: #c2ccd8; }
+.plaza-hint {
+  margin-left: auto; font-size: 0.76rem; color: #8d99a8;
+  white-space: nowrap;
+}
+
+.plaza-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+}
+.plaza-canvas {
+  width: 100%;
+  max-width: 1000px;
+  height: auto;
+  aspect-ratio: 1000 / 647;
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  image-rendering: auto;
+  outline: none;
+  background: #7ec8f0;
+}
+
+.plaza-chat {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(14, 23, 38, 0.92);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.plaza-chat-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #eef2f7;
+  font-size: 0.9rem;
+  outline: none;
+}
+.plaza-chat-input::placeholder { color: #7c8694; }
+.plaza-chat-input:focus { border-color: var(--primary); background: rgba(255, 255, 255, 0.1); }
+.plaza-chat-send {
+  padding: 0 18px;
+  border-radius: 10px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.plaza-chat-send:hover { background: var(--primary-deep); }
+
+@media (max-width: 640px) {
+  .plaza-hint { display: none; }
+}

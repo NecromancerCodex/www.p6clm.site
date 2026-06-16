@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut, Phone, Mountain } from "lucide-react";
+import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut, Phone, Mountain, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -13,6 +13,7 @@ import { logout, fetchMe } from "../../lib/auth";
 
 const NAV_ITEMS = [
   { path: "/home", label: "AI 대화", icon: Bot },
+  { path: "/plaza", label: "광장", icon: Gamepad2 }, // 2D 플랫포머 실시간 대화방
 ];
 
 // 공정관리 — 확장형 그룹. 대시보드(4D)가 기본 진입점.
