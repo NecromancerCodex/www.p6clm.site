@@ -24,9 +24,9 @@ import {
 // ── 월드 / 물리 상수 ──────────────────────────────────────────────────────────
 const WORLD_W = 1000;
 const WORLD_H = 647;
-const GRAVITY = 0.65;
-const MOVE_SPEED = 3.3;
-const JUMP_V = -12.5;
+const GRAVITY = 0.62;
+const MOVE_SPEED = 3.4;
+const JUMP_V = -13; // 최대 점프 높이 ≈ JUMP_V²/(2·GRAVITY) ≈ 136px > 발판 간격(~92px)
 const MAX_FALL = 16;
 const PLAYER_W = 30;
 const PLAYER_H = 44;
@@ -47,12 +47,14 @@ interface Foothold {
   y: number; // 윗면 y
   solid?: boolean;
 }
+const GROUND_Y = 600;
 const FOOTHOLDS: Foothold[] = [
-  { x: 0, w: WORLD_W, y: 600, solid: true }, // 바닥 (잔디 윗면)
-  { x: 250, w: 180, y: 470 }, // 나무 좌측 가지
-  { x: 575, w: 180, y: 470 }, // 나무 우측 가지
-  { x: 360, w: 285, y: 360 }, // 나무 중앙 단
-  { x: 410, w: 185, y: 250 }, // 나무 상단 (알 둥지 아래)
+  { x: 0, w: WORLD_W, y: GROUND_Y, solid: true }, // 바닥 (잔디 윗면)
+  { x: 190, w: 210, y: 508 }, // 좌측 낮은 가지  (gap 92)
+  { x: 600, w: 210, y: 508 }, // 우측 낮은 가지  (gap 92)
+  { x: 355, w: 290, y: 416 }, // 중앙 단        (gap 92)
+  { x: 405, w: 190, y: 326 }, // 상단 단        (gap 90)
+  { x: 438, w: 124, y: 250 }, // 꼭대기 둥지     (gap 76)
 ];
 
 // 캐릭터 색상 팔레트 — id 로 결정 (입장마다 일관)
@@ -384,112 +386,274 @@ export function PlazaCanvas() {
 // ── 배경 (오리지널, 절차적) ─────────────────────────────────────────────────────
 // "나무 마을" 분위기를 캔버스로 직접 그린다. 외부 이미지 자산 없음.
 // 나뭇가지 단(ledge)은 FOOTHOLDS 와 같은 좌표라 보이는 발판 = 실제 충돌면.
+const TREE_CX = 500;
+
+// 줄기 반폭 — 위(좁음) → 아래(넓음). 가지가 줄기 옆면에서 뻗도록 좌표 계산에 사용.
+function trunkHalf(y: number): number {
+  const top = 230, bot = GROUND_Y;
+  const r = Math.max(0, Math.min(1, (y - top) / (bot - top)));
+  return 46 + r * 46; // 46 → 92
+}
+
 function drawBackground(ctx: CanvasRenderingContext2D, now: number) {
-  // 하늘
+  // ── 하늘 ──
   const sky = ctx.createLinearGradient(0, 0, 0, WORLD_H);
-  sky.addColorStop(0, "#5bb8ef");
-  sky.addColorStop(0.55, "#9fd9f5");
-  sky.addColorStop(1, "#d6efd2");
+  sky.addColorStop(0, "#3f9fe6");
+  sky.addColorStop(0.42, "#82caee");
+  sky.addColorStop(0.72, "#c2e7f1");
+  sky.addColorStop(1, "#e9f4d8");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  // 햇무리
-  const sun = ctx.createRadialGradient(840, 110, 8, 840, 110, 150);
-  sun.addColorStop(0, "rgba(255,251,224,0.95)");
-  sun.addColorStop(1, "rgba(255,251,224,0)");
-  ctx.fillStyle = sun;
-  ctx.fillRect(600, 0, 400, 300);
+  // ── 태양 ──
+  ctx.save();
+  const glow = ctx.createRadialGradient(140, 120, 10, 140, 120, 190);
+  glow.addColorStop(0, "rgba(255,252,228,0.95)");
+  glow.addColorStop(0.4, "rgba(255,247,200,0.45)");
+  glow.addColorStop(1, "rgba(255,247,200,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, 380, 330);
+  ctx.fillStyle = "rgba(255,253,238,0.95)";
+  ctx.beginPath(); ctx.arc(140, 120, 46, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 
-  // 흐르는 구름
-  const t = now * 0.012;
-  const span = WORLD_W + 240;
-  drawCloud(ctx, ((140 + t) % span) - 120, 95, 1.0);
-  drawCloud(ctx, ((560 + t * 0.7) % span) - 120, 150, 0.8);
-  drawCloud(ctx, ((860 + t * 0.5) % span) - 120, 65, 1.15);
+  // ── 흐르는 구름 ──
+  const t = now * 0.01;
+  const span = WORLD_W + 260;
+  drawCloud(ctx, ((180 + t) % span) - 130, 90, 1.05);
+  drawCloud(ctx, ((620 + t * 0.65) % span) - 130, 150, 0.8);
+  drawCloud(ctx, ((900 + t * 0.45) % span) - 130, 60, 1.25);
 
-  // 먼 언덕
-  ctx.fillStyle = "#bfe39a";
-  blob(ctx, -60, 600, [[0, -90], [180, -150], [380, -100], [540, -150], [760, -90], [1060, -130], [1060, 60], [-60, 60]]);
-  ctx.fillStyle = "#a9d985";
-  blob(ctx, -60, 600, [[0, -40], [260, -90], [520, -50], [820, -95], [1060, -55], [1060, 60], [-60, 60]]);
+  // ── 먼 산 3겹 (패럴랙스 느낌) ──
+  ctx.fillStyle = "#cfe6c0";
+  blob(ctx, 0, GROUND_Y, [[-40, -150], [150, -230], [360, -160], [560, -250], [800, -170], [1040, -220], [1040, 80], [-40, 80]]);
+  ctx.fillStyle = "#aed99a";
+  blob(ctx, 0, GROUND_Y, [[-40, -90], [220, -170], [470, -110], [720, -180], [1040, -120], [1040, 80], [-40, 80]]);
+  // 중간 언덕 위 작은 나무들
+  for (const [bx, by, s] of [[120, 470, 1], [300, 455, 0.8], [820, 465, 1.1], [930, 450, 0.85]] as const) {
+    drawBush(ctx, bx, by, 26 * s, "#7fb96a");
+  }
+  ctx.fillStyle = "#93cd7e";
+  blob(ctx, 0, GROUND_Y, [[-40, -40], [260, -78], [540, -44], [820, -82], [1040, -50], [1040, 80], [-40, 80]]);
 
-  // 중앙 큰 나무
+  // ── 양옆 돌기둥 (랜턴) ──
+  drawPillar(ctx, 64, now);
+  drawPillar(ctx, WORLD_W - 64, now);
+
+  // ── 중앙 큰 나무 ──
   drawTree(ctx);
 
-  // 잔디 땅 (solid foothold y=600)
-  ctx.fillStyle = "#6fae3e";
-  ctx.fillRect(0, 600, WORLD_W, WORLD_H - 600);
-  ctx.fillStyle = "#5a4632"; // 흙
-  ctx.fillRect(0, 622, WORLD_W, WORLD_H - 622);
-  ctx.strokeStyle = "rgba(255,255,255,0.18)";
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, 601); ctx.lineTo(WORLD_W, 601); ctx.stroke();
+  // ── 잔디 땅 ──
+  const grass = ctx.createLinearGradient(0, GROUND_Y, 0, GROUND_Y + 30);
+  grass.addColorStop(0, "#79b94a");
+  grass.addColorStop(1, "#5f9c38");
+  ctx.fillStyle = grass;
+  ctx.fillRect(0, GROUND_Y, WORLD_W, WORLD_H - GROUND_Y);
+  ctx.fillStyle = "#5b4631"; // 흙
+  ctx.fillRect(0, GROUND_Y + 26, WORLD_W, WORLD_H - GROUND_Y - 26);
+  ctx.fillStyle = "rgba(70,52,34,0.5)"; // 흙 알갱이
+  for (let i = 0; i < 26; i++) ctx.fillRect((i * 71) % WORLD_W, GROUND_Y + 34 + (i % 4) * 8, 6, 4);
+  // 잔디 윗면 하이라이트
+  ctx.fillStyle = "#8fce5b";
+  ctx.fillRect(0, GROUND_Y, WORLD_W, 4);
+  // 잔디 포기 + 꽃
+  for (let i = 0; i < 30; i++) {
+    const gx = 18 + i * 33;
+    drawGrassTuft(ctx, gx, GROUND_Y + 2);
+    if (i % 5 === 2) drawFlower(ctx, gx + 10, GROUND_Y + 1, i % 2 ? "#ff7aa8" : "#ffd34d");
+  }
 
-  // 나뭇가지 발판 (one-way FOOTHOLDS)
+  // ── 나뭇가지 발판 (one-way FOOTHOLDS) ──
   for (const f of FOOTHOLDS) {
     if (f.solid) continue;
     drawLedge(ctx, f.x, f.y, f.w);
   }
+
+  // ── 반딧불/꽃가루 파티클 ──
+  ctx.save();
+  for (let i = 0; i < 16; i++) {
+    const px = (i * 137 + Math.sin(now / 1400 + i) * 60 + 50) % WORLD_W;
+    const py = 140 + ((i * 53) % 360) + Math.sin(now / 900 + i * 2) * 22;
+    const a = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(now / 600 + i));
+    ctx.fillStyle = `rgba(255,250,190,${a.toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.save();
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
   ctx.beginPath();
-  ctx.ellipse(x, y, 42 * s, 26 * s, 0, 0, Math.PI * 2);
-  ctx.ellipse(x + 40 * s, y + 6 * s, 34 * s, 22 * s, 0, 0, Math.PI * 2);
-  ctx.ellipse(x - 38 * s, y + 8 * s, 30 * s, 20 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y, 44 * s, 27 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 44 * s, y + 7 * s, 35 * s, 23 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(x - 42 * s, y + 9 * s, 31 * s, 20 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 16 * s, y - 12 * s, 30 * s, 22 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(210,232,245,0.6)"; // 아래 그림자
+  ctx.beginPath(); ctx.ellipse(x, y + 16 * s, 78 * s, 12 * s, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawBush(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x - r * 0.7, y, r * 0.7, 0, Math.PI * 2);
+  ctx.arc(x + r * 0.7, y, r * 0.7, 0, Math.PI * 2);
+  ctx.arc(x, y - r * 0.4, r * 0.85, 0, Math.PI * 2);
   ctx.fill();
 }
 
+function drawPillar(ctx: CanvasRenderingContext2D, x: number, now: number) {
+  ctx.save();
+  // 기둥
+  const g = ctx.createLinearGradient(x - 22, 0, x + 22, 0);
+  g.addColorStop(0, "#8d9099"); g.addColorStop(0.5, "#b9bcc4"); g.addColorStop(1, "#7d808a");
+  ctx.fillStyle = g;
+  roundRect(ctx, x - 20, 360, 40, GROUND_Y - 360 + 6, 6); ctx.fill();
+  // 돌 이음선
+  ctx.strokeStyle = "rgba(70,72,80,0.4)"; ctx.lineWidth = 2;
+  for (let yy = 392; yy < GROUND_Y; yy += 36) { ctx.beginPath(); ctx.moveTo(x - 20, yy); ctx.lineTo(x + 20, yy); ctx.stroke(); }
+  // 머릿돌
+  ctx.fillStyle = "#9aa0aa";
+  roundRect(ctx, x - 26, 346, 52, 20, 5); ctx.fill();
+  // 랜턴 등불 (은은한 깜빡임)
+  const flick = 0.6 + 0.25 * Math.sin(now / 240 + x);
+  const lg = ctx.createRadialGradient(x, 330, 2, x, 330, 30);
+  lg.addColorStop(0, `rgba(255,214,120,${(0.5 + flick * 0.4).toFixed(3)})`);
+  lg.addColorStop(1, "rgba(255,214,120,0)");
+  ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(x, 330, 30, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#3a3d44"; roundRect(ctx, x - 9, 320, 18, 22, 4); ctx.fill();
+  ctx.fillStyle = `rgba(255,201,92,${flick.toFixed(3)})`; roundRect(ctx, x - 5, 324, 10, 14, 3); ctx.fill();
+  ctx.restore();
+}
+
 function drawTree(ctx: CanvasRenderingContext2D) {
-  const cx = 500;
-  // 줄기
-  const trunk = ctx.createLinearGradient(cx - 90, 0, cx + 90, 0);
-  trunk.addColorStop(0, "#7b5a36");
-  trunk.addColorStop(0.5, "#9c7444");
-  trunk.addColorStop(1, "#6e4f30");
+  const cx = TREE_CX;
+
+  // ── 가지 (발판을 받치는 모양) — 캐노피·줄기보다 먼저(뒤에) ──
+  ctx.strokeStyle = "#6e4f30";
+  ctx.lineCap = "round";
+  for (const f of FOOTHOLDS) {
+    if (f.solid) continue;
+    const ledgeMid = f.x + f.w / 2;
+    const left = ledgeMid < cx;
+    const fromX = cx + (left ? -1 : 1) * trunkHalf(f.y) * 0.7;
+    const toX = left ? f.x + f.w - 14 : f.x + 14;
+    ctx.lineWidth = 16;
+    ctx.beginPath();
+    ctx.moveTo(fromX, f.y + 22);
+    ctx.quadraticCurveTo((fromX + toX) / 2, f.y + 4, toX, f.y + 6);
+    ctx.stroke();
+  }
+
+  // ── 뿌리 ──
+  ctx.fillStyle = "#6e4f30";
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(cx + dir * 60, GROUND_Y - 40);
+    ctx.quadraticCurveTo(cx + dir * 110, GROUND_Y - 6, cx + dir * 150, GROUND_Y + 6);
+    ctx.lineTo(cx + dir * 90, GROUND_Y + 6);
+    ctx.quadraticCurveTo(cx + dir * 70, GROUND_Y - 10, cx + dir * 30, GROUND_Y - 10);
+    ctx.closePath(); ctx.fill();
+  }
+
+  // ── 줄기 ──
+  const trunk = ctx.createLinearGradient(cx - 92, 0, cx + 92, 0);
+  trunk.addColorStop(0, "#6e4f2f");
+  trunk.addColorStop(0.45, "#9c7444");
+  trunk.addColorStop(0.6, "#b08a55");
+  trunk.addColorStop(1, "#67492c");
   ctx.fillStyle = trunk;
   ctx.beginPath();
-  ctx.moveTo(cx - 70, 600);
-  ctx.bezierCurveTo(cx - 95, 460, cx - 55, 360, cx - 60, 250);
-  ctx.lineTo(cx + 60, 250);
-  ctx.bezierCurveTo(cx + 55, 360, cx + 95, 460, cx + 70, 600);
+  ctx.moveTo(cx - 92, GROUND_Y);
+  ctx.bezierCurveTo(cx - 104, 500, cx - 58, 360, cx - 50, 240);
+  ctx.quadraticCurveTo(cx, 224, cx + 50, 240);
+  ctx.bezierCurveTo(cx + 58, 360, cx + 104, 500, cx + 92, GROUND_Y);
   ctx.closePath();
   ctx.fill();
   // 줄기 결
-  ctx.strokeStyle = "rgba(80,55,30,0.35)";
-  ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(cx - 20, 580); ctx.bezierCurveTo(cx - 30, 460, cx - 10, 360, cx - 18, 270); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(cx + 22, 580); ctx.bezierCurveTo(cx + 30, 470, cx + 12, 370, cx + 20, 270); ctx.stroke();
+  ctx.strokeStyle = "rgba(70,48,26,0.4)"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx - 24, 580); ctx.bezierCurveTo(cx - 34, 460, cx - 12, 360, cx - 20, 260); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + 26, 580); ctx.bezierCurveTo(cx + 34, 470, cx + 14, 370, cx + 22, 260); ctx.stroke();
+  // 옹이
+  ctx.fillStyle = "rgba(70,48,26,0.45)";
+  ctx.beginPath(); ctx.ellipse(cx + 8, 430, 12, 16, 0, 0, Math.PI * 2); ctx.fill();
 
-  // 잎 덩어리 (윗단 발판 y≈250 위로 풍성하게)
-  const leaves: Array<[number, number, number]> = [
-    [cx, 150, 130], [cx - 120, 200, 90], [cx + 120, 200, 90],
-    [cx - 70, 130, 80], [cx + 70, 130, 80], [cx, 90, 95],
+  // ── 매달린 간판 "광장" ──
+  ctx.save();
+  ctx.strokeStyle = "#5b3f24"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx - 34, 250); ctx.lineTo(cx - 34, 272); ctx.moveTo(cx + 34, 250); ctx.lineTo(cx + 34, 272); ctx.stroke();
+  ctx.fillStyle = "#a9763e"; roundRect(ctx, cx - 52, 270, 104, 40, 8); ctx.fill();
+  ctx.strokeStyle = "#7a5126"; ctx.lineWidth = 3; roundRect(ctx, cx - 52, 270, 104, 40, 8); ctx.stroke();
+  ctx.fillStyle = "#fff6e0"; ctx.font = "700 24px system-ui, sans-serif"; ctx.textAlign = "center";
+  ctx.fillText("광 장", cx, 298);
+  ctx.restore();
+
+  // ── 캐노피 (여러 겹 + 하이라이트) ──
+  const clumps: Array<[number, number, number]> = [
+    [cx, 150, 138], [cx - 132, 196, 92], [cx + 132, 196, 92],
+    [cx - 78, 120, 84], [cx + 78, 120, 84], [cx, 78, 100],
+    [cx - 40, 196, 70], [cx + 40, 196, 70],
   ];
-  for (const [lx, ly, r] of leaves) {
-    const g = ctx.createRadialGradient(lx - r * 0.3, ly - r * 0.3, r * 0.2, lx, ly, r);
-    g.addColorStop(0, "#7bc26a");
-    g.addColorStop(1, "#3f8f43");
+  for (const [lx, ly, r] of clumps) {
+    const g = ctx.createRadialGradient(lx - r * 0.35, ly - r * 0.4, r * 0.15, lx, ly, r);
+    g.addColorStop(0, "#86cf6f");
+    g.addColorStop(0.6, "#5cab4c");
+    g.addColorStop(1, "#3c8a3e");
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.fill();
+  }
+  // 잎 하이라이트 점
+  ctx.fillStyle = "rgba(190,234,150,0.55)";
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    const rr = 60 + (i % 5) * 22;
+    ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rr, 150 + Math.sin(a) * rr * 0.7, 5, 0, Math.PI * 2); ctx.fill();
   }
 }
 
 // 나뭇가지 발판 — 윗면 y 가 충돌면. 둥근 통나무 + 잎 장식.
 function drawLedge(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) {
-  const h = 16;
-  ctx.fillStyle = "#8a6239";
-  roundRect(ctx, x, y, w, h, 8); ctx.fill();
-  ctx.fillStyle = "#6f4d2b";
-  roundRect(ctx, x, y + h - 6, w, 6, 4); ctx.fill();
+  const h = 18;
+  ctx.save();
+  // 그림자
+  ctx.fillStyle = "rgba(0,0,0,0.12)";
+  roundRect(ctx, x + 4, y + 6, w, h, 9); ctx.fill();
+  // 통나무
+  const g = ctx.createLinearGradient(0, y, 0, y + h);
+  g.addColorStop(0, "#9c6f40"); g.addColorStop(1, "#6f4d2b");
+  ctx.fillStyle = g;
+  roundRect(ctx, x, y, w, h, 9); ctx.fill();
   // 윗면 이끼
-  ctx.fillStyle = "#5aa84a";
-  roundRect(ctx, x + 3, y - 3, w - 6, 7, 4); ctx.fill();
-  // 잎 끝 장식
+  ctx.fillStyle = "#62b24f";
+  roundRect(ctx, x + 3, y - 4, w - 6, 9, 5); ctx.fill();
+  ctx.fillStyle = "#7cc863";
+  roundRect(ctx, x + 3, y - 4, w - 6, 4, 4); ctx.fill();
+  // 양끝 잎 장식
   ctx.fillStyle = "#4f9b46";
-  ctx.beginPath(); ctx.arc(x + 6, y + 2, 9, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(x + w - 6, y + 2, 9, 0, Math.PI * 2); ctx.fill();
+  for (const ex of [x + 8, x + w - 8]) {
+    ctx.beginPath(); ctx.arc(ex, y + 1, 10, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawGrassTuft(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  ctx.strokeStyle = "#4f9434"; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.quadraticCurveTo(x - 4, y - 9, x - 6, y - 13);
+  ctx.moveTo(x, y); ctx.quadraticCurveTo(x, y - 11, x + 1, y - 16);
+  ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 4, y - 9, x + 7, y - 12);
+  ctx.stroke();
+}
+
+function drawFlower(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+  ctx.fillStyle = color;
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    ctx.beginPath(); ctx.arc(x + Math.cos(a) * 3.6, y - 14 + Math.sin(a) * 3.6, 2.6, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = "#ffe9a8"; ctx.beginPath(); ctx.arc(x, y - 14, 2.2, 0, Math.PI * 2); ctx.fill();
 }
 
 // 닫힌 다각형 채우기 헬퍼 (offset 기준 상대 좌표)
