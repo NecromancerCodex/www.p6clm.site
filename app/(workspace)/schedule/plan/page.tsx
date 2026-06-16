@@ -341,6 +341,14 @@ export default function SchedulePlanWizard() {
   };
   const removeAct = (i: number) => { setActs((prev) => prev.filter((_, j) => j !== i)); setDirty(true); };
 
+  // ── 멀티파싱 파라미터 가시성 — 단일 discipline 이 아니라 '채워진 슬롯' 기준 ──
+  // (토목+구조 동시 업로드 시 구조유형이 'discipline=토목'에 가려지던 버그 수정)
+  const filledDiscs = Object.keys(slots);
+  const multiDisc = filledDiscs.length >= 2;
+  const noSlots = filledDiscs.length === 0;
+  const hasStruct = !!slots["구조"] || (noSlots && (discipline === "" || discipline === "구조"));
+  const hasCivil = !!slots["토목"];
+
   // ════════════════ 렌더 ════════════════
   return (
     <div style={{ padding: 20, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -467,36 +475,53 @@ export default function SchedulePlanWizard() {
               <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="예: 모듈러 공동주택" />
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
             </Field>
-            <Field label="② 공종 / 구조유형 / 시공 전략 — 자동 판정 후 직접 수정 가능">
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {/* 공종(디시플린) — BIM trade 자동채움, 사람이 수정(휴먼인더루프). 비구조면 구조유형 숨김. */}
-                <select className="wz-in" value={discipline} onChange={(e) => setDiscipline(e.target.value)}
-                        title="BIM 공종 자동 판정 — 틀리면 직접 선택 (토목/건축/MEP/조경은 구조유형 무관)">
-                  <option value="">공종: 자동 판정</option>
-                  <option value="토목">토목</option>
-                  <option value="구조">구조</option>
-                  <option value="건축">건축</option>
-                  <option value="MEP">MEP (기계·소방·전기·통신)</option>
-                  <option value="조경">조경</option>
-                </select>
-                {/* 구조유형 — '구조' 또는 '자동'일 때만 (토목/건축/MEP/조경엔 무의미) */}
-                {(discipline === "" || discipline === "구조") && (
-                  <select className="wz-in" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
-                    <option value="">구조: 자동 판정</option>
-                    <option value="RC">RC (철근콘크리트)</option>
-                    <option value="철골">철골</option>
-                    <option value="SRC">SRC</option>
-                    <option value="PC·모듈러">PC·모듈러</option>
-                    <option value="혼합">혼합 (RC코어 + 철골)</option>
+            <Field label={multiDisc ? "② 공종별 파라미터 — 복수 공종 병합" : "② 공종 / 구조유형 / 시공 전략 — 자동 판정 후 직접 수정 가능"}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                {/* 복수 공종이면 슬롯이 공종을 정함 → 단일 드롭다운 숨김(혼동 방지). 단일/레거시면 드롭다운. */}
+                {multiDisc ? (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#15803d", padding: "6px 0" }}>
+                    🔗 {filledDiscs.join(" + ")} — 공종별로 따로 생성 후 병합
+                  </span>
+                ) : (
+                  <select className="wz-in" value={discipline} onChange={(e) => setDiscipline(e.target.value)}
+                          title="BIM 공종 자동 판정 — 틀리면 직접 선택">
+                    <option value="">공종: 자동 판정</option>
+                    <option value="토목">토목</option>
+                    <option value="구조">구조</option>
+                    <option value="건축">건축</option>
+                    <option value="MEP">MEP (기계·소방·전기·통신)</option>
+                    <option value="조경">조경</option>
                   </select>
                 )}
-                <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
-                        title="굴착·골조 전략 — 발주·부지 조건으로 결정되는 정보(AI 추정 불가)">
-                  <option value="bottom_up">순타·일괄 (전 구역 지하 → 지상)</option>
-                  <option value="bottom_up_phased">순타·단계 (구역별 지하→지상 연속)</option>
-                  <option value="top_down">역타 (지하·지상 병행)</option>
-                </select>
+                {/* 구조유형 — 구조 슬롯이 있으면(또는 단일 구조/자동) 표시. 토목 last 라도 안 가려짐. */}
+                {hasStruct && (
+                  <label className="wz-sub" style={{ display: "flex", flexDirection: "column", fontSize: 11, color: "#475569" }}>
+                    {multiDisc ? "구조유형" : ""}
+                    <select className="wz-in" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
+                      <option value="">구조: 자동 판정</option>
+                      <option value="RC">RC (철근콘크리트)</option>
+                      <option value="철골">철골</option>
+                      <option value="SRC">SRC</option>
+                      <option value="PC·모듈러">PC·모듈러</option>
+                      <option value="혼합">혼합 (RC코어 + 철골)</option>
+                    </select>
+                  </label>
+                )}
+                <label className="wz-sub" style={{ display: "flex", flexDirection: "column", fontSize: 11, color: "#475569" }}>
+                  {multiDisc ? "시공 전략(굴착·골조)" : ""}
+                  <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
+                          title="굴착·골조 전략 — 발주·부지 조건(AI 추정 불가)">
+                    <option value="bottom_up">순타·일괄 (전 구역 지하 → 지상)</option>
+                    <option value="bottom_up_phased">순타·단계 (구역별 지하→지상 연속)</option>
+                    <option value="top_down">역타 (지하·지상 병행)</option>
+                  </select>
+                </label>
               </div>
+              {multiDisc && (
+                <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
+                  착공일·목표공기·주N일·현장조건은 공통, 구조유형은 구조에만·투입조는 각 공종에 적용됩니다.
+                </p>
+              )}
             </Field>
             <Field label="③ 언제 — 착공일 * / 목표공기">
               <div style={{ display: "flex", gap: 8 }}>
@@ -508,13 +533,17 @@ export default function SchedulePlanWizard() {
                 </select>
               </div>
             </Field>
-            <Field label="④ 자원 — 타워크레인 / 작업조 / 토목 투입조">
-              <div style={{ display: "flex", gap: 8 }}>
-                <label className="wz-sub">크레인(대)
-                  <input type="number" min={0} className="wz-in" value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
-                <label className="wz-sub">작업조(조)
-                  <input type="number" min={1} className="wz-in" value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
-                {slots["토목"] && (
+            <Field label="④ 자원 — 공종별 투입">
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {(hasStruct || noSlots) && (
+                  <>
+                    <label className="wz-sub" title="구조 양중(모듈/PC설치) 동시 한계">{multiDisc ? "구조 크레인(대)" : "크레인(대)"}
+                      <input type="number" min={0} className="wz-in" value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
+                    <label className="wz-sub" title="구조 동시 동일공종 작업조">{multiDisc ? "구조 작업조(조)" : "작업조(조)"}
+                      <input type="number" min={1} className="wz-in" value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
+                  </>
+                )}
+                {hasCivil && (
                   <label className="wz-sub" title="굴착기·CIP장비 등 토목 투입 장비조 수 — 토목 기간 = 물량 ÷ (표준품셈 생산성 × 투입조)">토목 투입조(대)
                     <input type="number" min={1} className="wz-in" value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} /></label>
                 )}
