@@ -232,6 +232,8 @@ export interface CodeIndex {
 
 // 토공 공통 활동(4D 코드 없음 — 공통)을 이름으로 식별. 토목(CV) 부재가 이 기간에 매칭됨.
 const _EARTHWORK_KW = /흙막이|토공|굴착|터파기|차수|되메우|버림|토류|가시설|파일|말뚝/;
+// 되메우기·성토는 골조 후행(post) — 흙막이 부재 window 에서 제외(안 그러면 흙막이가 골조 끝까지 진행중).
+const _BACKFILL_KW = /되메우|성토|복구/;
 
 // 스케줄 op(CR/MD/FT/PR) → 부재 카테고리. BIM 부재(classifyIfcType)와 같은 축으로 통일해
 // trade(ST/MO)·wt(WAL/SLB/COL) 코드 차이를 무시하고 구역 단위 매칭을 살린다.
@@ -280,8 +282,9 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     const s = t.start ? Date.parse(t.start) : NaN;
     const e = t.end ? Date.parse(t.end) : NaN;
     if (Number.isNaN(s) || Number.isNaN(e)) continue;
-    // 토공 공통활동(4D 코드 없음) — 이름으로 식별해 earthwork window 누적 (토목 CV 매칭용)
-    if (_EARTHWORK_KW.test(t.name || "")) {
+    // 토공 공통활동(4D 코드 없음) — 이름으로 식별해 earthwork window 누적 (토목 부재 매칭용).
+    // 되메우기/성토(골조 후행)는 제외 — 흙막이·굴착(굴착 단계)까지만 → 토목 부재가 골조 전 완료.
+    if (_EARTHWORK_KW.test(t.name || "") && !_BACKFILL_KW.test(t.name || "")) {
       ewStart = Math.min(ewStart, s);
       ewEnd = Math.max(ewEnd, e);
       minD = Math.min(minD, s);
