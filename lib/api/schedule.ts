@@ -353,6 +353,7 @@ export interface GenWorkUnit {
   count?: number; quantity?: number; unit?: string;
   volume_m3?: number; // 정량물량 체적 ㎥ (콘크리트) — 품셈 정밀적용·자원계획용
   area_m2?: number; // 정량물량 면적 ㎡ (거푸집)
+  discipline?: string; // 공종(토목/구조/건축/MEP/조경/가설) — 멀티파싱 병합 분리용
 }
 export interface GenerateScheduleRequest {
   building_type: string;
@@ -438,6 +439,7 @@ export async function inferScheduleContext(req: {
   storeys: string[]; zones: string[];
   element_summary: { type: string; count: number; names?: string[] }[]; total_count: number;
   trade_summary?: { trade: string; count: number }[];   // 공정 PSet Trade(ST/MO) — 구조유형 결정론 신호
+  discipline_summary?: { discipline: string; count: number }[];   // 공종(흙막이 보정 후) — 멀티파싱 판정
 }): Promise<InferContextResult> {
   const res = await fetch(`${API_BASE}/schedule/infer-context`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),
@@ -452,6 +454,7 @@ export interface IfcWorkUnitsResult {
   zones: string[];
   storeys: string[];
   trade_summary: { trade: string; count: number }[];
+  discipline_summary?: { discipline: string; count: number }[];   // 공종 분포(흙막이 보정 후)
   element_summary: { type: string; count: number; names?: string[] }[];
   element_count: number;
 }

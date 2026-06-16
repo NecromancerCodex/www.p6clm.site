@@ -181,6 +181,7 @@ export default function SchedulePlanWizard() {
           storeys: r.storeys, zones: r.zones,
           element_summary: r.element_summary,
           trade_summary: r.trade_summary,
+          discipline_summary: r.discipline_summary,
           total_count: r.element_count,
         }).then((ctx) => {
           if (ctx.building_type && !buildingType) setBuildingType(ctx.building_type);
