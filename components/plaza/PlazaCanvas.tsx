@@ -23,7 +23,7 @@ import {
 
 // ── 월드 / 물리 상수 ──────────────────────────────────────────────────────────
 const WORLD_W = 1000;
-const WORLD_H = 647; // town.png 비율
+const WORLD_H = 647;
 const GRAVITY = 0.65;
 const MOVE_SPEED = 3.3;
 const JUMP_V = -12.5;
@@ -37,9 +37,9 @@ const SPAWN_X = 500;
 const SPAWN_Y = 540;
 
 /**
- * 발판(foothold) — 배경 그림과 별개의 충돌 데이터(메이플 방식).
+ * 발판(foothold) — 충돌 데이터. 배경의 나뭇가지 단도 이 좌표로 함께 그려져
+ * "보이는 발판 = 실제 콜라이더"가 정확히 일치한다 (별도 미세조정 불필요).
  * solid: 양방향 막힘(땅). 그 외: 위에서만 착지하는 one-way 발판(↓+점프로 통과).
- * ⚠ 좌표는 town.png 에 맞춰 눈대중 — 실제 그림 보며 미세조정 권장.
  */
 interface Foothold {
   x: number;
@@ -107,14 +107,6 @@ export function PlazaCanvas() {
   const bubblesRef = useRef<Map<number, Bubble>>(new Map()); // playerId → 말풍선 (-1=나)
   const keysRef = useRef<Record<string, boolean>>({});
   const inputFocusedRef = useRef(false);
-  const bgRef = useRef<HTMLImageElement | null>(null);
-
-  // ── 배경 이미지 로드 ────────────────────────────────────────────────────────
-  useEffect(() => {
-    const img = new Image();
-    img.src = "/plaza/town.png";
-    img.onload = () => { bgRef.current = img; };
-  }, []);
 
   // ── WebSocket 연결 ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -236,24 +228,11 @@ export function PlazaCanvas() {
 
       ctx.clearRect(0, 0, cw, ch);
 
-      if (bgRef.current) {
-        ctx.drawImage(bgRef.current, 0, 0, cw, ch);
-      } else {
-        const g = ctx.createLinearGradient(0, 0, 0, ch);
-        g.addColorStop(0, "#7ec8f0"); g.addColorStop(1, "#cde6b0");
-        ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
-      }
-
       ctx.save();
       ctx.scale(scale, scale);
 
-      const SHOW_FOOTHOLDS = false; // 발판 미세조정 시 true
-      if (SHOW_FOOTHOLDS) {
-        ctx.strokeStyle = "rgba(255,0,0,0.6)"; ctx.lineWidth = 3;
-        for (const f of FOOTHOLDS) {
-          ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x + f.w, f.y); ctx.stroke();
-        }
-      }
+      // 절차적 배경(오리지널) — 보이는 나뭇가지 단이 FOOTHOLDS 와 동일 좌표.
+      drawBackground(ctx, now);
 
       for (const r of remotesRef.current.values()) {
         drawCharacter(ctx, r.x, r.y, r.facing, r.st, colorFor(r.id), r.name, now, bubblesRef.current.get(r.id));
@@ -400,6 +379,128 @@ export function PlazaCanvas() {
       </form>
     </div>
   );
+}
+
+// ── 배경 (오리지널, 절차적) ─────────────────────────────────────────────────────
+// "나무 마을" 분위기를 캔버스로 직접 그린다. 외부 이미지 자산 없음.
+// 나뭇가지 단(ledge)은 FOOTHOLDS 와 같은 좌표라 보이는 발판 = 실제 충돌면.
+function drawBackground(ctx: CanvasRenderingContext2D, now: number) {
+  // 하늘
+  const sky = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+  sky.addColorStop(0, "#5bb8ef");
+  sky.addColorStop(0.55, "#9fd9f5");
+  sky.addColorStop(1, "#d6efd2");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+  // 햇무리
+  const sun = ctx.createRadialGradient(840, 110, 8, 840, 110, 150);
+  sun.addColorStop(0, "rgba(255,251,224,0.95)");
+  sun.addColorStop(1, "rgba(255,251,224,0)");
+  ctx.fillStyle = sun;
+  ctx.fillRect(600, 0, 400, 300);
+
+  // 흐르는 구름
+  const t = now * 0.012;
+  const span = WORLD_W + 240;
+  drawCloud(ctx, ((140 + t) % span) - 120, 95, 1.0);
+  drawCloud(ctx, ((560 + t * 0.7) % span) - 120, 150, 0.8);
+  drawCloud(ctx, ((860 + t * 0.5) % span) - 120, 65, 1.15);
+
+  // 먼 언덕
+  ctx.fillStyle = "#bfe39a";
+  blob(ctx, -60, 600, [[0, -90], [180, -150], [380, -100], [540, -150], [760, -90], [1060, -130], [1060, 60], [-60, 60]]);
+  ctx.fillStyle = "#a9d985";
+  blob(ctx, -60, 600, [[0, -40], [260, -90], [520, -50], [820, -95], [1060, -55], [1060, 60], [-60, 60]]);
+
+  // 중앙 큰 나무
+  drawTree(ctx);
+
+  // 잔디 땅 (solid foothold y=600)
+  ctx.fillStyle = "#6fae3e";
+  ctx.fillRect(0, 600, WORLD_W, WORLD_H - 600);
+  ctx.fillStyle = "#5a4632"; // 흙
+  ctx.fillRect(0, 622, WORLD_W, WORLD_H - 622);
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, 601); ctx.lineTo(WORLD_W, 601); ctx.stroke();
+
+  // 나뭇가지 발판 (one-way FOOTHOLDS)
+  for (const f of FOOTHOLDS) {
+    if (f.solid) continue;
+    drawLedge(ctx, f.x, f.y, f.w);
+  }
+}
+
+function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, s: number) {
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.beginPath();
+  ctx.ellipse(x, y, 42 * s, 26 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 40 * s, y + 6 * s, 34 * s, 22 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(x - 38 * s, y + 8 * s, 30 * s, 20 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawTree(ctx: CanvasRenderingContext2D) {
+  const cx = 500;
+  // 줄기
+  const trunk = ctx.createLinearGradient(cx - 90, 0, cx + 90, 0);
+  trunk.addColorStop(0, "#7b5a36");
+  trunk.addColorStop(0.5, "#9c7444");
+  trunk.addColorStop(1, "#6e4f30");
+  ctx.fillStyle = trunk;
+  ctx.beginPath();
+  ctx.moveTo(cx - 70, 600);
+  ctx.bezierCurveTo(cx - 95, 460, cx - 55, 360, cx - 60, 250);
+  ctx.lineTo(cx + 60, 250);
+  ctx.bezierCurveTo(cx + 55, 360, cx + 95, 460, cx + 70, 600);
+  ctx.closePath();
+  ctx.fill();
+  // 줄기 결
+  ctx.strokeStyle = "rgba(80,55,30,0.35)";
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(cx - 20, 580); ctx.bezierCurveTo(cx - 30, 460, cx - 10, 360, cx - 18, 270); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx + 22, 580); ctx.bezierCurveTo(cx + 30, 470, cx + 12, 370, cx + 20, 270); ctx.stroke();
+
+  // 잎 덩어리 (윗단 발판 y≈250 위로 풍성하게)
+  const leaves: Array<[number, number, number]> = [
+    [cx, 150, 130], [cx - 120, 200, 90], [cx + 120, 200, 90],
+    [cx - 70, 130, 80], [cx + 70, 130, 80], [cx, 90, 95],
+  ];
+  for (const [lx, ly, r] of leaves) {
+    const g = ctx.createRadialGradient(lx - r * 0.3, ly - r * 0.3, r * 0.2, lx, ly, r);
+    g.addColorStop(0, "#7bc26a");
+    g.addColorStop(1, "#3f8f43");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+// 나뭇가지 발판 — 윗면 y 가 충돌면. 둥근 통나무 + 잎 장식.
+function drawLedge(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) {
+  const h = 16;
+  ctx.fillStyle = "#8a6239";
+  roundRect(ctx, x, y, w, h, 8); ctx.fill();
+  ctx.fillStyle = "#6f4d2b";
+  roundRect(ctx, x, y + h - 6, w, 6, 4); ctx.fill();
+  // 윗면 이끼
+  ctx.fillStyle = "#5aa84a";
+  roundRect(ctx, x + 3, y - 3, w - 6, 7, 4); ctx.fill();
+  // 잎 끝 장식
+  ctx.fillStyle = "#4f9b46";
+  ctx.beginPath(); ctx.arc(x + 6, y + 2, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + w - 6, y + 2, 9, 0, Math.PI * 2); ctx.fill();
+}
+
+// 닫힌 다각형 채우기 헬퍼 (offset 기준 상대 좌표)
+function blob(ctx: CanvasRenderingContext2D, ox: number, oy: number, pts: number[][]) {
+  ctx.beginPath();
+  pts.forEach(([dx, dy], i) => {
+    const px = ox + dx, py = oy + dy;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+  ctx.fill();
 }
 
 // ── canvas 헬퍼 (모듈 레벨 — 순수 함수) ──────────────────────────────────────────
