@@ -30,8 +30,8 @@ const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; 
   // 종합 = REV 같은 전 공종 1파일 → PSet Trade + IFC 타입으로 토목/구조/건축 자동 분리 후 순서대로 생성.
   { key: "종합", label: "종합", icon: "🗂️", active: true, hint: "전 공종 1파일(REV 등) — 자동 분리" },
   { key: "토목", label: "토목", icon: "🏗️", active: true, hint: "굴착·흙막이" },
-  { key: "구조", label: "구조", icon: "🏢", active: true, hint: "골조(타워·모듈러)" },
-  { key: "건축", label: "건축", icon: "🧱", active: false, hint: "마감(종합 파일이면 자동)" },
+  { key: "구조", label: "구조", icon: "🏢", active: true, hint: "골조" },
+  { key: "건축", label: "건축", icon: "🧱", active: false, hint: "마감" },
   { key: "MEP", label: "MEP", icon: "🔧", active: false, hint: "기계·소방·전기·통신" },
   { key: "조경", label: "조경", icon: "🌳", active: false, hint: "조경" },
   { key: "가설", label: "가설", icon: "🚧", active: false, hint: "비계·거푸집(오버레이)" },
