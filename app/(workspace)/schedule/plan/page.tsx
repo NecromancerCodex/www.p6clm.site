@@ -770,6 +770,20 @@ export default function SchedulePlanWizard() {
               </div>
             );
           })()}
+          {stage === "scheduled" && civilQty && (
+            <div style={{ border: "1px solid #bae6fd", background: "#f0f9ff", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#0369a1", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ flex: 1 }}>
+                🏗️ 토목이 길면 <b>투입조(굴착기·CIP 대수)</b>를 늘리세요 — 굴착 {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥ ÷ (표준품셈 생산성 × 투입조). 늘릴수록 토목 기간 단축.
+              </span>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>토목 투입조
+                <input type="number" min={1} className="wz-in" style={{ width: 72 }} value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} />
+              </label>
+              <button className="wz-btn" disabled={busy} onClick={() => {
+                setBusy(true);
+                void confirmPlan(planId!, { civil_equipment: civilEquip }).then(() => refresh(planId!)).finally(() => setBusy(false));
+              }}>토목 기간 재계산</button>
+            </div>
+          )}
           {ganttReady && ganttTasks.length > 0 ? (
             <GanttChart tasks={ganttTasks} height={520} viewMode="Week" fillWidth />
           ) : (
