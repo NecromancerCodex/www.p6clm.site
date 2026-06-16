@@ -19,27 +19,33 @@ import {
   type ClientMsg,
   type ServerMsg,
   type PlayerSnapshot,
+  type Look,
 } from "../../lib/plaza/protocol";
+import { drawChibi, roundRect } from "../../lib/plaza/render";
+import { usePlazaStore } from "../../stores/plazaStore";
+import { InventoryPanel } from "./InventoryPanel";
+import { EquipPanel } from "./EquipPanel";
+import { ShopPanel } from "./ShopPanel";
 
 // ── 월드 / 물리 상수 ──────────────────────────────────────────────────────────
-const WORLD_W = 1000;
-const WORLD_H = 647;
+// 월드 = 배경 이미지(town.png) 원본 크기 1384×768 와 1:1.
+const WORLD_W = 1384;
+const WORLD_H = 768;
 const GRAVITY = 0.62;
-const MOVE_SPEED = 3.4;
-const JUMP_V = -13; // 최대 점프 높이 ≈ JUMP_V²/(2·GRAVITY) ≈ 136px > 발판 간격(~92px)
-const MAX_FALL = 16;
+const MOVE_SPEED = 4.2;
+const JUMP_V = -13.5; // 최대 점프 높이 ≈ JUMP_V²/(2·GRAVITY) ≈ 147px
+const MAX_FALL = 18;
 const PLAYER_W = 30;
-const PLAYER_H = 44;
 const DROP_GRACE_MS = 250; // 하강 시 발판 무시 시간
 
-// 스폰 지점 — 백엔드 _SPAWN_X/_SPAWN_Y 와 동일
-const SPAWN_X = 500;
-const SPAWN_Y = 540;
+// 스폰 지점 (중앙 바닥) — 백엔드 _SPAWN_X/_SPAWN_Y 와 동일
+const SPAWN_X = 692;
+const SPAWN_Y = 560;
 
 /**
- * 발판(foothold) — 충돌 데이터. 배경의 나뭇가지 단도 이 좌표로 함께 그려져
- * "보이는 발판 = 실제 콜라이더"가 정확히 일치한다 (별도 미세조정 불필요).
+ * 발판(foothold) — 충돌 데이터. 배경 그림(town.png)의 빨간 콜리전 표시에 맞춤.
  * solid: 양방향 막힘(땅). 그 외: 위에서만 착지하는 one-way 발판(↓+점프로 통과).
+ * 좌표는 픽셀 분석으로 추출 — SHOW_FOOTHOLDS(아래)로 그림과 정렬 확인 가능.
  */
 interface Foothold {
   x: number;
@@ -47,14 +53,17 @@ interface Foothold {
   y: number; // 윗면 y
   solid?: boolean;
 }
-const GROUND_Y = 600;
+const GROUND_Y = 616;
 const FOOTHOLDS: Foothold[] = [
-  { x: 0, w: WORLD_W, y: GROUND_Y, solid: true }, // 바닥 (잔디 윗면)
-  { x: 190, w: 210, y: 508 }, // 좌측 낮은 가지  (gap 92)
-  { x: 600, w: 210, y: 508 }, // 우측 낮은 가지  (gap 92)
-  { x: 355, w: 290, y: 416 }, // 중앙 단        (gap 92)
-  { x: 405, w: 190, y: 326 }, // 상단 단        (gap 90)
-  { x: 438, w: 124, y: 250 }, // 꼭대기 둥지     (gap 76)
+  { x: 0, w: WORLD_W, y: GROUND_Y, solid: true }, // 바닥 데크 (전폭)
+  { x: 200, w: 1020, y: 407 },                    // 2층 보 (좌우 관통)
+  // 중앙 나선계단 (바닥→2층 climb)
+  { x: 600, w: 100, y: 580 },
+  { x: 575, w: 90, y: 530 },
+  { x: 575, w: 90, y: 482 },
+  { x: 610, w: 100, y: 437 },
+  { x: 655, w: 105, y: 384 },                     // 다락 (침대 옆)
+  { x: 318, w: 70, y: 488 },                      // 좌측 작은 단
 ];
 
 // 캐릭터 색상 팔레트 — id 로 결정 (입장마다 일관)
@@ -83,6 +92,7 @@ interface RemotePlayer {
   vx: number;
   facing: Facing;
   st: AnimState;
+  look: Look; // 장착 외형
 }
 
 interface Bubble {
@@ -98,6 +108,11 @@ export function PlazaCanvas() {
   const [status, setStatus] = useState<"connecting" | "open" | "closed">("connecting");
   const [count, setCount] = useState(1);
   const [chatValue, setChatValue] = useState("");
+  const [panel, setPanel] = useState<null | "inv" | "equip" | "shop">(null);
+
+  // 프로필 스토어 (재화·인벤·장착)
+  const equipped = usePlazaStore((s) => s.equipped);
+  const loadProfile = usePlazaStore((s) => s.load);
 
   // 게임/네트워크 상태 (고빈도 — ref)
   const wsRef = useRef<WebSocket | null>(null);
@@ -109,6 +124,16 @@ export function PlazaCanvas() {
   const bubblesRef = useRef<Map<number, Bubble>>(new Map()); // playerId → 말풍선 (-1=나)
   const keysRef = useRef<Record<string, boolean>>({});
   const inputFocusedRef = useRef(false);
+  const bgRef = useRef<HTMLImageElement | null>(null);
+  const myLookRef = useRef<Look>({}); // 내 장착 외형 (게임 루프용)
+
+  // ── 배경 이미지 + 프로필 로드 ────────────────────────────────────────────────
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/plaza/town.png";
+    img.onload = () => { bgRef.current = img; };
+    void loadProfile();
+  }, [loadProfile]);
 
   // ── WebSocket 연결 ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -160,6 +185,11 @@ export function PlazaCanvas() {
           );
           break;
         }
+        case "look": {
+          const r = remotesRef.current.get(msg.id);
+          if (r) r.look = msg.eq || {};
+          break;
+        }
         case "leave": {
           remotesRef.current.delete(msg.id);
           bubblesRef.current.delete(msg.id);
@@ -173,7 +203,7 @@ export function PlazaCanvas() {
       if (p.id === myIdRef.current) return;
       remotesRef.current.set(p.id, {
         id: p.id, name: p.name, x: p.x, y: p.y, tx: p.x, ty: p.y,
-        vx: 0, facing: p.facing, st: p.st,
+        vx: 0, facing: p.facing, st: p.st, look: p.look || {},
       });
     }
 
@@ -185,6 +215,15 @@ export function PlazaCanvas() {
     };
   }, []);
 
+  // ── 장착 외형 동기화: 변경/접속 시 WS look 송신 ───────────────────────────────
+  useEffect(() => {
+    myLookRef.current = equipped;
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ t: "look", eq: equipped } as ClientMsg));
+    }
+  }, [equipped, status]);
+
   // ── 키 입력 ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -194,6 +233,10 @@ export function PlazaCanvas() {
         keysRef.current[k] = true;
         e.preventDefault(); // Alt 메뉴 포커스·스페이스 스크롤 방지
       }
+      // I=인벤토리, E=장비 (영문 키, 대소문자 모두)
+      if (k === "i" || k === "I" || k === "ㅑ") { e.preventDefault(); setPanel((p) => (p === "inv" ? null : "inv")); }
+      if (k === "e" || k === "E" || k === "ㄷ") { e.preventDefault(); setPanel((p) => (p === "equip" ? null : "equip")); }
+      if (k === "Escape") setPanel(null);
       if (k === "Enter") {
         e.preventDefault();
         inputRef.current?.focus();
@@ -222,25 +265,47 @@ export function PlazaCanvas() {
     let prevSt: AnimState = "idle";
     let prevFacing: Facing = "r";
 
-    // 한 프레임 렌더 — 배경 + 발판(디버그) + 원격/로컬 캐릭터.
+    const SHOW_FOOTHOLDS = false; // 발판↔그림 정렬 확인 시 true
+
+    const bubbleFor = (key: number, now: number): { text: string } | undefined => {
+      const b = bubblesRef.current.get(key);
+      return b && b.until > now ? { text: b.text } : undefined;
+    };
+
+    // 한 프레임 렌더 — 배경 이미지(없으면 절차적) + 원격/로컬 캐릭터.
     const draw = (now: number) => {
       const cw = ctx.canvas.width;
       const ch = ctx.canvas.height;
-      const scale = cw / WORLD_W; // 가로 맞춤 (height 는 WORLD_H*scale)
+      const scale = cw / WORLD_W;
 
       ctx.clearRect(0, 0, cw, ch);
-
       ctx.save();
       ctx.scale(scale, scale);
 
-      // 절차적 배경(오리지널) — 보이는 나뭇가지 단이 FOOTHOLDS 와 동일 좌표.
-      drawBackground(ctx, now);
+      if (bgRef.current) {
+        ctx.drawImage(bgRef.current, 0, 0, WORLD_W, WORLD_H);
+      } else {
+        drawBackground(ctx, now); // 폴백 (이미지 로드 전/실패)
+      }
+
+      if (SHOW_FOOTHOLDS) {
+        ctx.strokeStyle = "rgba(255,0,0,0.7)"; ctx.lineWidth = 3;
+        for (const f of FOOTHOLDS) {
+          ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x + f.w, f.y); ctx.stroke();
+        }
+      }
 
       for (const r of remotesRef.current.values()) {
-        drawCharacter(ctx, r.x, r.y, r.facing, r.st, colorFor(r.id), r.name, now, bubblesRef.current.get(r.id));
+        drawChibi(ctx, {
+          x: r.x, y: r.y, facing: r.facing, st: r.st, bodyColor: colorFor(r.id),
+          name: r.name, now, look: r.look, bubble: bubbleFor(r.id, now),
+        });
       }
       const LL = localRef.current;
-      drawCharacter(ctx, LL.x, LL.y, LL.facing, LL.st, colorFor(myIdRef.current), "나", now, bubblesRef.current.get(-1), true);
+      drawChibi(ctx, {
+        x: LL.x, y: LL.y, facing: LL.facing, st: LL.st, bodyColor: colorFor(myIdRef.current),
+        name: "나", now, look: myLookRef.current, isMe: true, bubble: bubbleFor(-1, now),
+      });
 
       ctx.restore();
     };
@@ -351,6 +416,11 @@ export function PlazaCanvas() {
           {status === "open" ? `접속 중 · ${count}명` : status === "connecting" ? "연결 중…" : "연결 끊김"}
         </span>
         <span className="plaza-hint">← → 이동 · Alt 점프 · ↓+Alt 내려가기 · Enter 채팅</span>
+        <div className="plaza-tools">
+          <button type="button" className={`plaza-tool${panel === "inv" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "inv" ? null : "inv"))}>🎒 인벤 <kbd>I</kbd></button>
+          <button type="button" className={`plaza-tool${panel === "equip" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "equip" ? null : "equip"))}>🧢 장비 <kbd>E</kbd></button>
+          <button type="button" className={`plaza-tool${panel === "shop" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "shop" ? null : "shop"))}>🛒 상점</button>
+        </div>
       </div>
 
       <div className="plaza-stage">
@@ -361,6 +431,9 @@ export function PlazaCanvas() {
           className="plaza-canvas"
           tabIndex={0}
         />
+        {panel === "inv" && <InventoryPanel onClose={() => setPanel(null)} />}
+        {panel === "equip" && <EquipPanel onClose={() => setPanel(null)} />}
+        {panel === "shop" && <ShopPanel onClose={() => setPanel(null)} />}
       </div>
 
       <form
@@ -667,96 +740,3 @@ function blob(ctx: CanvasRenderingContext2D, ox: number, oy: number, pts: number
   ctx.fill();
 }
 
-// ── canvas 헬퍼 (모듈 레벨 — 순수 함수) ──────────────────────────────────────────
-function drawCharacter(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, facing: Facing, st: AnimState,
-  color: string, name: string, now: number, bubble: Bubble | undefined, isMe = false,
-) {
-  const bob = st === "walk" ? Math.sin(now / 90) * 2 : 0;
-  const topY = y - PLAYER_H + bob;
-
-  ctx.save();
-  // 그림자
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.beginPath(); ctx.ellipse(x, y + 2, PLAYER_W * 0.5, 5, 0, 0, Math.PI * 2); ctx.fill();
-
-  // 몸통 (둥근 사각형)
-  ctx.fillStyle = color;
-  roundRect(ctx, x - PLAYER_W / 2, topY, PLAYER_W, PLAYER_H, 8);
-  ctx.fill();
-  if (isMe) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.stroke(); }
-
-  // 눈 (바라보는 방향)
-  ctx.fillStyle = "#fff";
-  const ex = facing === "r" ? x + 4 : x - 4;
-  ctx.beginPath(); ctx.arc(ex, topY + 15, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = "#222";
-  ctx.beginPath(); ctx.arc(ex + (facing === "r" ? 1.5 : -1.5), topY + 15, 2.3, 0, Math.PI * 2); ctx.fill();
-
-  // 이름표
-  ctx.font = "600 13px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  const tw = ctx.measureText(name).width;
-  ctx.fillStyle = "rgba(0,0,0,0.55)";
-  roundRect(ctx, x - tw / 2 - 6, y + 6, tw + 12, 18, 9); ctx.fill();
-  ctx.fillStyle = isMe ? "#ffe066" : "#fff";
-  ctx.fillText(name, x, y + 19);
-
-  // 말풍선
-  if (bubble && bubble.until > now) {
-    drawBubble(ctx, x, topY - 10, bubble.text);
-  }
-  ctx.restore();
-}
-
-function drawBubble(ctx: CanvasRenderingContext2D, cx: number, bottomY: number, text: string) {
-  ctx.font = "13px system-ui, sans-serif";
-  ctx.textAlign = "left";
-  const maxW = 220;
-  const lines = wrapText(ctx, text, maxW);
-  const lineH = 17;
-  const padX = 10, padY = 7;
-  let bw = 0;
-  for (const ln of lines) bw = Math.max(bw, ctx.measureText(ln).width);
-  bw = Math.min(bw, maxW) + padX * 2;
-  const bh = lines.length * lineH + padY * 2;
-  const bx = cx - bw / 2;
-  const by = bottomY - bh;
-
-  ctx.fillStyle = "rgba(255,255,255,0.96)";
-  ctx.strokeStyle = "rgba(0,0,0,0.12)";
-  ctx.lineWidth = 1;
-  roundRect(ctx, bx, by, bw, bh, 10); ctx.fill(); ctx.stroke();
-  // 꼬리
-  ctx.beginPath();
-  ctx.moveTo(cx - 6, by + bh); ctx.lineTo(cx + 6, by + bh); ctx.lineTo(cx, by + bh + 8);
-  ctx.closePath(); ctx.fillStyle = "rgba(255,255,255,0.96)"; ctx.fill();
-
-  ctx.fillStyle = "#222";
-  ctx.textAlign = "left";
-  lines.forEach((ln, i) => ctx.fillText(ln, bx + padX, by + padY + 13 + i * lineH));
-}
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  const rr = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rr, y);
-  ctx.arcTo(x + w, y, x + w, y + h, rr);
-  ctx.arcTo(x + w, y + h, x, y + h, rr);
-  ctx.arcTo(x, y + h, x, y, rr);
-  ctx.arcTo(x, y, x + w, y, rr);
-  ctx.closePath();
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
-  const lines: string[] = [];
-  let line = "";
-  for (const ch of text) {
-    const test = line + ch;
-    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = ch; }
-    else line = test;
-  }
-  if (line) lines.push(line);
-  return lines.slice(0, 4); // 최대 4줄
-}

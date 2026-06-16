@@ -4558,6 +4558,7 @@ select {
 }
 
 .plaza-stage {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -4568,9 +4569,9 @@ select {
 }
 .plaza-canvas {
   width: 100%;
-  max-width: 1000px;
+  max-width: 1384px;
   height: auto;
-  aspect-ratio: 1000 / 647;
+  aspect-ratio: 1384 / 768;
   border-radius: 12px;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
   image-rendering: auto;
@@ -4611,4 +4612,107 @@ select {
 
 @media (max-width: 640px) {
   .plaza-hint { display: none; }
+}
+
+/* 광장 — 툴바 버튼 */
+.plaza-tools { margin-left: 12px; display: flex; gap: 6px; }
+.plaza-tool {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.07); color: #e8edf4;
+  font-size: 0.8rem; font-weight: 600; cursor: pointer;
+}
+.plaza-tool:hover { background: rgba(255,255,255,0.13); }
+.plaza-tool.on { background: var(--primary); border-color: var(--primary); }
+.plaza-tool kbd {
+  font-size: 0.66rem; padding: 1px 4px; border-radius: 4px;
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.18);
+}
+
+/* 광장 — 패널 오버레이 */
+.plaza-panel {
+  position: absolute; top: 16px; right: 16px;
+  width: 340px; max-height: calc(100% - 32px);
+  display: flex; flex-direction: column;
+  background: rgba(20, 28, 44, 0.96);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+  color: #e8edf4; overflow: hidden;
+  backdrop-filter: blur(6px);
+}
+.plaza-panel--wide { width: 460px; }
+.plaza-panel-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.plaza-panel-title { font-weight: 700; font-size: 0.95rem; }
+.plaza-coin {
+  margin-left: auto; font-weight: 700; font-size: 0.85rem; color: #ffd75e;
+  background: rgba(255,200,40,0.12); padding: 3px 10px; border-radius: 8px;
+}
+.plaza-panel-x {
+  display: inline-flex; padding: 4px; border-radius: 6px;
+  border: none; background: transparent; color: #aab3c0; cursor: pointer;
+}
+.plaza-panel-x:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.plaza-panel-empty { padding: 36px 16px; text-align: center; color: #9aa6b5; font-size: 0.86rem; line-height: 1.7; }
+.plaza-panel-foot { padding: 10px 14px; margin: 0; font-size: 0.74rem; color: #8d99a8; border-top: 1px solid rgba(255,255,255,0.08); }
+
+/* 광장 — 아이템 그리드/카드 */
+.plaza-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  padding: 14px; overflow-y: auto;
+}
+.plaza-panel--wide .plaza-grid { grid-template-columns: repeat(4, 1fr); }
+.plaza-card {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 10px 6px; border-radius: 10px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  color: #e8edf4; cursor: pointer; font: inherit;
+}
+.plaza-card:hover { background: rgba(255,255,255,0.1); }
+.plaza-card.equipped { border-color: #ffd75e; background: rgba(255,200,40,0.12); }
+.plaza-card--shop { cursor: default; }
+.plaza-card--shop:hover { background: rgba(255,255,255,0.05); }
+.plaza-item-icon { width: 48px; height: 48px; }
+.plaza-card-name { font-size: 0.78rem; font-weight: 600; text-align: center; }
+.plaza-card-slot { font-size: 0.66rem; color: #93a0b0; }
+.plaza-card-price { font-size: 0.74rem; color: #ffd75e; font-weight: 700; }
+.plaza-card-badge {
+  position: absolute; top: 4px; right: 4px;
+  font-size: 0.6rem; font-weight: 700; color: #1a2332;
+  background: #ffd75e; padding: 1px 5px; border-radius: 6px;
+}
+.plaza-buy {
+  margin-top: 4px; width: 100%; padding: 5px 0; border-radius: 7px;
+  border: none; background: var(--primary); color: #fff;
+  font-size: 0.76rem; font-weight: 700; cursor: pointer;
+}
+.plaza-buy:hover:not(:disabled) { background: var(--primary-deep); }
+.plaza-buy:disabled { background: rgba(255,255,255,0.1); color: #8d99a8; cursor: not-allowed; }
+.plaza-shop-msg { margin: 0; padding: 8px 14px; font-size: 0.78rem; color: #aee9c0; background: rgba(80,200,120,0.1); }
+
+/* 광장 — 장비 슬롯 */
+.plaza-slots { display: flex; flex-direction: column; gap: 8px; padding: 14px; overflow-y: auto; }
+.plaza-slot {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+}
+.plaza-slot.filled { border-color: rgba(255,215,94,0.4); }
+.plaza-slot-label { width: 42px; font-size: 0.78rem; font-weight: 700; color: #aab3c0; flex: 0 0 auto; }
+.plaza-slot-item {
+  display: flex; align-items: center; gap: 10px; flex: 1;
+  background: none; border: none; color: #e8edf4; cursor: pointer; font: inherit; text-align: left;
+}
+.plaza-slot-item .plaza-item-icon { width: 40px; height: 40px; }
+.plaza-slot-remove { margin-left: auto; font-size: 0.72rem; color: #ff8d8d; }
+.plaza-slot-empty { flex: 1; font-size: 0.8rem; color: #6f7b8a; }
+
+@media (max-width: 640px) {
+  .plaza-tools { width: 100%; margin-left: 0; }
+  .plaza-panel { left: 8px; right: 8px; width: auto; }
+  .plaza-panel--wide { width: auto; }
 }
