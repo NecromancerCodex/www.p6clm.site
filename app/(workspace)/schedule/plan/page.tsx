@@ -237,8 +237,8 @@ export default function SchedulePlanWizard() {
   const onStart = async () => {
     const entries = Object.entries(slotFilesRef.current);
     if (!entries.length) { setErr("BIM 파일을 공종 슬롯에 올리세요"); return; }
-    if (!buildingType.trim()) { setErr("건물유형을 입력하세요"); return; }
     if (!startDate) { setErr("착공일을 입력하세요"); return; }
+    // 건물유형은 비워도 됨 — 분석 후 자동 추천으로 채움(아래 ②)
     setBusy(true); setBimBusy(true); setErr(null);
     try {
       // ① 슬롯 파일들 일괄 분석(여기서 처음 서버추출) → work_unit 결합. 공종=슬롯으로 확정(분류기 무시).
@@ -256,21 +256,24 @@ export default function SchedulePlanWizard() {
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
       setWorkUnits(allWu); setZones([...zoneSet]); setStoreys([...storeySet]); setCivilQty(cq);
-      // ② 구조유형 비었으면 1회 추론(생성 직전)
-      let st = structureType;
-      if (!st && inferSrc) {
+      // ② 자동 추천(생성 직전 1회) — 빈 칸만 채움(건물유형·범위·구조유형). 업로드 즉시성 유지하면서 추천 복원.
+      let bt = buildingType.trim(); let sc = scope.trim(); let st = structureType.trim();
+      if ((!bt || !sc || !st) && inferSrc) {
         const ctx = await inferScheduleContext({
           storeys: [...storeySet], zones: [...zoneSet], element_summary: inferSrc.element_summary,
           trade_summary: inferSrc.trade_summary, discipline_summary: inferSrc.discipline_summary, total_count: inferSrc.element_count,
         });
-        if (ctx.structure_type) { st = ctx.structure_type; setStructureType(st); }
-        if (ctx.reason) setInferReason(ctx.reason); else setInferReason(null);
+        if (!bt && ctx.building_type) { bt = ctx.building_type; setBuildingType(bt); }
+        if (!sc && ctx.scope) { sc = ctx.scope; setScope(sc); }
+        if (!st && ctx.structure_type) { st = ctx.structure_type; setStructureType(st); }
+        setInferReason(ctx.reason || null);
       } else { setInferReason(null); }
+      if (!bt) bt = "건물"; // 추론도 비면 안전 폴백
       setBimBusy(false);
       // ③ 생성
       const r = await startPlan({
-        building_type: buildingType.trim(), scope: scope.trim() || undefined,
-        structure_type: st.trim() || undefined, discipline: discipline.trim() || undefined,
+        building_type: bt, scope: sc || undefined,
+        structure_type: st || undefined, discipline: discipline.trim() || undefined,
         zones: [...zoneSet], storeys: [...storeySet], work_units: allWu, methods: [],
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
@@ -458,8 +461,8 @@ export default function SchedulePlanWizard() {
           </div>
 
           <div className="wz-card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <Field label="① 무엇을 — 건물유형 *">
-              <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="예: 모듈러 공동주택" />
+            <Field label="① 무엇을 — 건물유형 (비우면 생성 시 AI 자동 추천)">
+              <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="비워두면 AI 가 추천 (예: 모듈러 공동주택)" />
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
             </Field>
             <Field label={multiDisc ? "② 공종별 파라미터 — 복수 공종 병합" : "② 공종 / 구조유형 / 시공 전략 — 자동 판정 후 직접 수정 가능"}>
@@ -563,7 +566,7 @@ export default function SchedulePlanWizard() {
                     : <>📂 {Object.keys(slots).join("+")} 업로드됨 · 생성 시 분석</>}
                 </span>
               )}
-              <button className="wz-btn" disabled={!Object.keys(slots).length || !buildingType.trim() || !startDate || busy} onClick={() => void onStart()}>
+              <button className="wz-btn" disabled={!Object.keys(slots).length || !startDate || busy} onClick={() => void onStart()}>
                 {busy ? (bimBusy ? "BIM 분석 중…" : "생성 중…") : "P1 스코프 확정 → P2 액티비티 생성"}
               </button>
             </div>
