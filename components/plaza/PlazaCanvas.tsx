@@ -67,18 +67,35 @@ const FOOTHOLDS: Foothold[] = [
 ];
 
 /**
- * 전경(foreground) 구역 — 캐릭터를 가려야 하는 "앞쪽" 구조물(외벽·기둥)의 이미지 좌표.
- * 캐릭터를 그린 뒤 같은 배경 픽셀을 이 구역만 다시 덮어 그려서, 그 구역을 지나는
- * 캐릭터가 건물 뒤로 숨은 것처럼 보이게 한다. (town_fg.png 가 있으면 그게 우선)
- * SHOW_FG=true 로 빨간 박스를 띄워 구역을 그림과 맞춰 조정.
+ * 전경(foreground) 구역 — 캐릭터를 가려야 하는 "앞쪽" 구조물(외벽·기둥)을
+ * **폴리곤**으로 정의. 캐릭터를 그린 뒤 이 폴리곤으로 클립해 원본 배경 픽셀을
+ * 다시 덮어 그린다 → 곡면 외벽의 실제 윤곽을 따라 캐릭터가 뒤로 숨는다.
+ * (색은 원본 그대로, 경계만 폴리곤 곡선) town_fg.png 가 있으면 그게 우선.
+ * SHOW_FG=true 로 폴리곤 외곽선을 띄워 그림과 맞춰 조정.
  */
-interface FgSlice { x: number; y: number; w: number; h: number; }
-const FG_SLICES: FgSlice[] = [
-  { x: 0, y: 0, w: 158, h: WORLD_H },         // 좌측 외벽
-  { x: 1228, y: 0, w: 156, h: WORLD_H },      // 우측 외벽
-  { x: 470, y: 150, w: 46, h: WORLD_H - 150 },// 중앙 좌 기둥
-  { x: 864, y: 150, w: 50, h: WORLD_H - 150 },// 중앙 우 기둥
+// 전경 가림은 2층 위쪽만 — 1층(바닥) 캐릭터는 가리지 않도록 여기서 끊는다.
+// 바닥 캐릭터 머리 높이(≈566)보다 위. 2층(407)·계단 상단 캐릭터는 정상 가림.
+const FG_BOTTOM = 548;
+const FG_REGIONS: number[][][] = [
+  // 좌측 외벽(곡면) — 우측 안쪽 윤곽을 따라
+  [[0, 230], [388, 234], [300, 330], [190, 440], [172, FG_BOTTOM], [0, FG_BOTTOM]],
+  // 우측 외벽(곡면) — 좌측 안쪽 윤곽을 따라 (창문 포함)
+  [[1145, 236], [1092, 305], [1010, 430], [992, FG_BOTTOM], [WORLD_W, FG_BOTTOM], [WORLD_W, 236]],
+  // 중앙 좌 기둥 (직사각 — 현재 잘 맞음)
+  [[470, 150], [516, 150], [516, FG_BOTTOM], [470, FG_BOTTOM]],
+  // 중앙 우 기둥
+  [[864, 150], [914, 150], [914, FG_BOTTOM], [864, FG_BOTTOM]],
 ];
+
+/** 폴리곤 bbox (clip 후 그 영역만 재드로해 비용 절감). */
+function polyBBox(poly: number[][]): [number, number, number, number] {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [px, py] of poly) {
+    if (px < minX) minX = px; if (px > maxX) maxX = px;
+    if (py < minY) minY = py; if (py > maxY) maxY = py;
+  }
+  return [minX, minY, maxX - minX, maxY - minY];
+}
 
 // 캐릭터 색상 팔레트 — id 로 결정 (입장마다 일관)
 const PALETTE = ["#ff6b6b", "#4dabf7", "#51cf66", "#ffd43b", "#cc5de8", "#ff922b", "#20c997", "#f783ac"];
@@ -330,14 +347,25 @@ export function PlazaCanvas() {
       if (fgRef.current) {
         ctx.drawImage(fgRef.current, 0, 0, WORLD_W, WORLD_H); // 정밀: 컷아웃 PNG
       } else if (bgRef.current) {
-        for (const s of FG_SLICES) {
-          ctx.drawImage(bgRef.current, s.x, s.y, s.w, s.h, s.x, s.y, s.w, s.h); // 같은 픽셀 재드로
+        for (const poly of FG_REGIONS) {
+          const [bx, by, bw, bh] = polyBBox(poly);
+          ctx.save();
+          ctx.beginPath();
+          poly.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(bgRef.current, bx, by, bw, bh, bx, by, bw, bh); // 폴리곤 윤곽으로 원본 재드로
+          ctx.restore();
         }
       }
-      const SHOW_FG = false; // 전경 구역 확인 시 true
+      const SHOW_FG = false; // 전경 폴리곤 확인 시 true
       if (SHOW_FG) {
-        ctx.strokeStyle = "rgba(0,120,255,0.8)"; ctx.lineWidth = 3;
-        for (const s of FG_SLICES) ctx.strokeRect(s.x, s.y, s.w, s.h);
+        ctx.strokeStyle = "rgba(0,120,255,0.85)"; ctx.lineWidth = 3;
+        for (const poly of FG_REGIONS) {
+          ctx.beginPath();
+          poly.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+          ctx.closePath(); ctx.stroke();
+        }
       }
 
       ctx.restore();
