@@ -299,6 +299,13 @@ export default function FourDPage() {
         minDate = codeIndex ? Math.min(codeIndex.minDate, sidx.minDate) : sidx.minDate;
         maxDate = codeIndex ? Math.max(codeIndex.maxDate, sidx.maxDate) : sidx.maxDate;
       }
+      // 4D 타임라인 = 전체 공정표 범위(모든 task). 코드/키워드 인덱스에 안 잡히는 활동(지반개량 등)도
+      // 포함 → 슬라이더가 진짜 착공일(첫 활동)부터 시작. (안 그러면 흙막이부터 시작해 6~7월 공백)
+      {
+        const tt = tasks.flatMap((t) => [t.start, t.end]).filter(Boolean)
+          .map((d) => Date.parse(String(d))).filter(Number.isFinite);
+        if (tt.length) { minDate = Math.min(minDate, ...tt); maxDate = Math.max(maxDate, ...tt); }
+      }
 
       const topVia = Object.entries(summary.byVia)
         .sort((a, b) => b[1] - a[1])
