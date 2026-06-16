@@ -12,6 +12,7 @@ export interface PlazaProfile {
   currency: number;
   inventory: string[];
   equipped: Look;
+  character: string | null;
 }
 
 async function parse(res: Response): Promise<PlazaProfile> {
@@ -46,6 +47,16 @@ export async function equipItem(slot: string, itemKey: string | null): Promise<P
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slot, item_key: itemKey }),
+    }),
+  );
+}
+
+export async function setCharacter(character: string): Promise<PlazaProfile> {
+  return parse(
+    await fetch(`${API_BASE}/plaza/character`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ character }),
     }),
   );
 }

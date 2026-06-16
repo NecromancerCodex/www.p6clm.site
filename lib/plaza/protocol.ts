@@ -18,6 +18,7 @@ export type ServerMsg =
   | { t: "state"; id: number; x: number; y: number; vx: number; facing: Facing; st: AnimState }
   | { t: "chat"; id: number; name: string; text: string }
   | { t: "look"; id: number; eq: Look }
+  | { t: "char"; id: number; c: string }
   | { t: "leave"; id: number }
   | { t: "pong" };
 
@@ -26,6 +27,7 @@ export type ClientMsg =
   | { t: "move"; x: number; y: number; vx: number; facing: Facing; st: AnimState }
   | { t: "chat"; text: string }
   | { t: "look"; eq: Look }
+  | { t: "char"; c: string }
   | { t: "ping" };
 
 export type Facing = "l" | "r";
@@ -39,6 +41,7 @@ export interface PlayerSnapshot {
   facing: Facing;
   st: AnimState;
   look?: Look;
+  character?: string | null;
 }
 
 /** 백엔드 WS 엔드포인트 URL. http(s) 베이스를 ws(s) 로 변환. */

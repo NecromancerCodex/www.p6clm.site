@@ -7,7 +7,7 @@
  */
 import { create } from "zustand";
 
-import { fetchProfile, buyItem, equipItem } from "../lib/plaza/api";
+import { fetchProfile, buyItem, equipItem, setCharacter } from "../lib/plaza/api";
 import type { Look } from "../lib/plaza/protocol";
 import { getItem } from "../lib/plaza/catalog";
 
@@ -18,12 +18,14 @@ interface PlazaState {
   currency: number;
   inventory: string[];
   equipped: Look;
+  character: string | null;
 
   load: () => Promise<void>;
   buy: (itemKey: string) => Promise<{ ok: boolean; error?: string }>;
   /** 슬롯 토글 장착. 이미 그 아이템이 장착돼 있으면 해제. */
   toggleEquip: (itemKey: string) => Promise<void>;
   unequip: (slot: string) => Promise<void>;
+  chooseCharacter: (key: string) => Promise<void>;
 }
 
 export const usePlazaStore = create<PlazaState>((set, get) => ({
@@ -33,17 +35,27 @@ export const usePlazaStore = create<PlazaState>((set, get) => ({
   currency: 0,
   inventory: [],
   equipped: {},
+  character: null,
 
   load: async () => {
     if (get().loading) return;
     set({ loading: true, error: null });
     try {
       const p = await fetchProfile();
-      set({ currency: p.currency, inventory: p.inventory, equipped: p.equipped, loaded: true });
+      set({ currency: p.currency, inventory: p.inventory, equipped: p.equipped, character: p.character, loaded: true });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "프로필 로드 실패" });
     } finally {
       set({ loading: false });
+    }
+  },
+
+  chooseCharacter: async (key) => {
+    try {
+      const p = await setCharacter(key);
+      set({ character: p.character });
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : "캐릭터 선택 실패" });
     }
   },
 

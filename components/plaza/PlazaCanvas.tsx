@@ -22,10 +22,12 @@ import {
   type Look,
 } from "../../lib/plaza/protocol";
 import { drawChibi, drawSpriteChar, roundRect } from "../../lib/plaza/render";
+import { CHARACTERS, DEFAULT_CHARACTER } from "../../lib/plaza/characters";
 import { usePlazaStore } from "../../stores/plazaStore";
 import { InventoryPanel } from "./InventoryPanel";
 import { EquipPanel } from "./EquipPanel";
 import { ShopPanel } from "./ShopPanel";
+import { CharacterSelect } from "./CharacterSelect";
 
 // ── 월드 / 물리 상수 ──────────────────────────────────────────────────────────
 // 월드 = 배경 이미지(town.png) 원본 크기 1384×768 와 1:1.
@@ -96,6 +98,7 @@ interface RemotePlayer {
   facing: Facing;
   st: AnimState;
   look: Look; // 장착 외형
+  character: string; // 선택 캐릭터 키
 }
 
 interface Bubble {
@@ -113,9 +116,12 @@ export function PlazaCanvas() {
   const [chatValue, setChatValue] = useState("");
   const [panel, setPanel] = useState<null | "inv" | "equip" | "shop">(null);
 
-  // 프로필 스토어 (재화·인벤·장착)
+  // 프로필 스토어 (재화·인벤·장착·캐릭터)
   const equipped = usePlazaStore((s) => s.equipped);
   const loadProfile = usePlazaStore((s) => s.load);
+  const loaded = usePlazaStore((s) => s.loaded);
+  const character = usePlazaStore((s) => s.character);
+  const chooseCharacter = usePlazaStore((s) => s.chooseCharacter);
 
   // 게임/네트워크 상태 (고빈도 — ref)
   const wsRef = useRef<WebSocket | null>(null);
@@ -129,8 +135,9 @@ export function PlazaCanvas() {
   const inputFocusedRef = useRef(false);
   const bgRef = useRef<HTMLImageElement | null>(null);
   const fgRef = useRef<HTMLImageElement | null>(null); // 선택: 전경 컷아웃 PNG
-  const charRef = useRef<HTMLImageElement | null>(null); // 캐릭터 스프라이트시트
+  const charSheetsRef = useRef<Map<string, HTMLImageElement>>(new Map()); // 캐릭터별 시트
   const myLookRef = useRef<Look>({}); // 내 장착 외형 (게임 루프용)
+  const myCharRef = useRef<string>(DEFAULT_CHARACTER); // 내 캐릭터 키 (게임 루프용)
 
   // ── 배경/전경/캐릭터 이미지 + 프로필 로드 ─────────────────────────────────────
   useEffect(() => {
@@ -141,10 +148,12 @@ export function PlazaCanvas() {
     const fg = new Image();
     fg.onload = () => { fgRef.current = fg; };
     fg.src = "/plaza/town_fg.png";
-    // 캐릭터 스프라이트시트 (애니메이션) — 없으면 절차적 치비 폴백
-    const ch = new Image();
-    ch.onload = () => { charRef.current = ch; };
-    ch.src = "/plaza/char.png";
+    // 캐릭터 스프라이트시트 전부 프리로드 (애니메이션) — 없으면 절차적 치비 폴백
+    for (const c of CHARACTERS) {
+      const ch = new Image();
+      ch.onload = () => { charSheetsRef.current.set(c.key, ch); };
+      ch.src = c.src;
+    }
     void loadProfile();
   }, [loadProfile]);
 
@@ -203,6 +212,11 @@ export function PlazaCanvas() {
           if (r) r.look = msg.eq || {};
           break;
         }
+        case "char": {
+          const r = remotesRef.current.get(msg.id);
+          if (r && msg.c) r.character = msg.c;
+          break;
+        }
         case "leave": {
           remotesRef.current.delete(msg.id);
           bubblesRef.current.delete(msg.id);
@@ -217,6 +231,7 @@ export function PlazaCanvas() {
       remotesRef.current.set(p.id, {
         id: p.id, name: p.name, x: p.x, y: p.y, tx: p.x, ty: p.y,
         vx: 0, facing: p.facing, st: p.st, look: p.look || {},
+        character: p.character || DEFAULT_CHARACTER,
       });
     }
 
@@ -236,6 +251,15 @@ export function PlazaCanvas() {
       ws.send(JSON.stringify({ t: "look", eq: equipped } as ClientMsg));
     }
   }, [equipped, status]);
+
+  // ── 캐릭터 동기화: 선택/접속 시 WS char 송신 + 게임루프 ref 갱신 ────────────────
+  useEffect(() => {
+    myCharRef.current = character || DEFAULT_CHARACTER;
+    const ws = wsRef.current;
+    if (character && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ t: "char", c: character } as ClientMsg));
+    }
+  }, [character, status]);
 
   // ── 키 입력 ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -308,12 +332,13 @@ export function PlazaCanvas() {
         }
       }
 
-      const sheet = charRef.current;
+      const sheets = charSheetsRef.current;
       for (const r of remotesRef.current.values()) {
         const opts = {
           x: r.x, y: r.y, facing: r.facing, st: r.st, bodyColor: colorFor(r.id),
           name: r.name, now, look: r.look, bubble: bubbleFor(r.id, now),
         };
+        const sheet = sheets.get(r.character);
         if (sheet) drawSpriteChar(ctx, opts, sheet); else drawChibi(ctx, opts);
       }
       const LL = localRef.current;
@@ -321,7 +346,8 @@ export function PlazaCanvas() {
         x: LL.x, y: LL.y, facing: LL.facing, st: LL.st, bodyColor: colorFor(myIdRef.current),
         name: "나", now, look: myLookRef.current, isMe: true, bubble: bubbleFor(-1, now),
       };
-      if (sheet) drawSpriteChar(ctx, myOpts, sheet); else drawChibi(ctx, myOpts);
+      const mySheet = sheets.get(myCharRef.current);
+      if (mySheet) drawSpriteChar(ctx, myOpts, mySheet); else drawChibi(ctx, myOpts);
 
       // ── 전경(foreground) — 투명 컷아웃 PNG(town_fg.png) 가 있을 때만 캐릭터 위에 덮음.
       //    (슬라이스 재드로 방식은 반투명 벽/레이어 아티팩트가 있어 제거함)
@@ -456,6 +482,7 @@ export function PlazaCanvas() {
         {panel === "inv" && <InventoryPanel onClose={() => setPanel(null)} />}
         {panel === "equip" && <EquipPanel onClose={() => setPanel(null)} />}
         {panel === "shop" && <ShopPanel onClose={() => setPanel(null)} />}
+        {loaded && !character && <CharacterSelect onChoose={(k) => void chooseCharacter(k)} />}
       </div>
 
       <form

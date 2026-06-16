@@ -4716,3 +4716,38 @@ select {
   .plaza-panel { left: 8px; right: 8px; width: auto; }
   .plaza-panel--wide { width: auto; }
 }
+
+/* 광장 — 캐릭터 선택 모달 */
+.plaza-charsel-backdrop {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10, 16, 28, 0.72); backdrop-filter: blur(4px);
+}
+.plaza-charsel {
+  width: min(560px, 92%);
+  background: rgba(22, 30, 46, 0.98);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px; padding: 22px;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.55); color: #e8edf4; text-align: center;
+}
+.plaza-charsel-title { margin: 0 0 4px; font-size: 1.2rem; font-weight: 800; }
+.plaza-charsel-desc { margin: 0 0 18px; font-size: 0.84rem; color: #9aa6b5; }
+.plaza-charsel-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px;
+}
+.plaza-charsel-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px 6px; border-radius: 12px; cursor: pointer; font: inherit; color: #e8edf4;
+  background: rgba(255,255,255,0.05); border: 2px solid transparent;
+}
+.plaza-charsel-card:hover { background: rgba(255,255,255,0.1); }
+.plaza-charsel-card.sel { border-color: #ffd75e; background: rgba(255,200,40,0.12); }
+.plaza-char-preview { width: 64px; height: 128px; image-rendering: pixelated; }
+.plaza-charsel-name { font-size: 0.82rem; font-weight: 600; }
+.plaza-charsel-confirm {
+  width: 100%; padding: 12px 0; border-radius: 10px; border: none;
+  background: var(--primary); color: #fff; font-size: 0.92rem; font-weight: 700; cursor: pointer;
+}
+.plaza-charsel-confirm:hover:not(:disabled) { background: var(--primary-deep); }
+.plaza-charsel-confirm:disabled { background: rgba(255,255,255,0.1); color: #8d99a8; cursor: not-allowed; }
+@media (max-width: 560px) { .plaza-charsel-grid { grid-template-columns: repeat(2, 1fr); } }
