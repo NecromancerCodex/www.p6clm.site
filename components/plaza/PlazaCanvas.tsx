@@ -66,6 +66,20 @@ const FOOTHOLDS: Foothold[] = [
   { x: 318, w: 70, y: 488 },                      // 좌측 작은 단
 ];
 
+/**
+ * 전경(foreground) 구역 — 캐릭터를 가려야 하는 "앞쪽" 구조물(외벽·기둥)의 이미지 좌표.
+ * 캐릭터를 그린 뒤 같은 배경 픽셀을 이 구역만 다시 덮어 그려서, 그 구역을 지나는
+ * 캐릭터가 건물 뒤로 숨은 것처럼 보이게 한다. (town_fg.png 가 있으면 그게 우선)
+ * SHOW_FG=true 로 빨간 박스를 띄워 구역을 그림과 맞춰 조정.
+ */
+interface FgSlice { x: number; y: number; w: number; h: number; }
+const FG_SLICES: FgSlice[] = [
+  { x: 0, y: 0, w: 158, h: WORLD_H },         // 좌측 외벽
+  { x: 1228, y: 0, w: 156, h: WORLD_H },      // 우측 외벽
+  { x: 470, y: 150, w: 46, h: WORLD_H - 150 },// 중앙 좌 기둥
+  { x: 864, y: 150, w: 50, h: WORLD_H - 150 },// 중앙 우 기둥
+];
+
 // 캐릭터 색상 팔레트 — id 로 결정 (입장마다 일관)
 const PALETTE = ["#ff6b6b", "#4dabf7", "#51cf66", "#ffd43b", "#cc5de8", "#ff922b", "#20c997", "#f783ac"];
 const colorFor = (id: number) => PALETTE[id % PALETTE.length];
@@ -125,13 +139,18 @@ export function PlazaCanvas() {
   const keysRef = useRef<Record<string, boolean>>({});
   const inputFocusedRef = useRef(false);
   const bgRef = useRef<HTMLImageElement | null>(null);
+  const fgRef = useRef<HTMLImageElement | null>(null); // 선택: 전경 컷아웃 PNG
   const myLookRef = useRef<Look>({}); // 내 장착 외형 (게임 루프용)
 
-  // ── 배경 이미지 + 프로필 로드 ────────────────────────────────────────────────
+  // ── 배경/전경 이미지 + 프로필 로드 ───────────────────────────────────────────
   useEffect(() => {
     const img = new Image();
     img.src = "/plaza/town.png";
     img.onload = () => { bgRef.current = img; };
+    // 전경 컷아웃(있으면) — 없으면 onerror 로 조용히 무시하고 FG_SLICES 폴백 사용
+    const fg = new Image();
+    fg.onload = () => { fgRef.current = fg; };
+    fg.src = "/plaza/town_fg.png";
     void loadProfile();
   }, [loadProfile]);
 
@@ -306,6 +325,20 @@ export function PlazaCanvas() {
         x: LL.x, y: LL.y, facing: LL.facing, st: LL.st, bodyColor: colorFor(myIdRef.current),
         name: "나", now, look: myLookRef.current, isMe: true, bubble: bubbleFor(-1, now),
       });
+
+      // ── 전경(foreground) — 캐릭터 위에 덮어 "건물 뒤로 숨김" 효과 ──
+      if (fgRef.current) {
+        ctx.drawImage(fgRef.current, 0, 0, WORLD_W, WORLD_H); // 정밀: 컷아웃 PNG
+      } else if (bgRef.current) {
+        for (const s of FG_SLICES) {
+          ctx.drawImage(bgRef.current, s.x, s.y, s.w, s.h, s.x, s.y, s.w, s.h); // 같은 픽셀 재드로
+        }
+      }
+      const SHOW_FG = false; // 전경 구역 확인 시 true
+      if (SHOW_FG) {
+        ctx.strokeStyle = "rgba(0,120,255,0.8)"; ctx.lineWidth = 3;
+        for (const s of FG_SLICES) ctx.strokeRect(s.x, s.y, s.w, s.h);
+      }
 
       ctx.restore();
     };
