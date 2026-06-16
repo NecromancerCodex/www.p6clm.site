@@ -596,9 +596,11 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
     const focusTask = focusId
       ? tasks.find((tt) => String(tt.id || tt.activity_code) === String(focusId))
       : null;
+    // 첫 활동 날짜로 스크롤 — "start"(여백 포함 gantt_start)면 첫 활동 앞 빈 기간(~2주 패딩)이 보임.
+    const earliest = tasks.map((t) => t.start).filter(Boolean).map((d) => String(d).slice(0, 10)).sort()[0];
     const scrollTarget = focusTask?.start
       ? String(focusTask.start).slice(0, 10)
-      : "start";
+      : (earliest || "start");
 
     // fillWidth: 타임라인이 가용 폭을 정확히 채우도록 컬럼 폭 산정(빈 공간 0).
     //   컬럼 수가 적으면 늘려서 꽉 채우고, 많으면 최소 가독폭 유지(내용>폭 → 가로 스크롤).
