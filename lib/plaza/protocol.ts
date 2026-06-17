@@ -26,6 +26,7 @@ export type ServerMsg =
   | { t: "game_round_end"; word: string; scores: Scores }
   | { t: "game_over"; scores: Scores }
   | { t: "wheel_spin"; order: number[]; targetId: number; turns: number; dur: number }
+  | { t: "omok_state"; board: number[][]; turn: number; status: "waiting" | "playing" | "done"; black: number | null; white: number | null; winner: number | null; vsAI: boolean }
   | { t: "leave"; id: number }
   | { t: "pong" };
 
@@ -42,6 +43,11 @@ export type ClientMsg =
   | { t: "board_open" }
   | { t: "game_start"; difficulty: string }
   | { t: "wheel_spin" }
+  | { t: "omok_join" }
+  | { t: "omok_start"; vsAI: boolean }
+  | { t: "omok_move"; x: number; y: number }
+  | { t: "omok_reset" }
+  | { t: "omok_sync" }
   | { t: "ping" };
 
 /** 그림판 폴리라인 스트로크 */

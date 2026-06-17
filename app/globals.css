@@ -4988,3 +4988,29 @@ select {
 }
 .plaza-diff-btn:hover { background: rgba(255,255,255,0.12); }
 .plaza-diff-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* 광장 — 오목 룸 */
+.plaza-omok { width: min(560px, 96%); }
+.plaza-omok-body { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px; }
+.plaza-omok-seat {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 12px; border-radius: 10px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+}
+.plaza-omok-seat.turn { border-color: #ffd75e; background: rgba(255,200,40,0.12); }
+.plaza-omok-stone { width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto; }
+.plaza-omok-stone.b { background: radial-gradient(circle at 35% 35%, #555, #000); }
+.plaza-omok-stone.w { background: radial-gradient(circle at 35% 35%, #fff, #bbb); border: 1px solid #999; }
+.plaza-omok-noav { width: 40px; height: 48px; flex: 0 0 auto; }
+.plaza-omok-boardwrap { position: relative; width: 100%; max-width: 360px; }
+.plaza-omok-canvas {
+  display: block; width: 100%; height: auto; aspect-ratio: 1; border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45); touch-action: none;
+}
+.plaza-omok-over {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(10,16,28,0.7); color: #ffe066; font-weight: 800; font-size: 1.1rem;
+  border-radius: 8px; text-align: center;
+}
+.plaza-omok-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.plaza-omok-spec { color: #9aa6b5; font-size: 0.85rem; }
