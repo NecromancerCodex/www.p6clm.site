@@ -577,8 +577,6 @@ export function PlazaCanvas() {
             onClose={() => setPanel(null)}
             participants={participants}
             chatLog={chatLog}
-            sendChat={sendChat}
-            onChatFocus={(b) => { inputFocusedRef.current = b; }}
             game={game}
             startGame={() => wsSend({ t: "game_start" })}
           />
@@ -590,8 +588,6 @@ export function PlazaCanvas() {
             onClose={() => setPanel(null)}
             participants={participants}
             chatLog={chatLog}
-            sendChat={sendChat}
-            onChatFocus={(b) => { inputFocusedRef.current = b; }}
           />
         )}
         {/* 최초(아바타 없음) = 강제 / 툴바 = 편집(닫기 가능) */}

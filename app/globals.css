@@ -4977,3 +4977,4 @@ select {
   content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
   border: 6px solid transparent; border-top-color: #fff;
 }
+.plaza-room-chathint { color: #8d99a8; font-size: 0.78rem; text-align: center; padding: 6px 0; }

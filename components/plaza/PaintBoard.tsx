@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Trash2, Eraser, Pencil, Send, Play } from "lucide-react";
+import { X, Trash2, Eraser, Pencil, Play } from "lucide-react";
 
 import type { ClientMsg, ServerMsg, Stroke } from "../../lib/plaza/protocol";
 import type { Participant, ChatLine, GameView } from "./PlazaCanvas";
@@ -38,15 +38,13 @@ function recentBubble(chatLog: ChatLine[], id: number, nowMs: number): string | 
 }
 
 export function PaintBoard({
-  send, register, onClose, participants, chatLog, sendChat, onChatFocus, game, startGame,
+  send, register, onClose, participants, chatLog, game, startGame,
 }: {
   send: (m: ClientMsg) => void;
   register: (h: ((m: ServerMsg) => void) | null) => void;
   onClose: () => void;
   participants: Participant[];
   chatLog: ChatLine[];
-  sendChat: (text: string) => void;
-  onChatFocus: (focused: boolean) => void;
   game: GameView | null;
   startGame: () => void;
 }) {
@@ -56,7 +54,6 @@ export function PaintBoard({
   const [color, setColor] = useState("#222222");
   const [width, setWidth] = useState(6);
   const [eraser, setEraser] = useState(false);
-  const [chatValue, setChatValue] = useState("");
   const [remain, setRemain] = useState(0);
   const [nowMs, setNowMs] = useState(0);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
@@ -142,13 +139,6 @@ export function PaintBoard({
     if (curPts.current.length >= 10) flush();
   };
   const onUp = () => { if (drawing.current) { flush(); drawing.current = false; curPts.current = []; } };
-
-  const submitChat = (e: React.FormEvent) => {
-    e.preventDefault();
-    const t = chatValue.trim();
-    if (t) sendChat(t);
-    setChatValue("");
-  };
 
   const drawerName = game ? (participants.find((p) => p.id === game.drawerId)?.name ?? "?") : "";
   const card = (i: number) => {
@@ -236,17 +226,12 @@ export function PaintBoard({
 
             <div className="plaza-room-chat">
               <div className="plaza-room-chatlog" ref={chatLogRef}>
-                {chatLog.map((l, i) => (
-                  <div key={i} className="plaza-room-chatline"><b>{l.name}</b> {l.text}</div>
-                ))}
+                {chatLog.length === 0
+                  ? <div className="plaza-room-chathint">아래 채팅창으로 입력하세요{playing && !isDrawer ? " (정답 맞히기)" : ""}</div>
+                  : chatLog.map((l, i) => (
+                    <div key={i} className="plaza-room-chatline"><b>{l.name}</b> {l.text}</div>
+                  ))}
               </div>
-              <form className="plaza-room-chatform" onSubmit={submitChat}>
-                <input className="plaza-chat-input" value={chatValue}
-                  onChange={(e) => setChatValue(e.target.value)}
-                  onFocus={() => onChatFocus(true)} onBlur={() => onChatFocus(false)}
-                  placeholder={playing && !isDrawer ? "정답을 입력하세요…" : "메시지 입력…"} maxLength={200} />
-                <button type="submit" className="plaza-board-btn" aria-label="전송"><Send size={15} /></button>
-              </form>
             </div>
           </div>
 
