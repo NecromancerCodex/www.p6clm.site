@@ -96,6 +96,15 @@ export function normStorey(storeyName: string | null | undefined): string | null
   // 주차장지붕 등은 포디움/별도 구조 — 건물 RF(파라펫, 공정 끝)에 자동 귀속하면
   // 시공순서가 틀어진다. 전용 공정이 없으므로 미매칭 → 정책(AI)이 판단하게 둔다.
   if (s.includes("주차장")) return null;
+  // IfcBuildingStorey "LEVEL B5"/"LEVEL 1"/"LEVEL PIT"/"LEVEL B5 TOS" — 접두 LEVEL·접미 TOS 정리(서버 _norm_storey 미러).
+  const base = s.trim().replace(/^LEVEL\s+/i, "").replace(/\s+TOS$/i, "").trim();
+  const bu = base.toUpperCase();
+  if (bu === "PIT") return "PT";
+  const mb = /^B\s*0*(\d{1,2})$/.exec(bu);
+  if (mb) return "B" + mb[1];
+  const mg = /^0*(\d{1,3})$/.exec(bu);
+  if (mg && +mg[1] > 0 && +mg[1] <= 200) return mg[1].padStart(2, "0");
+  if (bu === "RF" || bu === "ROOF") return "RF";
   const m = /_(\d+)\s*층/.exec(s) || /(\d+)\s*F/i.exec(s);
   if (m) return m[1].padStart(2, "0");
   const u = s.toUpperCase();
@@ -128,7 +137,8 @@ export function canonStorey(s: string | null | undefined): string | null {
     /\bF\s*0*(\d+)/.exec(u) ||
     /^0*(\d+)$/.exec(u);
   if (m) return m[1];
-  return u; // PT 등 미인식은 원형 보존
+  if (u.includes("PIT") || u.includes("기초") || u.includes("지정")) return "PT"; // "LEVEL PIT" → PT
+  return u; // 그 외 미인식은 원형 보존
 }
 
 interface DateRange {
