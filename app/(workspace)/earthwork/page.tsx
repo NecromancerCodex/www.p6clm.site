@@ -27,6 +27,30 @@ function Chip({ label, c }: { label: string; c: string }) {
   );
 }
 
+function StatBox({ title, color, rows }: { title: string; color: string; rows: [string, string][] }) {
+  return (
+    <div style={{ border: "1px solid #eef1f6", borderRadius: 10, padding: 12, background: "#fbfcfe" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <span style={{ width: 10, height: 10, borderRadius: 3, background: color, display: "inline-block" }} />
+        <span style={{ fontWeight: 700, fontSize: 13, color: "#1e293b" }}>{title}</span>
+      </div>
+      {rows.map(([k, v]) => (
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, color: "#475569", padding: "2px 0" }}>
+          <span>{k}</span>
+          <strong style={{ color: "#334155" }}>{v}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 배열을 kind별 개수로 집계 → [["CIP","190개"], ...] */
+function kindRows(arr: { kind: string }[]): [string, string][] {
+  const m: Record<string, number> = {};
+  for (const a of arr) m[a.kind] = (m[a.kind] ?? 0) + 1;
+  return Object.entries(m).map(([k, n]) => [k, `${n}개`]);
+}
+
 function farthestPair(bores: Borehole[]): readonly [string, string] {
   if (bores.length < 2) return [bores[0]?.id ?? "", bores[0]?.id ?? ""] as const;
   let a = 0, b = 1, best = -1;
@@ -274,6 +298,30 @@ export default function EarthworkPage() {
           />
         </div>
       </div>
+
+      {/* ── 가져온 CAD 데이터 (CSV ##섹션 전체) ── */}
+      {(extra.boundary.length >= 3 || extra.piles.length > 0 || extra.walls.length > 0 || extra.terrain.length > 0) && (
+        <div style={CARD}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "0 0 12px" }}>가져온 CAD 데이터</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
+            {extra.boundary.length >= 3 && (
+              <StatBox title="대지경계선" color="#15803d" rows={[["꼭짓점", `${extra.boundary.length}점`], ["면적", `${fmt(polygonArea(clipLocal))} ㎡`]]} />
+            )}
+            {extra.piles.length > 0 && (
+              <StatBox title="Pile" color="#b45309" rows={[["총", `${extra.piles.length}개`], ...kindRows(extra.piles)]} />
+            )}
+            {extra.walls.length > 0 && (
+              <StatBox title="흙막이 벽" color="#be123c" rows={[["벽 수", `${extra.walls.length}개`], ...kindRows(extra.walls)]} />
+            )}
+            {extra.terrain.length > 0 && (
+              <StatBox title="지형 표고점" color="#0e7490" rows={[["점", `${extra.terrain.length}개`]]} />
+            )}
+          </div>
+          <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 10, marginBottom: 0 }}>
+            CSV ##섹션에서 읽은 값 · 3D에 함께 표시됨 (검수용)
+          </p>
+        </div>
+      )}
 
       {/* ── 하단 2단: 물량표 + 단면도 ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: 16, alignItems: "start" }}>
