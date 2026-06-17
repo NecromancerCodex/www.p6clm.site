@@ -8,39 +8,42 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import { LAYERS, type Borehole, type GridModel } from "../../lib/earthwork/model";
+import { LAYERS, pointInPoly, type Borehole, type GridModel } from "../../lib/earthwork/model";
 
-/** 한 층(top/bot 표고격자) → 닫힌 슬랩 BufferGeometry (상면+하면+측벽). */
-function buildSlab(g: GridModel, m: number): THREE.BufferGeometry {
+/**
+ * 한 층(top/bot 표고격자) → 닫힌 슬랩 BufferGeometry (상면+하면+측벽).
+ * inside(cx,cy) 주면 셀 중심이 그 안인 셀만 생성 → 땅이 대지경계선 모양으로 잘림. 경계엔 측벽 자동.
+ */
+function buildSlab(g: GridModel, m: number, inside?: (cx: number, cy: number) => boolean): THREE.BufferGeometry {
   const { nx, ny, lx, ly, ifaces } = g;
   const top = ifaces[m];
   const bot = ifaces[m + 1];
   const pos: number[] = [];
   const idx: number[] = [];
-  const N = nx * ny;
-  // 정점: 상면(0..N-1) + 하면(N..2N-1)
-  for (let iy = 0; iy < ny; iy++)
-    for (let ix = 0; ix < nx; ix++) pos.push(lx[ix], top[iy][ix], ly[iy]);
-  for (let iy = 0; iy < ny; iy++)
-    for (let ix = 0; ix < nx; ix++) pos.push(lx[ix], bot[iy][ix], ly[iy]);
-  const ti = (ix: number, iy: number) => iy * nx + ix;
-  const bi = (ix: number, iy: number) => N + iy * nx + ix;
-  // 상면/하면 (DoubleSide 라 winding 무관)
+  let v = 0;
+  const vert = (x: number, y: number, z: number) => { pos.push(x, y, z); return v++; };
+  const cellIn = (ix: number, iy: number) => {
+    if (ix < 0 || iy < 0 || ix >= nx - 1 || iy >= ny - 1) return false; // 격자 밖
+    if (!inside) return true;
+    return inside((lx[ix] + lx[ix + 1]) / 2, (ly[iy] + ly[iy + 1]) / 2);
+  };
+  const wall = (p0: number, p1: number, q0: number, q1: number) => idx.push(p0, p1, q1, p0, q1, q0);
   for (let iy = 0; iy < ny - 1; iy++) {
     for (let ix = 0; ix < nx - 1; ix++) {
-      idx.push(ti(ix, iy), ti(ix + 1, iy), ti(ix + 1, iy + 1), ti(ix, iy), ti(ix + 1, iy + 1), ti(ix, iy + 1));
-      idx.push(bi(ix, iy), bi(ix + 1, iy + 1), bi(ix + 1, iy), bi(ix, iy), bi(ix, iy + 1), bi(ix + 1, iy + 1));
+      if (!cellIn(ix, iy)) continue;
+      const x0 = lx[ix], x1 = lx[ix + 1], y0 = ly[iy], y1 = ly[iy + 1];
+      const tA = vert(x0, top[iy][ix], y0), tB = vert(x1, top[iy][ix + 1], y0);
+      const tC = vert(x1, top[iy + 1][ix + 1], y1), tD = vert(x0, top[iy + 1][ix], y1);
+      const bA = vert(x0, bot[iy][ix], y0), bB = vert(x1, bot[iy][ix + 1], y0);
+      const bC = vert(x1, bot[iy + 1][ix + 1], y1), bD = vert(x0, bot[iy + 1][ix], y1);
+      idx.push(tA, tB, tC, tA, tC, tD); // 상면
+      idx.push(bA, bC, bB, bA, bD, bC); // 하면
+      // 측벽 — 이웃 셀이 경계 밖(또는 격자 밖)인 변에만
+      if (!cellIn(ix, iy - 1)) wall(tA, tB, bA, bB); // 앞(y0)
+      if (!cellIn(ix, iy + 1)) wall(tD, tC, bD, bC); // 뒤(y1)
+      if (!cellIn(ix - 1, iy)) wall(tD, tA, bD, bA); // 좌(x0)
+      if (!cellIn(ix + 1, iy)) wall(tB, tC, bB, bC); // 우(x1)
     }
-  }
-  // 측벽 (4 둘레) — top↔bot quad
-  const wall = (a0: number, a1: number, b0: number, b1: number) => idx.push(a0, a1, b1, a0, b1, b0);
-  for (let ix = 0; ix < nx - 1; ix++) {
-    wall(ti(ix, 0), ti(ix + 1, 0), bi(ix, 0), bi(ix + 1, 0)); // 앞
-    wall(ti(ix, ny - 1), ti(ix + 1, ny - 1), bi(ix, ny - 1), bi(ix + 1, ny - 1)); // 뒤
-  }
-  for (let iy = 0; iy < ny - 1; iy++) {
-    wall(ti(0, iy), ti(0, iy + 1), bi(0, iy), bi(0, iy + 1)); // 좌
-    wall(ti(nx - 1, iy), ti(nx - 1, iy + 1), bi(nx - 1, iy), bi(nx - 1, iy + 1)); // 우
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -150,12 +153,16 @@ export function EarthworkViewer({
     dir2.position.set(-1, 0.5, -1);
     scene.add(dir2);
 
+    // 대지경계선 있으면 땅을 그 폴리곤 모양으로 클리핑 (로컬좌표 셀-중심 판정).
+    const bLocal = boundary.length >= 3 ? boundary.map((p) => ({ x: p.x - model.minX, y: p.y - model.minY })) : null;
+    const inside = bLocal ? (cx: number, cy: number) => pointInPoly(bLocal, cx, cy) : undefined;
+
     // 층별 슬랩 메시
     const meshes: Record<string, THREE.Mesh> = {};
     for (let m = 0; m < LAYERS.length; m++) {
       const L = LAYERS[m];
       const mat = new THREE.MeshLambertMaterial({ color: L.color, side: THREE.DoubleSide });
-      const mesh = new THREE.Mesh(buildSlab(model, m), mat);
+      const mesh = new THREE.Mesh(buildSlab(model, m, inside), mat);
       mesh.visible = true; // 초기 표시 — 직후 [visible] effect 가 정확히 동기
       scene.add(mesh);
       meshes[L.key] = mesh;

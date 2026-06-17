@@ -50,7 +50,7 @@ export default function EarthworkPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = useMemo(() => prepare(boreholes), [boreholes]);
-  const model = useMemo(() => buildGridModel(boreholes, 2), [boreholes]);
+  const model = useMemo(() => buildGridModel(boreholes, 2, extra.boundary), [boreholes, extra.boundary]);
   // 대지경계선(로컬좌표) — 토공량 클리핑·면적용
   const clipLocal = useMemo(
     () => extra.boundary.map((p) => ({ x: p.x - model.minX, y: p.y - model.minY })),

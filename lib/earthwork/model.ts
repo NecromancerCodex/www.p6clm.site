@@ -372,11 +372,14 @@ export interface GridModel {
 }
 
 /** 부지 격자 + 각 층 경계 표고 IDW 보간. boreholes 기반. spacing(m). */
-export function buildGridModel(boreholes: Borehole[], spacing = 2): GridModel {
-  const minX = Math.min(...boreholes.map((b) => b.x));
-  const maxX = Math.max(...boreholes.map((b) => b.x));
-  const minY = Math.min(...boreholes.map((b) => b.y));
-  const maxY = Math.max(...boreholes.map((b) => b.y));
+export function buildGridModel(boreholes: Borehole[], spacing = 2, boundary?: { x: number; y: number }[]): GridModel {
+  const xs = boreholes.map((b) => b.x);
+  const ys = boreholes.map((b) => b.y);
+  if (boundary && boundary.length >= 3) { for (const p of boundary) { xs.push(p.x); ys.push(p.y); } } // 격자를 경계까지 확장
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
   const width = maxX - minX;
   const depthY = maxY - minY;
   // 격자 칸수 상한 — 좌표 폭이 비정상적으로 크면(잘못된 단위 등) OOM 방지. 칸수만 줄이고 해상도 자동 보정.
