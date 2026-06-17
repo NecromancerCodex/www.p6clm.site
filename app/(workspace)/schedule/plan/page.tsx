@@ -13,9 +13,9 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlUrl, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlUrl, riskBrief, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError,
-  type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
+  type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
 import { savePlanIfcs } from "../../../../lib/fourd/fileCache";
@@ -153,6 +153,8 @@ export default function SchedulePlanWizard() {
   const [milestones, setMilestones] = useState<GenMilestone[]>([]); // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 게이트
   const [diff, setDiff] = useState<IfcDiffResult | null>(null); // 설계변경 영향분석 결과
   const [diffBusy, setDiffBusy] = useState(false);
+  const [brief, setBrief] = useState<string | null>(null); // AI 리스크 브리핑
+  const [briefBusy, setBriefBusy] = useState(false);
   const [strategy, setStrategy] = useState("bottom_up");
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
@@ -865,6 +867,33 @@ export default function SchedulePlanWizard() {
                 {lod.zones > 0 && <span> · 구역 {lod.zones}</span>}
                 {lod.storeys > 0 && <span> · 층 {lod.storeys}</span>}
                 <br /><span style={{ color: "#78716c" }}>{lod.note}</span>
+              </div>
+            );
+          })()}
+          {(() => {
+            const risks = (plan?.payload.schedule as Record<string, unknown> | undefined)?.risks as ScheduleRisk[] | undefined;
+            if (!risks || !risks.length) return null;
+            const col = (s: string) => s === "high" ? { fg: "#991b1b", icon: "🔴" } : s === "medium" ? { fg: "#92400e", icon: "🟡" } : { fg: "#475569", icon: "⚪" };
+            return (
+              <div style={{ border: "1px solid #fecaca", background: "#fff7f7", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <b style={{ fontSize: 13, color: "#991b1b" }}>⚠️ 리스크 분석 — {risks.length}건</b>
+                  <button className="wz-btn" disabled={briefBusy} style={{ fontSize: 12 }}
+                          onClick={() => { setBriefBusy(true); void riskBrief(planId!).then((r) => setBrief(r.brief)).finally(() => setBriefBusy(false)); }}>
+                    {briefBusy ? "분석 중…" : "🤖 AI 브리핑"}
+                  </button>
+                </div>
+                {risks.map((r, i) => (
+                  <div key={i} style={{ fontSize: 12, padding: "3px 0", borderTop: i ? "1px solid #fde0e0" : undefined, color: col(r.severity).fg }}>
+                    {col(r.severity).icon} <b>{r.title}</b> <span style={{ color: "#78716c" }}>— {r.detail}</span>
+                    <br /><span style={{ color: "#0369a1" }}>→ {r.mitigation}</span>
+                  </div>
+                ))}
+                {brief && (
+                  <div style={{ marginTop: 8, padding: "8px 10px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 12, color: "#1e3a8a", whiteSpace: "pre-wrap" }}>
+                    🤖 {brief}
+                  </div>
+                )}
               </div>
             );
           })()}

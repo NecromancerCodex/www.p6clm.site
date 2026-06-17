@@ -584,6 +584,12 @@ export async function ifcDiff(planId: string, workUnits: unknown[]): Promise<Ifc
   return planFetch(`/${planId}/ifc-diff`, { method: "POST", body: JSON.stringify({ work_units: workUnits }) });
 }
 
+export interface ScheduleRisk { severity: string; category: string; title: string; detail: string; count?: number; mitigation: string }
+/** AI 리스크 브리핑 — 결정론 탐지 리스크를 mini 가 우선순위·대응으로 서술. */
+export async function riskBrief(planId: string): Promise<{ brief: string }> {
+  return planFetch(`/${planId}/risk-brief`, { method: "POST", body: "{}" });
+}
+
 /** P6 XML 다운로드 URL */
 export function planP6XmlUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/p6xml`;
