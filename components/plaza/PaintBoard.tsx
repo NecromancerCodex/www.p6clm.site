@@ -11,13 +11,14 @@ const BW = 640, BH = 420;
 const COLORS = ["#222222", "#e03131", "#f08c00", "#f5c518", "#2f9e44", "#1971c2", "#7048e8", "#e64980", "#ffffff"];
 const SIZES = [3, 6, 12, 22];
 
-function PlayerCard({ p, game }: { p: Participant | null; game: GameView | null }) {
+function PlayerCard({ p, game, bubble }: { p: Participant | null; game: GameView | null; bubble?: string }) {
   if (!p) return <div className="plaza-pcard plaza-pcard--empty">비어 있음</div>;
   const score = game?.scores[String(p.id)] ?? 0;
   const isDrawer = game?.drawerId === p.id;
   const correct = game?.guessed.includes(p.id);
   return (
     <div className={`plaza-pcard${p.me ? " me" : ""}${correct ? " correct" : ""}`}>
+      {bubble && <div className="plaza-pcard-bubble">{bubble}</div>}
       <AvatarThumb config={p.avatar} />
       <div className="plaza-pcard-info">
         <span className="plaza-pcard-name">{isDrawer && "✏️ "}{p.me ? `${p.name}(나)` : p.name}</span>
@@ -26,6 +27,14 @@ function PlayerCard({ p, game }: { p: Participant | null; game: GameView | null 
       {correct && <span className="plaza-pcard-badge">정답!</span>}
     </div>
   );
+}
+
+/** chatLog 에서 해당 id 의 최근(4.5s 이내) 메시지 텍스트 — 룸 말풍선용. */
+function recentBubble(chatLog: ChatLine[], id: number, nowMs: number): string | undefined {
+  for (let i = chatLog.length - 1; i >= 0; i--) {
+    if (chatLog[i].id === id) return nowMs - chatLog[i].ts < 4500 ? chatLog[i].text : undefined;
+  }
+  return undefined;
 }
 
 export function PaintBoard({
@@ -49,7 +58,14 @@ export function PaintBoard({
   const [eraser, setEraser] = useState(false);
   const [chatValue, setChatValue] = useState("");
   const [remain, setRemain] = useState(0);
+  const [nowMs, setNowMs] = useState(0);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
+
+  // 말풍선 만료용 시계 (Date.now()는 interval 콜백 안에서만)
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 400);
+    return () => window.clearInterval(id);
+  }, []);
 
   const drawing = useRef(false);
   const curPts = useRef<number[][]>([]);
@@ -135,7 +151,10 @@ export function PaintBoard({
   };
 
   const drawerName = game ? (participants.find((p) => p.id === game.drawerId)?.name ?? "?") : "";
-  const card = (i: number) => <PlayerCard key={i} p={participants[i] ?? null} game={game} />;
+  const card = (i: number) => {
+    const p = participants[i] ?? null;
+    return <PlayerCard key={i} p={p} game={game} bubble={p ? recentBubble(chatLog, p.id, nowMs) : undefined} />;
+  };
 
   return (
     <div className="plaza-board-backdrop" onClick={onClose}>

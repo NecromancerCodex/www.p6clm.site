@@ -30,9 +30,21 @@ export function WheelRoom({
   const [dur, setDur] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [winnerId, setWinnerId] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(0);
   const rotRef = useRef(0);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 400);
+    return () => window.clearInterval(id);
+  }, []);
+
   const nameOf = (id: number) => participants.find((p) => p.id === id)?.name ?? "?";
+  const bubbleOf = (id: number): string | undefined => {
+    for (let i = chatLog.length - 1; i >= 0; i--) {
+      if (chatLog[i].id === id) return nowMs - chatLog[i].ts < 4500 ? chatLog[i].text : undefined;
+    }
+    return undefined;
+  };
   // 스핀 중/직후엔 서버가 준 순서 유지, 그 외엔 현재 참가자 순서
   const wheelIds = spinOrder ?? participants.map((p) => p.id);
 
@@ -103,8 +115,10 @@ export function WheelRoom({
   const card = (i: number) => {
     const p = participants[i] ?? null;
     if (!p) return <div key={i} className="plaza-pcard plaza-pcard--empty">비어 있음</div>;
+    const bubble = bubbleOf(p.id);
     return (
       <div key={i} className={`plaza-pcard${p.me ? " me" : ""}${winnerId === p.id ? " correct" : ""}`}>
+        {bubble && <div className="plaza-pcard-bubble">{bubble}</div>}
         <AvatarThumb config={p.avatar} />
         <div className="plaza-pcard-info"><span className="plaza-pcard-name">{p.me ? `${p.name}(나)` : p.name}</span></div>
         {winnerId === p.id && <span className="plaza-pcard-badge">지목!</span>}

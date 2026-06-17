@@ -117,6 +117,7 @@ export interface ChatLine {
   id: number;
   name: string;
   text: string;
+  ts: number; // 수신 시각(ms) — 룸 말풍선 표시용
 }
 
 export interface GameView {
@@ -249,7 +250,7 @@ export function PlazaCanvas() {
             msg.id === myIdRef.current ? -1 : msg.id,
             { text: msg.text, until: performance.now() + 5200 },
           );
-          setChatLog((log) => [...log.slice(-29), { id: msg.id, name: msg.name, text: msg.text }]);
+          setChatLog((log) => [...log.slice(-29), { id: msg.id, name: msg.name, text: msg.text, ts: Date.now() }]);
           break;
         }
         case "avatar": {
@@ -282,7 +283,7 @@ export function PlazaCanvas() {
         case "game_correct": {
           const cid = msg.id, cname = msg.name;
           setGame((g) => (g ? { ...g, scores: msg.scores, guessed: [...g.guessed, cid] } : g));
-          setChatLog((log) => [...log.slice(-29), { id: cid, name: cname, text: "✅ 정답!" }]);
+          setChatLog((log) => [...log.slice(-29), { id: cid, name: cname, text: "✅ 정답!", ts: Date.now() }]);
           break;
         }
         case "game_round_end": {
