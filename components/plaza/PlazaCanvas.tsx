@@ -118,6 +118,20 @@ export interface ChatLine {
   text: string;
 }
 
+export interface GameView {
+  status: "playing" | "intermission";
+  round: number;
+  total: number;
+  drawerId: number;
+  wordLen: number;
+  endsAt: number;            // 라운드 종료 epoch ms
+  scores: Record<string, number>;
+  guessed: number[];         // 이번 라운드 정답자 id
+  myWord: string | null;     // 출제자에게만
+  roundWord: string | null;  // 라운드 종료 공개 단어
+  over: Record<string, number> | null; // 게임 종료 최종 점수
+}
+
 export function PlazaCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -129,6 +143,7 @@ export function PlazaCanvas() {
   const [panel, setPanel] = useState<null | "shop" | "creator" | "paint">(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [chatLog, setChatLog] = useState<ChatLine[]>([]);
+  const [game, setGame] = useState<GameView | null>(null);
 
   // 프로필 스토어 (재화·인벤·아바타)
   const loadProfile = usePlazaStore((s) => s.load);
@@ -246,6 +261,35 @@ export function PlazaCanvas() {
         case "board_init":
         case "board_clear": {
           boardHandlerRef.current?.(msg); // 그림판으로 전달
+          break;
+        }
+        case "game_state": {
+          const drawerId = msg.drawerId;
+          setGame((g) => ({
+            status: msg.status, round: msg.round, total: msg.total, drawerId,
+            wordLen: msg.wordLen, endsAt: Date.now() + msg.secs * 1000, scores: msg.scores,
+            guessed: [], myWord: drawerId === myIdRef.current ? (g?.myWord ?? null) : null,
+            roundWord: null, over: null,
+          }));
+          break;
+        }
+        case "game_word": {
+          setGame((g) => (g ? { ...g, myWord: msg.word } : g));
+          break;
+        }
+        case "game_correct": {
+          const cid = msg.id, cname = msg.name;
+          setGame((g) => (g ? { ...g, scores: msg.scores, guessed: [...g.guessed, cid] } : g));
+          setChatLog((log) => [...log.slice(-29), { id: cid, name: cname, text: "✅ 정답!" }]);
+          break;
+        }
+        case "game_round_end": {
+          setGame((g) => (g ? { ...g, status: "intermission", roundWord: msg.word, scores: msg.scores } : g));
+          break;
+        }
+        case "game_over": {
+          setGame((g) => (g ? { ...g, over: msg.scores } : g));
+          window.setTimeout(() => setGame(null), 8000);
           break;
         }
         case "leave": {
@@ -531,6 +575,8 @@ export function PlazaCanvas() {
             chatLog={chatLog}
             sendChat={sendChat}
             onChatFocus={(b) => { inputFocusedRef.current = b; }}
+            game={game}
+            startGame={() => wsSend({ t: "game_start" })}
           />
         )}
         {/* 최초(아바타 없음) = 강제 / 툴바 = 편집(닫기 가능) */}

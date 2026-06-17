@@ -4889,3 +4889,42 @@ select {
   .plaza-room-side .plaza-pcard { flex: 1 1 calc(25% - 6px); flex-direction: column; text-align: center; }
   .plaza-room-center { order: -1; flex: 1 1 100%; }
 }
+
+/* 광장 — 캐치마인드 게임 UI */
+.plaza-game-status { font-size: 0.8rem; color: #c2ccd8; }
+.plaza-game-status b { color: #ffe066; }
+.plaza-timer { color: #8fd0ff; font-weight: 700; }
+.plaza-timer.low { color: #ff8787; }
+.plaza-game-start {
+  display: inline-flex; align-items: center; gap: 5px; margin-left: auto;
+  padding: 5px 12px; border-radius: 8px; border: none;
+  background: var(--green, #16a34a); color: #fff; font-weight: 700; font-size: 0.8rem; cursor: pointer;
+}
+.plaza-game-start:disabled { background: rgba(255,255,255,0.12); color: #8d99a8; cursor: not-allowed; }
+.plaza-word-bar {
+  padding: 7px 12px; border-radius: 8px; text-align: center; font-size: 0.86rem;
+  background: rgba(255,255,255,0.06); color: #e8edf4;
+}
+.plaza-word-bar b { color: #ffe066; font-size: 1.05rem; letter-spacing: 1px; }
+.plaza-word-blanks { letter-spacing: 3px; color: #9fd0ff; font-weight: 700; }
+.plaza-canvas-wrap { position: relative; }
+.plaza-board-canvas.locked { cursor: not-allowed; }
+.plaza-game-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  background: rgba(10, 16, 28, 0.78); border-radius: 8px; color: #fff; text-align: center;
+}
+.plaza-game-overlay-title { font-size: 1.3rem; font-weight: 800; }
+.plaza-game-overlay-title b { color: #ffd75e; }
+.plaza-game-overlay-sub { font-size: 0.85rem; color: #c2ccd8; }
+.plaza-rank { margin: 0; padding: 0; list-style: none; font-size: 0.95rem; line-height: 1.8; }
+.plaza-rank li:first-child { color: #ffd75e; font-weight: 700; }
+.plaza-rank b { color: #ffe066; }
+
+.plaza-pcard-info { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.plaza-pcard-score { font-size: 0.74rem; color: #ffd75e; font-weight: 700; }
+.plaza-pcard.correct { border-color: #51cf66; background: rgba(80,200,120,0.14); }
+.plaza-pcard-badge {
+  margin-left: auto; font-size: 0.66rem; font-weight: 800; color: #1a2332;
+  background: #51cf66; padding: 2px 6px; border-radius: 6px;
+}

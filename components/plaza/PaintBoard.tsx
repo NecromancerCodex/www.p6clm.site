@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Trash2, Eraser, Pencil, Send } from "lucide-react";
+import { X, Trash2, Eraser, Pencil, Send, Play } from "lucide-react";
 
 import type { ClientMsg, ServerMsg, Stroke } from "../../lib/plaza/protocol";
 import { loadManifest, composeAvatar, type AvatarConfig } from "../../lib/plaza/parts";
-import type { Participant, ChatLine } from "./PlazaCanvas";
+import type { Participant, ChatLine, GameView } from "./PlazaCanvas";
 
 const BW = 640, BH = 420;
 const COLORS = ["#222222", "#e03131", "#f08c00", "#f5c518", "#2f9e44", "#1971c2", "#7048e8", "#e64980", "#ffffff"];
 const SIZES = [3, 6, 12, 22];
-const SLOTS = 8;
 
-/** 참가자 카드의 아바타 미리보기 (합성). */
 function AvatarThumb({ config }: { config: AvatarConfig }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
@@ -23,28 +21,33 @@ function AvatarThumb({ config }: { config: AvatarConfig }) {
       const ctx = c.getContext("2d"); if (!ctx) return;
       ctx.clearRect(0, 0, c.width, c.height);
       const scale = Math.min(c.width / res.w, c.height / res.h);
-      const dw = res.w * scale, dh = res.h * scale;
       ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(res.canvas, (c.width - dw) / 2, c.height - dh, dw, dh);
+      ctx.drawImage(res.canvas, (c.width - res.w * scale) / 2, c.height - res.h * scale, res.w * scale, res.h * scale);
     });
     return () => { alive = false; };
   }, [config]);
   return <canvas ref={ref} width={54} height={64} className="plaza-pcard-av" />;
 }
 
-function PlayerCard({ p }: { p: Participant | null }) {
+function PlayerCard({ p, game }: { p: Participant | null; game: GameView | null }) {
   if (!p) return <div className="plaza-pcard plaza-pcard--empty">비어 있음</div>;
+  const score = game?.scores[String(p.id)] ?? 0;
+  const isDrawer = game?.drawerId === p.id;
+  const correct = game?.guessed.includes(p.id);
   return (
-    <div className={`plaza-pcard${p.me ? " me" : ""}`}>
+    <div className={`plaza-pcard${p.me ? " me" : ""}${correct ? " correct" : ""}`}>
       <AvatarThumb config={p.avatar} />
-      <span className="plaza-pcard-name">{p.me ? `${p.name} (나)` : p.name}</span>
+      <div className="plaza-pcard-info">
+        <span className="plaza-pcard-name">{isDrawer && "✏️ "}{p.me ? `${p.name}(나)` : p.name}</span>
+        {game && <span className="plaza-pcard-score">{score}점</span>}
+      </div>
+      {correct && <span className="plaza-pcard-badge">정답!</span>}
     </div>
   );
 }
 
-/** 광장 공유 그림판 — 캐치마인드식 룸(가운데 보드 + 참가자 8 + 채팅). */
 export function PaintBoard({
-  send, register, onClose, participants, chatLog, sendChat, onChatFocus,
+  send, register, onClose, participants, chatLog, sendChat, onChatFocus, game, startGame,
 }: {
   send: (m: ClientMsg) => void;
   register: (h: ((m: ServerMsg) => void) | null) => void;
@@ -53,13 +56,17 @@ export function PaintBoard({
   chatLog: ChatLine[];
   sendChat: (text: string) => void;
   onChatFocus: (focused: boolean) => void;
+  game: GameView | null;
+  startGame: () => void;
 }) {
+  const myId = participants.find((p) => p.me)?.id ?? -1;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const [color, setColor] = useState("#222222");
   const [width, setWidth] = useState(6);
   const [eraser, setEraser] = useState(false);
   const [chatValue, setChatValue] = useState("");
+  const [remain, setRemain] = useState(0);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
 
   const drawing = useRef(false);
@@ -68,6 +75,18 @@ export function PaintBoard({
   const widthRef = useRef(width);
   const eraserRef = useRef(eraser);
   useEffect(() => { colorRef.current = color; widthRef.current = width; eraserRef.current = eraser; }, [color, width, eraser]);
+
+  const playing = game?.status === "playing";
+  const isDrawer = !!game && game.drawerId === myId;
+  const canDraw = !game ? true : playing && isDrawer;
+
+  // 남은 시간 카운트다운 (Date.now()는 effect 안에서만)
+  useEffect(() => {
+    if (!playing || !game) return;
+    const upd = () => setRemain(Math.max(0, Math.ceil((game.endsAt - Date.now()) / 1000)));
+    const id = window.setInterval(upd, 250);
+    return () => window.clearInterval(id);
+  }, [playing, game]);
 
   const drawPoly = (pts: number[][], c: string, w: number) => {
     const ctx = ctxRef.current;
@@ -98,7 +117,6 @@ export function PaintBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 채팅 로그 자동 스크롤
   useEffect(() => { const el = chatLogRef.current; if (el) el.scrollTop = el.scrollHeight; }, [chatLog]);
 
   const toCanvas = (e: React.PointerEvent): [number, number] => {
@@ -114,6 +132,7 @@ export function PaintBoard({
     }
   };
   const onDown = (e: React.PointerEvent) => {
+    if (!canDraw) return;
     drawing.current = true;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     const p = toCanvas(e); curPts.current = [p]; drawPoly([p], effColor(), widthRef.current);
@@ -133,13 +152,27 @@ export function PaintBoard({
     setChatValue("");
   };
 
-  const card = (i: number) => <PlayerCard key={i} p={participants[i] ?? null} />;
+  const drawerName = game ? (participants.find((p) => p.id === game.drawerId)?.name ?? "?") : "";
+  const card = (i: number) => <PlayerCard key={i} p={participants[i] ?? null} game={game} />;
 
   return (
     <div className="plaza-board-backdrop" onClick={onClose}>
       <div className="plaza-room" onClick={(e) => e.stopPropagation()}>
         <div className="plaza-panel-head">
-          <span className="plaza-panel-title">🖌️ 공유 그림판 · {participants.length}/{SLOTS}명</span>
+          <span className="plaza-panel-title">🎯 캐치마인드</span>
+          {game ? (
+            <span className="plaza-game-status">
+              라운드 {game.round}/{game.total} · 출제자 <b>{drawerName}</b>
+              {playing && <span className={`plaza-timer${remain <= 10 ? " low" : ""}`}> · ⏱ {remain}s</span>}
+            </span>
+          ) : (
+            <span className="plaza-game-status">참가 {participants.length}명 · 2명 이상이면 시작 가능</span>
+          )}
+          {!game && (
+            <button type="button" className="plaza-game-start" disabled={participants.length < 2} onClick={startGame}>
+              <Play size={14} /> 게임 시작
+            </button>
+          )}
           <button type="button" className="plaza-panel-x" onClick={onClose} aria-label="닫기"><X size={16} /></button>
         </div>
 
@@ -147,25 +180,58 @@ export function PaintBoard({
           <div className="plaza-room-side">{[0, 1, 2, 3].map(card)}</div>
 
           <div className="plaza-room-center">
-            <div className="plaza-board-tools">
-              {COLORS.map((c) => (
-                <button key={c} type="button" className={`plaza-board-color${!eraser && color === c ? " on" : ""}`}
-                  style={{ background: c }} onClick={() => { setColor(c); setEraser(false); }} aria-label={`색 ${c}`} />
-              ))}
-              <span className="plaza-board-sep" />
-              {SIZES.map((s) => (
-                <button key={s} type="button" className={`plaza-board-size${width === s ? " on" : ""}`} onClick={() => setWidth(s)}>
-                  <span style={{ width: s, height: s }} />
-                </button>
-              ))}
-              <span className="plaza-board-sep" />
-              <button type="button" className={`plaza-board-btn${!eraser ? " on" : ""}`} onClick={() => setEraser(false)} title="펜"><Pencil size={15} /></button>
-              <button type="button" className={`plaza-board-btn${eraser ? " on" : ""}`} onClick={() => setEraser(true)} title="지우개"><Eraser size={15} /></button>
-              <button type="button" className="plaza-board-btn" onClick={() => { clearBoard(); send({ t: "board_clear" }); }} title="전체 지우기"><Trash2 size={15} /></button>
-            </div>
+            {/* 제시어 바 */}
+            {playing && (
+              <div className="plaza-word-bar">
+                {isDrawer
+                  ? <>제시어: <b>{game!.myWord}</b> — 그려주세요!</>
+                  : <>제시어 <b>{game!.wordLen}</b>글자 — 맞혀보세요! <span className="plaza-word-blanks">{"_ ".repeat(game!.wordLen)}</span></>}
+              </div>
+            )}
 
-            <canvas ref={canvasRef} width={BW} height={BH} className="plaza-board-canvas"
-              onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} />
+            {/* 도구 (그릴 수 있을 때만) */}
+            {canDraw && (
+              <div className="plaza-board-tools">
+                {COLORS.map((c) => (
+                  <button key={c} type="button" className={`plaza-board-color${!eraser && color === c ? " on" : ""}`}
+                    style={{ background: c }} onClick={() => { setColor(c); setEraser(false); }} aria-label={`색 ${c}`} />
+                ))}
+                <span className="plaza-board-sep" />
+                {SIZES.map((s) => (
+                  <button key={s} type="button" className={`plaza-board-size${width === s ? " on" : ""}`} onClick={() => setWidth(s)}>
+                    <span style={{ width: s, height: s }} />
+                  </button>
+                ))}
+                <span className="plaza-board-sep" />
+                <button type="button" className={`plaza-board-btn${!eraser ? " on" : ""}`} onClick={() => setEraser(false)} title="펜"><Pencil size={15} /></button>
+                <button type="button" className={`plaza-board-btn${eraser ? " on" : ""}`} onClick={() => setEraser(true)} title="지우개"><Eraser size={15} /></button>
+                <button type="button" className="plaza-board-btn" onClick={() => { clearBoard(); send({ t: "board_clear" }); }} title="전체 지우기"><Trash2 size={15} /></button>
+              </div>
+            )}
+
+            <div className="plaza-canvas-wrap">
+              <canvas ref={canvasRef} width={BW} height={BH}
+                className={`plaza-board-canvas${canDraw ? "" : " locked"}`}
+                onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} />
+
+              {/* 라운드 종료 / 게임 오버 오버레이 */}
+              {game?.over && (
+                <div className="plaza-game-overlay">
+                  <div className="plaza-game-overlay-title">🏆 게임 종료!</div>
+                  <ol className="plaza-rank">
+                    {Object.entries(game.over).sort((a, b) => b[1] - a[1]).map(([id, sc]) => (
+                      <li key={id}>{participants.find((p) => p.id === Number(id))?.name ?? "?"} — <b>{sc}점</b></li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {!game?.over && game?.status === "intermission" && game.roundWord && (
+                <div className="plaza-game-overlay">
+                  <div className="plaza-game-overlay-title">정답은 <b>{game.roundWord}</b>!</div>
+                  <div className="plaza-game-overlay-sub">다음 라운드 준비 중…</div>
+                </div>
+              )}
+            </div>
 
             <div className="plaza-room-chat">
               <div className="plaza-room-chatlog" ref={chatLogRef}>
@@ -174,13 +240,10 @@ export function PaintBoard({
                 ))}
               </div>
               <form className="plaza-room-chatform" onSubmit={submitChat}>
-                <input
-                  className="plaza-chat-input" value={chatValue}
+                <input className="plaza-chat-input" value={chatValue}
                   onChange={(e) => setChatValue(e.target.value)}
-                  onFocus={() => onChatFocus(true)}
-                  onBlur={() => onChatFocus(false)}
-                  placeholder="메시지 입력…" maxLength={200}
-                />
+                  onFocus={() => onChatFocus(true)} onBlur={() => onChatFocus(false)}
+                  placeholder={playing && !isDrawer ? "정답을 입력하세요…" : "메시지 입력…"} maxLength={200} />
                 <button type="submit" className="plaza-board-btn" aria-label="전송"><Send size={15} /></button>
               </form>
             </div>

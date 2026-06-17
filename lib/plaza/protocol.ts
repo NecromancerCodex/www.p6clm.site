@@ -20,8 +20,16 @@ export type ServerMsg =
   | { t: "draw"; pts: number[][]; c: string; w: number }
   | { t: "board_init"; strokes: Stroke[] }
   | { t: "board_clear" }
+  | { t: "game_state"; status: "playing" | "intermission"; round: number; total: number; drawerId: number; wordLen: number; secs: number; scores: Scores }
+  | { t: "game_word"; word: string }
+  | { t: "game_correct"; id: number; name: string; scores: Scores }
+  | { t: "game_round_end"; word: string; scores: Scores }
+  | { t: "game_over"; scores: Scores }
   | { t: "leave"; id: number }
   | { t: "pong" };
+
+/** 점수 — JSON 키는 문자열(플레이어 id) */
+export type Scores = Record<string, number>;
 
 /** client → server */
 export type ClientMsg =
@@ -31,6 +39,7 @@ export type ClientMsg =
   | { t: "draw"; pts: number[][]; c: string; w: number }
   | { t: "board_clear" }
   | { t: "board_open" }
+  | { t: "game_start" }
   | { t: "ping" };
 
 /** 그림판 폴리라인 스트로크 */
