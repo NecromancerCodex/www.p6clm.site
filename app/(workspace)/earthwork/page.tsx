@@ -124,6 +124,11 @@ export default function EarthworkPage() {
     grand += v.volume;
   }
 
+  const CARD: React.CSSProperties = {
+    background: "#fff", border: "1px solid #e8ecf2", borderRadius: 14,
+    boxShadow: "0 1px 3px rgba(16,24,40,0.05)", padding: 16, marginBottom: 16,
+  };
+
   return (
     <div className="ws-inner-pad" style={{ maxWidth: "none" }}>
       <div className="ws-section-title">
@@ -135,198 +140,214 @@ export default function EarthworkPage() {
         부지 약 {Math.round(model.width)}×{Math.round(model.depthY)}m.
       </p>
 
-      {/* CSV 업로드 (데이터 구동) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "8px 0 14px" }}>
-        <input ref={fileRef} type="file" accept=".csv" onChange={onCsv} style={{ display: "none" }} />
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
-        >
-          <Upload size={15} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-          시추 CSV 업로드
-        </button>
-        <span style={{ fontSize: 13, color: "#475569" }}>현재: <strong>{source}</strong></span>
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>
-          시추 CSV 또는 add 통합 CSV(##섹션) 지원
-        </span>
-        {(extra.terrain.length > 0 || extra.boundary.length > 0 || extra.piles.length > 0) && (
-          <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {extra.terrain.length > 0 && <Chip label={`지형 ${extra.terrain.length}점`} c="#0e7490" />}
-            {extra.boundary.length > 0 && <Chip label={`경계 ${extra.boundary.length}점`} c="#15803d" />}
-            {extra.piles.length > 0 && <Chip label={`Pile ${extra.piles.length}`} c="#b45309" />}
-          </span>
-        )}
-        {clipLocal.length >= 3 && (
-          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer" }}>
-            <input type="checkbox" checked={clip} onChange={(e) => setClip(e.target.checked)} />
-            대지경계선 내부만 산정 ({fmt(polygonArea(clipLocal))}㎡)
-          </label>
-        )}
-        {extra.terrain.length >= 3 && (
-          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer" }}>
-            <input type="checkbox" checked={showContour} onChange={(e) => setShowContour(e.target.checked)} />
-            등고선 생성
-            <input
-              type="number" min={0.1} step={0.5} value={contourInterval}
-              onChange={(e) => setContourInterval(Math.max(0.1, Number(e.target.value) || 1))}
-              style={{ width: 52, padding: "2px 4px", fontSize: 12, border: "1px solid #cbd5e1", borderRadius: 4 }}
-            />
-            m 간격{showContour && contours.length > 0 ? ` · ${contours.length}선` : ""}
-          </label>
-        )}
-      </div>
-
-      {/* 대표 지형 프리셋 (로컬 미리보기 — DB 저장 안 함) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 0 14px" }}>
-        <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>지형 프리셋:</span>
-        {TERRAIN_PRESETS.map((p) => (
+      {/* ── 컨트롤 카드 ── */}
+      <div style={CARD}>
+        {/* 업로드 + 상태 + 가져온 데이터 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <input ref={fileRef} type="file" accept=".csv" onChange={onCsv} style={{ display: "none" }} />
           <button
-            key={p.kind}
             type="button"
-            title={p.desc}
-            onClick={() => {
-              const bh = makeTerrainPreset(p.kind);
-              setBoreholes(bh);
-              setSec(farthestPair(bh));
-              setSource(`프리셋: ${p.label} (가상 ${bh.length}공)`);
+            onClick={() => fileRef.current?.click()}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10,
+              border: "none", background: "linear-gradient(180deg,#3b82f6,#2563eb)", color: "#fff",
+              fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 1px 2px rgba(37,99,235,0.4)",
             }}
-            style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#f8fafc", color: "#334155", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
           >
-            {p.label}
+            <Upload size={15} strokeWidth={2.2} />
+            CSV 업로드
           </button>
-        ))}
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>형태 미리보기용 가상 지반 (저장하려면 CSV 업로드)</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+            <span style={{ fontSize: 13, color: "#334155", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {source}
+            </span>
+            <span style={{ fontSize: 11, color: "#94a3b8" }}>시추 CSV · add 통합 CSV(##섹션) 지원</span>
+          </div>
+          {(extra.terrain.length > 0 || extra.boundary.length > 0 || extra.piles.length > 0) && (
+            <span style={{ display: "flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
+              {extra.terrain.length > 0 && <Chip label={`지형 ${extra.terrain.length}점`} c="#0e7490" />}
+              {extra.boundary.length > 0 && <Chip label={`경계 ${extra.boundary.length}점`} c="#15803d" />}
+              {extra.piles.length > 0 && <Chip label={`Pile ${extra.piles.length}`} c="#b45309" />}
+            </span>
+          )}
+        </div>
+
+        {/* 프리셋 + 옵션 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 14, paddingTop: 14, borderTop: "1px solid #f1f5f9" }}>
+          <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>지형 프리셋</span>
+          {TERRAIN_PRESETS.map((p) => (
+            <button
+              key={p.kind}
+              type="button"
+              title={p.desc}
+              onClick={() => {
+                const bh = makeTerrainPreset(p.kind);
+                setBoreholes(bh);
+                setSec(farthestPair(bh));
+                setSource(`프리셋: ${p.label} (가상 ${bh.length}공)`);
+              }}
+              style={{ padding: "6px 13px", borderRadius: 999, border: "1px solid #d8dee8", background: "#fff", color: "#475569", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
+            >
+              {p.label}
+            </button>
+          ))}
+
+          {clipLocal.length >= 3 && (
+            <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer", marginLeft: 4 }}>
+              <input type="checkbox" checked={clip} onChange={(e) => setClip(e.target.checked)} />
+              경계 내부만 ({fmt(polygonArea(clipLocal))}㎡)
+            </label>
+          )}
+          {extra.terrain.length >= 3 && (
+            <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer" }}>
+              <input type="checkbox" checked={showContour} onChange={(e) => setShowContour(e.target.checked)} />
+              등고선
+              <input
+                type="number" min={0.1} step={0.5} value={contourInterval}
+                onChange={(e) => setContourInterval(Math.max(0.1, Number(e.target.value) || 1))}
+                style={{ width: 50, padding: "2px 5px", fontSize: 12, border: "1px solid #d8dee8", borderRadius: 6 }}
+              />
+              m{showContour && contours.length > 0 ? ` · ${contours.length}선` : ""}
+            </label>
+          )}
+        </div>
       </div>
 
-      {/* 3D 뷰어 */}
-      <div style={{ position: "relative", height: "56vh", minHeight: 380, marginBottom: 12 }}>
-        <EarthworkViewer
-          model={model}
-          visible={visible}
+      {/* ── 3D 뷰어 카드 (상단 컨트롤바 + 뷰어) ── */}
+      <div style={{ ...CARD, padding: 0, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid #eef1f6", background: "#fafbfd" }}>
+          <button
+            type="button"
+            onClick={() => setShowLabels((v) => !v)}
+            style={{
+              padding: "4px 11px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: "1px solid " + (showLabels ? "#2563eb" : "#d8dee8"),
+              background: showLabels ? "#2563eb" : "#fff",
+              color: showLabels ? "#fff" : "#64748b",
+            }}
+            title="시추공 공번 라벨 표시/숨김"
+          >
+            공번 {showLabels ? "ON" : "OFF"}
+          </button>
+          <span style={{ width: 1, height: 16, background: "#e2e8f0", margin: "0 2px" }} />
+          <Layers size={14} strokeWidth={1.8} style={{ color: "#94a3b8" }} />
+          {LAYERS.map((L) => (
+            <button
+              key={L.key}
+              type="button"
+              onClick={() => toggle(L.key)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px",
+                borderRadius: 999, border: "1px solid #e2e8f0", fontSize: 11.5, fontWeight: 600,
+                background: visible[L.key] ? "#fff" : "#f1f5f9",
+                color: visible[L.key] ? "#334155" : "#a8b3c2", cursor: "pointer",
+                opacity: visible[L.key] ? 1 : 0.55,
+              }}
+              title={visible[L.key] ? "숨기기" : "표시"}
+            >
+              <span style={{ width: 11, height: 11, borderRadius: 3, background: hex(L.color), display: "inline-block" }} />
+              {L.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ position: "relative", height: "60vh", minHeight: 420 }}>
+          <EarthworkViewer
+            model={model}
+            visible={visible}
+            boreholes={boreholes}
+            showLabels={showLabels}
+            terrain={extra.terrain}
+            boundary={extra.boundary}
+            piles={extra.piles}
+            contours={contours}
+          />
+        </div>
+      </div>
+
+      {/* ── 하단 2단: 물량표 + 단면도 ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: 16, alignItems: "start" }}>
+        {/* 물량표 카드 */}
+        <div style={CARD}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "0 0 12px" }}>층별 토공 물량</h3>
+          <div style={{ overflowX: "auto", border: "1px solid #eef1f6", borderRadius: 10 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#f8fafc", color: "#475569" }}>
+                  <th style={th()}>구분</th>
+                  <th style={th()}>지층</th>
+                  <th style={th(true)}>물량 (m³)</th>
+                  <th style={th(true)}>비율</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(["토사", "풍화", "암반"] as const).map((grp) => {
+                  const rows = vols.filter((v) => v.group === grp);
+                  return rows.map((v, i) => (
+                    <tr key={v.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                      {i === 0 && (
+                        <td rowSpan={rows.length} style={{ ...td(), fontWeight: 700, color: "#334155", verticalAlign: "top", background: "#fbfcfe" }}>
+                          {grp}
+                          <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>
+                            {fmt(groupTotal[grp])} m³
+                          </div>
+                        </td>
+                      )}
+                      <td style={td()}>
+                        <span style={{ width: 10, height: 10, borderRadius: 2, background: hex(v.color), display: "inline-block", marginRight: 6 }} />
+                        {v.label}
+                      </td>
+                      <td style={td(true)}>{fmt(v.volume)}</td>
+                      <td style={td(true)}>{grand ? ((v.volume / grand) * 100).toFixed(1) : "0"}%</td>
+                    </tr>
+                  ));
+                })}
+                <tr style={{ borderTop: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 700 }}>
+                  <td style={td()} colSpan={2}>합계</td>
+                  <td style={td(true)}>{fmt(grand)}</td>
+                  <td style={td(true)}>100%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 10, marginBottom: 0 }}>
+            ※ IDW 보간 추정치. {clipLocal.length >= 3 && clip ? "대지경계선 내부 기준." : "전체 격자 기준."} 외곽·심부는 오차가 큽니다.
+          </p>
+        </div>
+
+        {/* 단면도 카드 */}
+        <div style={CARD}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: 0 }}>지질 단면도</h3>
+            <select value={secA} onChange={(e) => setSec([e.target.value, secB])} style={selStyle}>
+              {boreholes.map((b) => <option key={b.id} value={b.id}>{b.id}</option>)}
+            </select>
+            <span style={{ color: "#94a3b8" }}>→</span>
+            <select value={secB} onChange={(e) => setSec([secA, e.target.value])} style={selStyle}>
+              {boreholes.map((b) => <option key={b.id} value={b.id}>{b.id}</option>)}
+            </select>
+            <span style={{ fontSize: 11, color: "#94a3b8" }}>지하수위 ─ ─ 청색</span>
+          </div>
+          {bhA && bhB && (
+            <EarthworkSection set={set} boreholes={boreholes} ax={bhA.x} ay={bhA.y} bx={bhB.x} by={bhB.y} aLabel={bhA.id} bLabel={bhB.id} />
+          )}
+        </div>
+      </div>
+
+      {/* ── 시추공 편집 카드 ── */}
+      <div style={CARD}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "0 0 12px" }}>시추공 데이터</h3>
+        <BoreholeTable
+          key={source}
           boreholes={boreholes}
-          showLabels={showLabels}
-          terrain={extra.terrain}
-          boundary={extra.boundary}
-          piles={extra.piles}
-          contours={contours}
+          onApply={(bh) => { setBoreholes(bh); setSec(farthestPair(bh)); setSource(`편집 적용 (${bh.length}공)`); }}
+          onSave={async (bh) => {
+            setBoreholes(bh);
+            setSec(farthestPair(bh));
+            try { const n = await saveBoreholes(bh); setSource(`저장됨 (${n}공)`); }
+            catch { setSource(`${bh.length}공 · 저장 실패-화면만`); }
+          }}
         />
       </div>
-
-      {/* 지질 단면도 */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>지질 단면도</h3>
-          <select value={secA} onChange={(e) => setSec([e.target.value, secB])} style={selStyle}>
-            {boreholes.map((b) => <option key={b.id} value={b.id}>{b.id}</option>)}
-          </select>
-          <span style={{ color: "#94a3b8" }}>→</span>
-          <select value={secB} onChange={(e) => setSec([secA, e.target.value])} style={selStyle}>
-            {boreholes.map((b) => <option key={b.id} value={b.id}>{b.id}</option>)}
-          </select>
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>두 시추공 단면 · 지하수위 ─ ─ 청색</span>
-        </div>
-        {bhA && bhB && (
-          <EarthworkSection set={set} boreholes={boreholes} ax={bhA.x} ay={bhA.y} bx={bhB.x} by={bhB.y} aLabel={bhA.id} bLabel={bhB.id} />
-        )}
-      </div>
-
-      {/* 범례 + 토글 */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
-        <button
-          type="button"
-          onClick={() => setShowLabels((v) => !v)}
-          style={{
-            padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
-            border: "1px solid " + (showLabels ? "#2563eb" : "#cbd5e1"),
-            background: showLabels ? "#2563eb" : "#fff",
-            color: showLabels ? "#fff" : "#64748b",
-          }}
-          title="시추공 공번 라벨 표시/숨김"
-        >
-          🏷️ 공번 {showLabels ? "ON" : "OFF"}
-        </button>
-        <span style={{ width: 1, height: 18, background: "#e2e8f0" }} />
-        <Layers size={15} strokeWidth={1.8} style={{ color: "#64748b" }} />
-        {LAYERS.map((L) => (
-          <button
-            key={L.key}
-            type="button"
-            onClick={() => toggle(L.key)}
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
-              borderRadius: 999, border: "1px solid #cbd5e1", fontSize: 12, fontWeight: 600,
-              background: visible[L.key] ? "#fff" : "#f1f5f9",
-              color: visible[L.key] ? "#1e293b" : "#94a3b8", cursor: "pointer",
-              opacity: visible[L.key] ? 1 : 0.6,
-            }}
-            title={visible[L.key] ? "숨기기" : "표시"}
-          >
-            <span style={{ width: 12, height: 12, borderRadius: 3, background: hex(L.color), display: "inline-block" }} />
-            {L.label}
-          </button>
-        ))}
-      </div>
-
-      {/* 물량표 */}
-      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>층별 토공 물량</h3>
-      <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8, maxWidth: 560 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ background: "#f8fafc", color: "#475569" }}>
-              <th style={th()}>구분</th>
-              <th style={th()}>지층</th>
-              <th style={th(true)}>물량 (m³)</th>
-              <th style={th(true)}>비율</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(["토사", "풍화", "암반"] as const).map((grp) => {
-              const rows = vols.filter((v) => v.group === grp);
-              return rows.map((v, i) => (
-                <tr key={v.key} style={{ borderTop: "1px solid #f1f5f9" }}>
-                  {i === 0 && (
-                    <td rowSpan={rows.length} style={{ ...td(), fontWeight: 700, color: "#334155", verticalAlign: "top", background: "#fbfcfe" }}>
-                      {grp}
-                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>
-                        {fmt(groupTotal[grp])} m³
-                      </div>
-                    </td>
-                  )}
-                  <td style={td()}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: hex(v.color), display: "inline-block", marginRight: 6 }} />
-                    {v.label}
-                  </td>
-                  <td style={td(true)}>{fmt(v.volume)}</td>
-                  <td style={td(true)}>{grand ? ((v.volume / grand) * 100).toFixed(1) : "0"}%</td>
-                </tr>
-              ));
-            })}
-            <tr style={{ borderTop: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 700 }}>
-              <td style={td()} colSpan={2}>합계</td>
-              <td style={td(true)}>{fmt(grand)}</td>
-              <td style={td(true)}>100%</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        ※ IDW 보간 추정치. 시추공 11개 기반이라 외곽·심부는 오차가 큽니다. 굴착 레벨 지정 시 절토량 계산은 다음 단계.
-      </p>
-
-      {/* 시추공 편집 테이블 (CAD 팔레트처럼) */}
-      <div style={{ height: 24 }} />
-      <BoreholeTable
-        key={source}
-        boreholes={boreholes}
-        onApply={(bh) => { setBoreholes(bh); setSec(farthestPair(bh)); setSource(`편집 적용 (${bh.length}공)`); }}
-        onSave={async (bh) => {
-          setBoreholes(bh);
-          setSec(farthestPair(bh));
-          try { const n = await saveBoreholes(bh); setSource(`저장됨 (${n}공)`); }
-          catch { setSource(`${bh.length}공 · 저장 실패-화면만`); }
-        }}
-      />
     </div>
   );
 }
