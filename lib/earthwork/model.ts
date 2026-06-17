@@ -223,6 +223,83 @@ export function parseBoreholeCsv(text: string): Borehole[] {
   return out;
 }
 
+// ── 통합 토공 데이터 (add CSV ##섹션) ──
+export interface TerrainPt { x: number; y: number; z: number; }
+export interface PileItem { kind: string; x: number; y: number; dia: number; length: number; }
+export interface EarthworkData {
+  boreholes: Borehole[];
+  terrain: TerrainPt[];
+  boundary: { x: number; y: number }[];
+  piles: PileItem[];
+}
+
+/** "##SECTION" 구분자로 텍스트를 섹션별 라인배열로 분리. */
+function splitSections(text: string): Record<string, string[]> {
+  const sec: Record<string, string[]> = {};
+  let cur = "";
+  for (const ln of text.split(/\r?\n/)) {
+    const t = ln.trim();
+    if (!t) continue;
+    if (t.startsWith("##")) { cur = t.slice(2).toUpperCase(); sec[cur] = []; continue; }
+    if (cur) sec[cur].push(ln);
+  }
+  return sec;
+}
+
+/**
+ * add(AutoCAD) 통합 CSV 파싱 → 시추공+지형+경계+Pile.
+ * ##섹션 없으면 일반 시추공 CSV로 폴백. 좌표계: ##섹션은 CAD 좌표(X_cad)로 통일.
+ */
+export function parseEarthworkCsv(text: string): EarthworkData {
+  const data: EarthworkData = { boreholes: [], terrain: [], boundary: [], piles: [] };
+  if (!text.includes("##")) {
+    data.boreholes = parseBoreholeCsv(text);
+    return data;
+  }
+  const sec = splitSections(text);
+  const rows = (name: string) => {
+    const block = sec[name];
+    if (!block || block.length < 2) return [] as ((k: string) => string)[];
+    const header = block[0].split(",").map((h) => h.trim());
+    const hi: Record<string, number> = {};
+    header.forEach((h, i) => (hi[h] = i));
+    return block.slice(1).map((ln) => {
+      const c = ln.split(",");
+      return (k: string) => (hi[k] != null ? (c[hi[k]] ?? "").trim() : "");
+    });
+  };
+  const f = (s: string) => parseFloat(s);
+
+  for (const g of rows("BOREHOLES")) {
+    const id = g("borehole");
+    if (!id) continue;
+    const xc = f(g("X_cad")), yc = f(g("Y_cad"));
+    const x = Number.isFinite(xc) && xc !== 0 ? xc : f(g("X")); // CAD 좌표 우선(통일), 없으면 측량
+    const y = Number.isFinite(yc) && yc !== 0 ? yc : f(g("Y"));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const t: Record<string, number> = {};
+    for (const L of LAYERS) t[L.key] = _orZero(f(g(L.key)));
+    data.boreholes.push({
+      id, x, y, el: _orZero(f(g("surface_EL"))), depth: _orZero(f(g("drill_depth"))),
+      gwl: _orZero(f(g("gwl_GL"))), t,
+    });
+  }
+  for (const g of rows("TERRAIN")) {
+    const x = f(g("X_cad")), y = f(g("Y_cad")), z = f(g("Z"));
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) data.terrain.push({ x, y, z });
+  }
+  for (const g of rows("BOUNDARY")) {
+    const x = f(g("X_cad")), y = f(g("Y_cad"));
+    if (Number.isFinite(x) && Number.isFinite(y)) data.boundary.push({ x, y });
+  }
+  for (const g of rows("PILES")) {
+    const x = f(g("X_cad")), y = f(g("Y_cad"));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    data.piles.push({ kind: g("kind") || "Pile", x, y, dia: _orZero(f(g("dia_m"))), length: _orZero(f(g("length_m"))) });
+  }
+  return data;
+}
+
 export interface GridModel {
   nx: number;
   ny: number;

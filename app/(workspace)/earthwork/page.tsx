@@ -12,12 +12,20 @@ import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
 import { EarthworkSection } from "../../../components/earthwork/EarthworkSection";
 import { BoreholeTable } from "../../../components/earthwork/BoreholeTable";
 import {
-  BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, layerVolumes, makeTerrainPreset, parseBoreholeCsv, prepare,
-  type Borehole,
+  BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, layerVolumes, makeTerrainPreset, parseEarthworkCsv, prepare,
+  type Borehole, type TerrainPt, type PileItem,
 } from "../../../lib/earthwork/model";
 import { loadBoreholes, saveBoreholes } from "../../../lib/api/earthwork";
 
 /** 가장 멀리 떨어진 두 시추공 = 대표 단면 기본값. */
+function Chip({ label, c }: { label: string; c: string }) {
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: c, padding: "3px 9px", borderRadius: 999 }}>
+      {label}
+    </span>
+  );
+}
+
 function farthestPair(bores: Borehole[]): readonly [string, string] {
   if (bores.length < 2) return [bores[0]?.id ?? "", bores[0]?.id ?? ""] as const;
   let a = 0, b = 1, best = -1;
@@ -35,6 +43,9 @@ const fmt = (n: number) => Math.round(n).toLocaleString();
 export default function EarthworkPage() {
   const [boreholes, setBoreholes] = useState<Borehole[]>(BOREHOLES);
   const [source, setSource] = useState("샘플 (시추 11공)");
+  const [extra, setExtra] = useState<{ terrain: TerrainPt[]; boundary: { x: number; y: number }[]; piles: PileItem[] }>(
+    { terrain: [], boundary: [], piles: [] },
+  );
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = useMemo(() => prepare(boreholes), [boreholes]);
@@ -66,19 +77,27 @@ export default function EarthworkPage() {
     const f = e.target.files?.[0];
     if (f) e.target.value = "";
     if (!f) return;
-    const parsed = parseBoreholeCsv(await f.text());
+    const data = parseEarthworkCsv(await f.text());
+    const parsed = data.boreholes;
     if (parsed.length < 2) {
       alert("좌표(X,Y) 있는 시추공이 2개 이상 필요합니다. CSV 헤더/좌표 컬럼을 확인하세요.");
       return;
     }
     setBoreholes(parsed);
     setSec(farthestPair(parsed));
+    setExtra({ terrain: data.terrain, boundary: data.boundary, piles: data.piles });
+    // 통합 CSV(##섹션)에서 추가로 들어온 데이터 요약
+    const ex: string[] = [];
+    if (data.terrain.length) ex.push(`지형 ${data.terrain.length}점`);
+    if (data.boundary.length) ex.push(`경계 ${data.boundary.length}점`);
+    if (data.piles.length) ex.push(`Pile ${data.piles.length}`);
+    const suffix = ex.length ? ` + ${ex.join(", ")}` : "";
     // DB 저장 (기존 데이터 교체 = 최신만 유지). 백엔드 미가동이면 화면만 갱신.
     try {
       const n = await saveBoreholes(parsed);
-      setSource(`${f.name} (저장됨 ${n}공)`);
+      setSource(`${f.name} (저장됨 ${n}공${suffix})`);
     } catch {
-      setSource(`${f.name} (시추 ${parsed.length}공 · 저장 실패-화면만)`);
+      setSource(`${f.name} (시추 ${parsed.length}공${suffix} · 저장 실패-화면만)`);
     }
   };
 
@@ -114,8 +133,15 @@ export default function EarthworkPage() {
         </button>
         <span style={{ fontSize: 13, color: "#475569" }}>현재: <strong>{source}</strong></span>
         <span style={{ fontSize: 11, color: "#94a3b8" }}>
-          헤더: borehole,X,Y,surface_EL,drill_depth,gwl_GL,fill,clay,sand,gravel,wsoil,wrock,srock,mrock,hrock
+          시추 CSV 또는 add 통합 CSV(##섹션) 지원
         </span>
+        {(extra.terrain.length > 0 || extra.boundary.length > 0 || extra.piles.length > 0) && (
+          <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {extra.terrain.length > 0 && <Chip label={`지형 ${extra.terrain.length}점`} c="#0e7490" />}
+            {extra.boundary.length > 0 && <Chip label={`경계 ${extra.boundary.length}점`} c="#15803d" />}
+            {extra.piles.length > 0 && <Chip label={`Pile ${extra.piles.length}`} c="#b45309" />}
+          </span>
+        )}
       </div>
 
       {/* 대표 지형 프리셋 (로컬 미리보기 — DB 저장 안 함) */}
