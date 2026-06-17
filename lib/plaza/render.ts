@@ -177,12 +177,13 @@ export function drawStaticChar(
     const upperDH = dh * HIP;
     const legDH = dh - upperDH;
     const hipY = topY + upperDH;
-    const ang = Math.sin(o.now / 140) * 0.24; // 다리 스윙 각 (~14°)
+    const ang = Math.sin(o.now / 150) * 0.11; // 다리 스윙 각 (~6°, 찢김 최소화)
     // 다리(뒤) — 좌/우 반대 회전, 허리 피벗
     drawLegPiece(ctx, src, 0, hipSrcY, srcW / 2, legSrcH, left, hipY, dw / 2, legDH, o.x, hipY, ang);
     drawLegPiece(ctx, src, srcW / 2, hipSrcY, srcW / 2, legSrcH, o.x, hipY, dw / 2, legDH, o.x, hipY, -ang);
-    // 상체(앞) — 허리 이음새를 덮는다
-    ctx.drawImage(src, 0, 0, srcW, hipSrcY, left, topY, dw, upperDH);
+    // 상체(앞) — 허리보다 살짝 더 아래까지 덮어 이음새/찢김 가림
+    const ovS = srcH * 0.05, ovD = dh * 0.05;
+    ctx.drawImage(src, 0, 0, srcW, hipSrcY + ovS, left, topY, dw, upperDH + ovD);
   } else {
     ctx.drawImage(src, left, topY, dw, dh);
   }
