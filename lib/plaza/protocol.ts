@@ -17,6 +17,9 @@ export type ServerMsg =
   | { t: "state"; id: number; x: number; y: number; vx: number; facing: Facing; st: AnimState }
   | { t: "chat"; id: number; name: string; text: string }
   | { t: "avatar"; id: number; a: AvatarConfig }
+  | { t: "draw"; pts: number[][]; c: string; w: number }
+  | { t: "board_init"; strokes: Stroke[] }
+  | { t: "board_clear" }
   | { t: "leave"; id: number }
   | { t: "pong" };
 
@@ -25,7 +28,13 @@ export type ClientMsg =
   | { t: "move"; x: number; y: number; vx: number; facing: Facing; st: AnimState }
   | { t: "chat"; text: string }
   | { t: "avatar"; a: AvatarConfig }
+  | { t: "draw"; pts: number[][]; c: string; w: number }
+  | { t: "board_clear" }
+  | { t: "board_open" }
   | { t: "ping" };
+
+/** 그림판 폴리라인 스트로크 */
+export interface Stroke { pts: number[][]; c: string; w: number; }
 
 export type Facing = "l" | "r";
 export type AnimState = "idle" | "walk" | "jump";

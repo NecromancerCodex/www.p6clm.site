@@ -28,6 +28,7 @@ import {
 import { usePlazaStore } from "../../stores/plazaStore";
 import { ShopPanel } from "./ShopPanel";
 import { CharacterCreator } from "./CharacterCreator";
+import { PaintBoard } from "./PaintBoard";
 
 // ── 월드 / 물리 상수 ──────────────────────────────────────────────────────────
 // 월드 = 배경 이미지(town.png) 원본 크기 1384×768 와 1:1.
@@ -113,7 +114,7 @@ export function PlazaCanvas() {
   const [status, setStatus] = useState<"connecting" | "open" | "closed">("connecting");
   const [count, setCount] = useState(1);
   const [chatValue, setChatValue] = useState("");
-  const [panel, setPanel] = useState<null | "shop" | "creator">(null);
+  const [panel, setPanel] = useState<null | "shop" | "creator" | "paint">(null);
 
   // 프로필 스토어 (재화·인벤·아바타)
   const loadProfile = usePlazaStore((s) => s.load);
@@ -137,6 +138,13 @@ export function PlazaCanvas() {
   const manifestRef = useRef<PartsManifest | null>(null);
   const avatarCacheRef = useRef<Map<string, ComposedAvatar>>(new Map()); // 합성 결과 캐시
   const composingRef = useRef<Set<string>>(new Set()); // 합성 진행 중
+  const boardHandlerRef = useRef<((m: ServerMsg) => void) | null>(null); // 그림판 수신 핸들러
+
+  // WS 송신 헬퍼 (그림판 등에서 사용)
+  const wsSend = (m: ClientMsg) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
+  };
 
   // ── 배경/전경 이미지 + 매니페스트 + 프로필 로드 ───────────────────────────────
   useEffect(() => {
@@ -203,6 +211,12 @@ export function PlazaCanvas() {
         case "avatar": {
           const r = remotesRef.current.get(msg.id);
           if (r && msg.a) r.avatar = msg.a;
+          break;
+        }
+        case "draw":
+        case "board_init":
+        case "board_clear": {
+          boardHandlerRef.current?.(msg); // 그림판으로 전달
           break;
         }
         case "leave": {
@@ -464,6 +478,7 @@ export function PlazaCanvas() {
         <div className="plaza-tools">
           <button type="button" className={`plaza-tool${panel === "shop" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "shop" ? null : "shop"))}>🛒 상점</button>
           <button type="button" className={`plaza-tool${panel === "creator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "creator" ? null : "creator"))}>🎨 캐릭터 <kbd>C</kbd></button>
+          <button type="button" className={`plaza-tool${panel === "paint" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "paint" ? null : "paint"))}>🖌️ 그림판</button>
         </div>
       </div>
 
@@ -476,6 +491,13 @@ export function PlazaCanvas() {
           tabIndex={0}
         />
         {panel === "shop" && <ShopPanel onClose={() => setPanel(null)} />}
+        {panel === "paint" && (
+          <PaintBoard
+            send={wsSend}
+            register={(h) => { boardHandlerRef.current = h; }}
+            onClose={() => setPanel(null)}
+          />
+        )}
         {/* 최초(아바타 없음) = 강제 / 툴바 = 편집(닫기 가능) */}
         {loaded && (!avatar || panel === "creator") && (
           <CharacterCreator

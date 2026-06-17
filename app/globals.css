@@ -4806,3 +4806,45 @@ select {
 }
 .plaza-shop-thumb img { width: 230%; height: 230%; object-fit: contain; object-position: center 22%; }
 .plaza-part-shop-hint { border-style: dashed !important; opacity: 0.7; }
+
+/* 광장 — 공유 그림판 (가운데 모달) */
+.plaza-board-backdrop {
+  position: absolute; inset: 0; z-index: 18;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10, 16, 28, 0.55);
+}
+.plaza-board {
+  width: min(680px, 94%);
+  background: rgba(22, 30, 46, 0.98);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px; box-shadow: 0 16px 60px rgba(0,0,0,0.55);
+  color: #e8edf4; overflow: hidden;
+}
+.plaza-board-tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.plaza-board-color {
+  width: 24px; height: 24px; border-radius: 6px; cursor: pointer; padding: 0;
+  border: 2px solid rgba(255,255,255,0.25);
+}
+.plaza-board-color.on { border-color: #ffd75e; transform: scale(1.12); }
+.plaza-board-sep { width: 1px; height: 22px; background: rgba(255,255,255,0.15); margin: 0 4px; }
+.plaza-board-size {
+  width: 30px; height: 30px; border-radius: 7px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: center;
+}
+.plaza-board-size.on { border-color: #ffd75e; background: rgba(255,200,40,0.14); }
+.plaza-board-size span { background: #e8edf4; border-radius: 50%; display: block; }
+.plaza-board-btn {
+  width: 30px; height: 30px; border-radius: 7px; cursor: pointer; color: #c2ccd8;
+  border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: center;
+}
+.plaza-board-btn:hover { background: rgba(255,255,255,0.12); }
+.plaza-board-btn.on { border-color: var(--primary); background: var(--primary); color: #fff; }
+.plaza-board-canvas {
+  display: block; width: 100%; height: auto; aspect-ratio: 640 / 420;
+  background: #fff; cursor: crosshair; touch-action: none;
+}
