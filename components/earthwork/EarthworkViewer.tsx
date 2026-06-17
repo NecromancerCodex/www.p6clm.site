@@ -92,9 +92,15 @@ interface Props {
   visible: Record<string, boolean>; // 층key → 표시 여부
   boreholes: Borehole[];
   showLabels: boolean; // 공번 라벨 표시
+  terrain?: { x: number; y: number; z: number }[]; // 현황 지형 표고점 (CAD 좌표)
+  boundary?: { x: number; y: number }[]; // 대지경계선
+  piles?: { kind: string; x: number; y: number; dia: number; length: number }[];
 }
 
-export function EarthworkViewer({ model, visible, boreholes, showLabels }: Props) {
+export function EarthworkViewer({
+  model, visible, boreholes, showLabels,
+  terrain = [], boundary = [], piles = [],
+}: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const meshesRef = useRef<Record<string, THREE.Mesh>>({});
   const labelsRef = useRef<THREE.Sprite[]>([]);
@@ -182,6 +188,52 @@ export function EarthworkViewer({ model, visible, boreholes, showLabels }: Props
     labelsRef.current = labels; // 표시여부는 아래 [showLabels] effect 가 동기
     scene.add(boreGroup);
 
+    // ── 통합 데이터 오버레이: 대지경계선 + Pile + 지형 표고점 ──
+    const overlay = new THREE.Group();
+    const surfY = bounds.maxE; // 지표 근처 표고
+
+    if (boundary.length >= 3) {
+      const bpts = boundary.map((p) => new THREE.Vector3(p.x - model.minX, surfY + span * 0.01, p.y - model.minY));
+      bpts.push(bpts[0].clone()); // 닫기
+      overlay.add(new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(bpts),
+        new THREE.LineBasicMaterial({ color: 0x22c55e }),
+      ));
+    }
+
+    if (piles.length) {
+      for (const p of piles) {
+        const px = p.x - model.minX, pz = p.y - model.minY;
+        const len = p.length > 0 ? p.length : span * 0.15;
+        overlay.add(new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(px, surfY, pz),
+            new THREE.Vector3(px, surfY - len, pz),
+          ]),
+          new THREE.LineBasicMaterial({ color: 0xe0892b }),
+        ));
+      }
+    }
+
+    if (terrain.length) {
+      let tmin = Infinity, tmax = -Infinity;
+      for (const t of terrain) { if (t.z < tmin) tmin = t.z; if (t.z > tmax) tmax = t.z; }
+      const tspan = tmax - tmin || 1;
+      const pos: number[] = [];
+      const col: number[] = [];
+      const c = new THREE.Color();
+      for (const t of terrain) {
+        pos.push(t.x - model.minX, t.z, t.y - model.minY);
+        c.setHSL((1 - (t.z - tmin) / tspan) * 0.66, 0.85, 0.5); // 파랑(낮음)→빨강(높음)
+        col.push(c.r, c.g, c.b);
+      }
+      const tGeo = new THREE.BufferGeometry();
+      tGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      tGeo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      overlay.add(new THREE.Points(tGeo, new THREE.PointsMaterial({ size: Math.max(span * 0.012, 0.5), vertexColors: true })));
+    }
+    scene.add(overlay);
+
     let raf = 0;
     const animate = () => {
       controls.update();
@@ -217,10 +269,16 @@ export function EarthworkViewer({ model, visible, boreholes, showLabels }: Props
           mat.dispose();
         }
       });
+      overlay.traverse((o) => {
+        const any = o as THREE.Mesh;
+        any.geometry?.dispose?.();
+        const mat = any.material as THREE.Material | undefined;
+        mat?.dispose?.();
+      });
       renderer.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
-  }, [model, bounds, boreholes]);
+  }, [model, bounds, boreholes, terrain, boundary, piles]);
 
   // 공번 라벨 표시 토글
   useEffect(() => {

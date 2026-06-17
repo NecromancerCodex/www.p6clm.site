@@ -12,7 +12,8 @@ import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
 import { EarthworkSection } from "../../../components/earthwork/EarthworkSection";
 import { BoreholeTable } from "../../../components/earthwork/BoreholeTable";
 import {
-  BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, layerVolumes, makeTerrainPreset, parseEarthworkCsv, prepare,
+  BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, layerVolumes, makeTerrainPreset, parseEarthworkCsv,
+  polygonArea, prepare,
   type Borehole, type TerrainPt, type PileItem,
 } from "../../../lib/earthwork/model";
 import { loadBoreholes, saveBoreholes } from "../../../lib/api/earthwork";
@@ -50,7 +51,14 @@ export default function EarthworkPage() {
 
   const set = useMemo(() => prepare(boreholes), [boreholes]);
   const model = useMemo(() => buildGridModel(boreholes, 2), [boreholes]);
-  const vols = useMemo(() => layerVolumes(model), [model]);
+  // 대지경계선(로컬좌표) — 토공량 클리핑·면적용
+  const clipLocal = useMemo(
+    () => extra.boundary.map((p) => ({ x: p.x - model.minX, y: p.y - model.minY })),
+    [extra.boundary, model.minX, model.minY],
+  );
+  const [clip, setClip] = useState(true);
+  const useClip = clip && clipLocal.length >= 3;
+  const vols = useMemo(() => layerVolumes(model, useClip ? clipLocal : undefined), [model, useClip, clipLocal]);
   const [visible, setVisible] = useState<Record<string, boolean>>(
     () => Object.fromEntries(LAYERS.map((L) => [L.key, true])),
   );
@@ -142,6 +150,12 @@ export default function EarthworkPage() {
             {extra.piles.length > 0 && <Chip label={`Pile ${extra.piles.length}`} c="#b45309" />}
           </span>
         )}
+        {clipLocal.length >= 3 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer" }}>
+            <input type="checkbox" checked={clip} onChange={(e) => setClip(e.target.checked)} />
+            대지경계선 내부만 산정 ({fmt(polygonArea(clipLocal))}㎡)
+          </label>
+        )}
       </div>
 
       {/* 대표 지형 프리셋 (로컬 미리보기 — DB 저장 안 함) */}
@@ -168,7 +182,15 @@ export default function EarthworkPage() {
 
       {/* 3D 뷰어 */}
       <div style={{ position: "relative", height: "56vh", minHeight: 380, marginBottom: 12 }}>
-        <EarthworkViewer model={model} visible={visible} boreholes={boreholes} showLabels={showLabels} />
+        <EarthworkViewer
+          model={model}
+          visible={visible}
+          boreholes={boreholes}
+          showLabels={showLabels}
+          terrain={extra.terrain}
+          boundary={extra.boundary}
+          piles={extra.piles}
+        />
       </div>
 
       {/* 지질 단면도 */}

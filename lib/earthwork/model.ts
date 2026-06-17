@@ -360,8 +360,12 @@ export interface LayerVolume {
   volume: number; // m³
 }
 
-/** 층별 토공 물량(m³) — 격자 셀별 평균두께 × 셀면적 적분. */
-export function layerVolumes(g: GridModel): LayerVolume[] {
+/**
+ * 층별 토공 물량(m³) — 격자 셀별 평균두께 × 셀면적 적분.
+ * clipLocal: 대지경계선(로컬좌표 x-minX,y-minY) 주면 셀 중심이 경계 안인 셀만 합산(부지 내부만).
+ */
+export function layerVolumes(g: GridModel, clipLocal?: { x: number; y: number }[]): LayerVolume[] {
+  const clip = clipLocal && clipLocal.length >= 3 ? clipLocal : null;
   const out: LayerVolume[] = [];
   for (let m = 0; m < LAYERS.length; m++) {
     const top = g.ifaces[m];
@@ -369,6 +373,11 @@ export function layerVolumes(g: GridModel): LayerVolume[] {
     let vol = 0;
     for (let iy = 0; iy < g.ny - 1; iy++) {
       for (let ix = 0; ix < g.nx - 1; ix++) {
+        if (clip) {
+          const cx = (g.lx[ix] + g.lx[ix + 1]) / 2;
+          const cy = (g.ly[iy] + g.ly[iy + 1]) / 2;
+          if (!pointInPoly(clip, cx, cy)) continue; // 경계 밖 셀 제외
+        }
         // 셀 4코너 평균 두께
         const th =
           (top[iy][ix] - bot[iy][ix] +
@@ -383,4 +392,23 @@ export function layerVolumes(g: GridModel): LayerVolume[] {
     out.push({ key: LAYERS[m].key, label: LAYERS[m].label, group: LAYERS[m].group, color: LAYERS[m].color, volume: vol });
   }
   return out;
+}
+
+/** 점(px,py)이 폴리곤 내부인지 — ray casting. */
+export function pointInPoly(poly: { x: number; y: number }[], px: number, py: number): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** 폴리곤 면적(m²) — shoelace. */
+export function polygonArea(poly: { x: number; y: number }[]): number {
+  let a = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    a += (poly[j].x + poly[i].x) * (poly[j].y - poly[i].y);
+  }
+  return Math.abs(a) / 2;
 }
