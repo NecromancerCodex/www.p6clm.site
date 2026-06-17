@@ -227,6 +227,8 @@ export interface CodeIndex {
   byStorey: Map<string, DateRange>; // 층(canonStorey)별 골조 window — 가설(TW) 층 추종용(zone 무관)
   earthworkWindow: DateRange | null; // 토공(흙막이/굴착/차수) 공통활동 기간 — 토목(CV) 매칭용
   finishWindow: DateRange | null; // 마감(창호·문·마감재) 활동 기간 — 마감 부재(골조 후) 매칭용
+  mepWindow: DateRange | null; // 설비(배관·덕트·전기·소방·통신) 활동 기간 — MEP 부재 매칭용
+  landscapeWindow: DateRange | null; // 조경(식재·포장·시설물) 활동 기간 — 조경 부재 매칭용
   minDate: number;
   maxDate: number;
 }
@@ -237,13 +239,25 @@ const _EARTHWORK_KW = /흙막이|토공|굴착|터파기|차수|되메우|버림
 const _BACKFILL_KW = /되메우|성토|복구/;
 // 건축 마감 활동(4D 코드 없음) — 마감 부재(창호·문·마감재)가 이 기간(골조 후)에 매칭. architecture.py 활동명.
 const _FINISH_KW = /조적|방수|미장|창호|문 설치|타일|석재|천장|도장|바닥|마감|커튼월/;
-// 마감/FF&E/MEP 타입 — 골조(구조) 공정 부재가 아님. BIM 이 이들을 구조 코드(ST/MO·CR/MD)로 오태깅해도
-// IFC 타입이 진실 → 골조 매칭 제외(회색). 골조 scope 엔 마감 활동이 없음(있으면 추후 그쪽 매칭).
+// MEP 설비 활동(mep.py 활동명) — 설비 부재가 이 기간(골조 후)에 매칭.
+const _MEP_KW = /슬리브|인서트|배관|덕트|배선|소방|통신|TAB|시운전/;
+// 조경 활동(landscape.py 활동명) — 조경 부재가 이 기간(준공 직전)에 매칭.
+const _LANDSCAPE_KW = /식재|교목|관목|잔디|지피|관수|활착|조경|객토/;
+// 건축 마감/FF&E 타입 — 골조(구조) 부재 아님. IFC 타입이 진실 → 마감 window 매칭(골조 후).
 const _FINISH_TYPES = new Set([
   "IfcWindow", "IfcDoor", "IfcCovering", "IfcRailing", "IfcFurnishingElement", "IfcFurniture",
-  "IfcSystemFurnitureElement", "IfcFlowTerminal", "IfcFlowSegment", "IfcFlowFitting",
-  "IfcSanitaryTerminal", "IfcLightFixture", "IfcDistributionElement", "IfcDistributionFlowElement",
+  "IfcSystemFurnitureElement", "IfcCurtainWall",
 ]);
+// MEP 타입 — 기계·전기·소방·통신 설비. IFC 타입이 진실 → MEP window 매칭(disc/trade 없어도).
+const _MEP_TYPES = new Set([
+  "IfcFlowTerminal", "IfcFlowSegment", "IfcFlowFitting", "IfcFlowController", "IfcFlowMovingDevice",
+  "IfcFlowStorageDevice", "IfcEnergyConversionDevice", "IfcDistributionElement", "IfcDistributionFlowElement",
+  "IfcSanitaryTerminal", "IfcLightFixture", "IfcPipeSegment", "IfcPipeFitting", "IfcDuctSegment",
+  "IfcDuctFitting", "IfcAirTerminal", "IfcValve", "IfcPump", "IfcFan", "IfcCableCarrierSegment",
+  "IfcCableSegment", "IfcElectricAppliance", "IfcOutlet", "IfcSwitchingDevice", "IfcJunctionBox",
+]);
+const _MEP_TRADES = new Set(["ME", "FP", "EL", "TC"]);
+const _LANDSCAPE_TYPES = new Set(["IfcGeographicElement"]);
 
 // 스케줄 op(CR/MD/FT/PR) → 부재 카테고리. BIM 부재(classifyIfcType)와 같은 축으로 통일해
 // trade(ST/MO)·wt(WAL/SLB/COL) 코드 차이를 무시하고 구역 단위 매칭을 살린다.
@@ -288,6 +302,10 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   let ewEnd = -Infinity;
   let fwStart = Infinity;
   let fwEnd = -Infinity;
+  let mwStart = Infinity;
+  let mwEnd = -Infinity;
+  let lwStart = Infinity;
+  let lwEnd = -Infinity;
   let minD = Infinity;
   let maxD = -Infinity;
   for (const t of tasks) {
@@ -306,6 +324,20 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     if (_FINISH_KW.test(t.name || "")) {
       fwStart = Math.min(fwStart, s);
       fwEnd = Math.max(fwEnd, e);
+      minD = Math.min(minD, s);
+      maxD = Math.max(maxD, e);
+    }
+    // MEP 설비 활동 → mep window 누적 (설비 부재 매칭, 골조 후).
+    if (_MEP_KW.test(t.name || "")) {
+      mwStart = Math.min(mwStart, s);
+      mwEnd = Math.max(mwEnd, e);
+      minD = Math.min(minD, s);
+      maxD = Math.max(maxD, e);
+    }
+    // 조경 활동 → landscape window 누적 (조경 부재 매칭, 준공 직전).
+    if (_LANDSCAPE_KW.test(t.name || "")) {
+      lwStart = Math.min(lwStart, s);
+      lwEnd = Math.max(lwEnd, e);
       minD = Math.min(minD, s);
       maxD = Math.max(maxD, e);
     }
@@ -334,6 +366,8 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     byStorey,
     earthworkWindow: ewStart === Infinity ? null : { start: ewStart, end: ewEnd },
     finishWindow: fwStart === Infinity ? null : { start: fwStart, end: fwEnd },
+    mepWindow: mwStart === Infinity ? null : { start: mwStart, end: mwEnd },
+    landscapeWindow: lwStart === Infinity ? null : { start: lwStart, end: lwEnd },
     minDate: minD === Infinity ? Date.now() : minD,
     maxDate: maxD === -Infinity ? Date.now() : maxD,
   };
@@ -482,7 +516,27 @@ export function matchAllHybrid(
   const byVia: Record<string, number> = {};
   let matched = 0;
   for (const el of elements) {
-    // 마감/FF&E/MEP 타입(창호·문·마감재) — 골조 아님. BIM 이 구조 코드로 오태깅해도 IFC 타입이 진실 →
+    // MEP 설비 부재(배관·덕트·위생·조명·전기) → 설비 window(골조 후). disc/trade/타입 중 하나라도.
+    if (el.disc === "MEP" || _MEP_TRADES.has(el.trade ?? "") || _MEP_TYPES.has(el.ifcType)) {
+      const rm: MatchResult = codeIdx.mepWindow
+        ? { range: codeIdx.mepWindow, via: "mep:MEP" }
+        : { range: null, via: "mep:no_act" };
+      ranges.set(el.globalId, rm);
+      if (rm.range) matched++;
+      byVia[rm.range ? "MEP설비" : "MEP무활동"] = (byVia[rm.range ? "MEP설비" : "MEP무활동"] ?? 0) + 1;
+      continue;
+    }
+    // 조경 부재(식재·포장·시설물) → 조경 window(준공 직전).
+    if (el.disc === "조경" || el.trade === "LS" || _LANDSCAPE_TYPES.has(el.ifcType)) {
+      const rl: MatchResult = codeIdx.landscapeWindow
+        ? { range: codeIdx.landscapeWindow, via: "landscape:조경" }
+        : { range: null, via: "landscape:no_act" };
+      ranges.set(el.globalId, rl);
+      if (rl.range) matched++;
+      byVia[rl.range ? "조경" : "조경무활동"] = (byVia[rl.range ? "조경" : "조경무활동"] ?? 0) + 1;
+      continue;
+    }
+    // 마감/FF&E 타입(창호·문·마감재·커튼월) — 골조 아님. IFC 타입이 진실 →
     // 건축(마감) 활동 기간(골조 후)에 매칭. finishWindow 없으면(마감 활동 미생성) 미매칭(회색).
     if (_FINISH_TYPES.has(el.ifcType)) {
       const r0: MatchResult = codeIdx.finishWindow

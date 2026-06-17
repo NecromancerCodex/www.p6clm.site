@@ -35,3 +35,19 @@ export function layerName(trade: string | undefined): string {
   if (!trade) return "기타";
   return LAYER_BY_TRADE.get(trade)?.name ?? trade;
 }
+
+// ── 공종(disc) 단위 필터 — 패널은 6공종으로 토글(ME/FP/EL/TC 를 MEP 하나로 묶음) ──
+// trade(Lv.2) → 공종(disc). MEP 4개 sub-trade 를 하나로, ST/MO 를 구조로 통합.
+export const TRADE_TO_DISC: Record<string, string> = {
+  CV: "토목", TW: "가설", ST: "구조", MO: "구조", AR: "건축",
+  ME: "MEP", FP: "MEP", EL: "MEP", TC: "MEP", LS: "조경",
+};
+// 패널 표시 순서 = 시공 시퀀스.
+export const DISC_ORDER = ["토목", "구조", "건축", "MEP", "조경", "가설"];
+
+/** 요소의 공종 — disc(슬롯/분류기) 우선, 종합/미설정이면 trade 매핑, 그것도 없으면 기타. */
+export function disciplineOf(el: { disc?: string; trade?: string }): string {
+  if (el.disc && el.disc !== "종합") return el.disc;   // 슬롯/서버 분류 공종
+  if (el.trade) return TRADE_TO_DISC[el.trade] ?? el.trade;  // 종합 파일 = PSet trade 로 분리
+  return "기타";
+}

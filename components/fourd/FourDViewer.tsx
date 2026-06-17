@@ -30,7 +30,7 @@ type BvhGeom = THREE.BufferGeometry & { computeBoundsTree: () => void; disposeBo
 
 import type { ParsedIfc, ParsedElement } from "../../lib/fourd/ifc";
 import { statusAt, canonStorey, classifyIfcType, type MatchResult } from "../../lib/fourd/match";
-import { LAYERS, layerName } from "../../lib/fourd/layers";
+import { DISC_ORDER, disciplineOf, layerName } from "../../lib/fourd/layers";
 import { buildGeologyGroup } from "../../lib/earthwork/geologyGroup";
 import type { Borehole } from "../../lib/earthwork/model";
 
@@ -372,11 +372,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
   const [hidden, setHidden] = useState<Set<string>>(() => new Set<string>());
   const hiddenRef = useRef(hidden);
   hiddenRef.current = hidden;
-  // 이 모델에 실제 존재하는 레이어(trade)만 패널에 — 정의된 순서대로.
-  const presentLayers = useMemo(() => {
+  // 이 모델에 실제 존재하는 공종(disc)만 패널에 — 시공순서대로. el.disc(슬롯/분류기) 우선, 종합은 trade.
+  const presentDiscs = useMemo(() => {
     const present = new Set<string>();
-    for (const el of parsed.elements) if (el.trade) present.add(el.trade);
-    return LAYERS.filter((l) => present.has(l.trade));
+    for (const el of parsed.elements) present.add(disciplineOf(el));
+    const ordered = DISC_ORDER.filter((d) => present.has(d));
+    const extra = [...present].filter((d) => !DISC_ORDER.includes(d) && d !== "기타").sort();
+    return [...ordered, ...extra, ...(present.has("기타") ? ["기타"] : [])];
   }, [parsed]);
   const [bimOffset, setBimOffset] = useState({ x: 0, y: 0, z: 0 });
   const controlsRef = useRef<OrbitControls | null>(null);
@@ -875,7 +877,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       for (const el of parsed.elements) {
         // 숨김 레이어(가설·MEP 등) → 색 루프에서 완전 skip (hide effect 가 setVisibleAt 로 숨겨둠).
         // KPI 집계도 제외.
-        if (el.trade && hiddenRef.current.has(el.trade)) continue;
+        if (hiddenRef.current.has(disciplineOf(el))) continue;
         const mr = ranges.get(el.globalId);
         const st = statusAt(dateMs, mr?.range ?? null);
         // AI 정책매칭 = 추정. 확정(규칙)과 분리 집계·색칠. 추정은 상태 무관 estimate 로.
@@ -911,7 +913,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const batch = batchRef.current;
     if (!batch) return;
     for (const el of parsed.elements) {
-      if (!el.trade || !hidden.has(el.trade)) continue;
+      if (!hidden.has(disciplineOf(el))) continue;
       setElementVisible(batch, el, false);
     }
   }, [hidden, parsed]);
@@ -939,8 +941,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     if (prevKey) {
       for (const el of parsed.elements) {
         if (!matches(el, prevKey, prevMode)) continue;
-        if (el.trade && hiddenRef.current.has(el.trade)) {
-          setElementVisible(batch, el, false); // 숨김 레이어 → 복원도 숨김 유지
+        if (hiddenRef.current.has(disciplineOf(el))) {
+          setElementVisible(batch, el, false); // 숨김 공종 → 복원도 숨김 유지
           continue;
         }
         const mr2 = ranges.get(el.globalId);
@@ -1201,16 +1203,16 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             {geoOn ? "🏔 지반 ON" : "지반 OFF"}
           </button>
         )}
-        {presentLayers.map((l) => {
-          const on = !hidden.has(l.trade);
+        {presentDiscs.map((d) => {
+          const on = !hidden.has(d);
           return (
             <button
-              key={l.trade}
+              key={d}
               onClick={() =>
                 setHidden((prev) => {
                   const next = new Set(prev);
-                  if (next.has(l.trade)) next.delete(l.trade);
-                  else next.add(l.trade);
+                  if (next.has(d)) next.delete(d);
+                  else next.add(d);
                   return next;
                 })
               }
@@ -1224,10 +1226,10 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                 fontWeight: 600,
                 cursor: "pointer",
               }}
-              title={`${l.name} 레이어 ${on ? "표시 중 — 끄기" : "숨김 — 켜기"} (Lv.2 Trade=${l.trade})`}
+              title={`${d} 공종 ${on ? "표시 중 — 끄기" : "숨김 — 켜기"}`}
             >
               {on ? "● " : "○ "}
-              {l.name}
+              {d}
             </button>
           );
         })}
