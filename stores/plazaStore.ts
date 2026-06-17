@@ -7,8 +7,9 @@
  */
 import { create } from "zustand";
 
-import { fetchProfile, buyItem, equipItem, setCharacter } from "../lib/plaza/api";
+import { fetchProfile, buyItem, equipItem, saveAvatar } from "../lib/plaza/api";
 import type { Look } from "../lib/plaza/protocol";
+import type { AvatarConfig } from "../lib/plaza/parts";
 import { getItem } from "../lib/plaza/catalog";
 
 interface PlazaState {
@@ -18,14 +19,14 @@ interface PlazaState {
   currency: number;
   inventory: string[];
   equipped: Look;
-  character: string | null;
+  avatar: AvatarConfig | null;
 
   load: () => Promise<void>;
   buy: (itemKey: string) => Promise<{ ok: boolean; error?: string }>;
   /** 슬롯 토글 장착. 이미 그 아이템이 장착돼 있으면 해제. */
   toggleEquip: (itemKey: string) => Promise<void>;
   unequip: (slot: string) => Promise<void>;
-  chooseCharacter: (key: string) => Promise<void>;
+  setAvatar: (config: AvatarConfig) => Promise<void>;
 }
 
 export const usePlazaStore = create<PlazaState>((set, get) => ({
@@ -35,14 +36,14 @@ export const usePlazaStore = create<PlazaState>((set, get) => ({
   currency: 0,
   inventory: [],
   equipped: {},
-  character: null,
+  avatar: null,
 
   load: async () => {
     if (get().loading) return;
     set({ loading: true, error: null });
     try {
       const p = await fetchProfile();
-      set({ currency: p.currency, inventory: p.inventory, equipped: p.equipped, character: p.character, loaded: true });
+      set({ currency: p.currency, inventory: p.inventory, equipped: p.equipped, avatar: p.avatar, loaded: true });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "프로필 로드 실패" });
     } finally {
@@ -50,12 +51,12 @@ export const usePlazaStore = create<PlazaState>((set, get) => ({
     }
   },
 
-  chooseCharacter: async (key) => {
+  setAvatar: async (config) => {
     try {
-      const p = await setCharacter(key);
-      set({ character: p.character });
+      const p = await saveAvatar(config);
+      set({ avatar: p.avatar });
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : "캐릭터 선택 실패" });
+      set({ error: e instanceof Error ? e.message : "아바타 저장 실패" });
     }
   },
 

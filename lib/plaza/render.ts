@@ -149,9 +149,11 @@ function drawNameTag(ctx: CanvasRenderingContext2D, x: number, feetY: number, na
 // 코드로 모션을 입힌다: idle 숨쉬기, walk 통통 튀기, jump 살짝 늘이기.
 const CHAR_H = 104; // 표시 높이(px). 폭은 원본 비율.
 
-export function drawStaticChar(ctx: CanvasRenderingContext2D, o: ChibiOpts, img: HTMLImageElement) {
-  if (!img.naturalHeight) return;
-  const baseScale = CHAR_H / img.naturalHeight;
+export function drawStaticChar(
+  ctx: CanvasRenderingContext2D, o: ChibiOpts, src: CanvasImageSource, srcW: number, srcH: number,
+) {
+  if (!srcH) return;
+  const baseScale = CHAR_H / srcH;
 
   // 절차적 모션
   let bobY = 0, sx = 1, sy = 1;
@@ -166,7 +168,7 @@ export function drawStaticChar(ctx: CanvasRenderingContext2D, o: ChibiOpts, img:
     sy = 1 + Math.sin(o.now / 650) * 0.015;
   }
 
-  const dw = img.naturalWidth * baseScale * sx;
+  const dw = srcW * baseScale * sx;
   const dh = CHAR_H * sy;
   const feetY = o.y;
   const topY = feetY - dh + bobY;
@@ -185,7 +187,7 @@ export function drawStaticChar(ctx: CanvasRenderingContext2D, o: ChibiOpts, img:
   ctx.imageSmoothingEnabled = true; // 고해상 일러스트 — 부드럽게 축소
   ctx.save();
   if (o.facing === "l") { ctx.translate(o.x, 0); ctx.scale(-1, 1); ctx.translate(-o.x, 0); }
-  ctx.drawImage(img, o.x - dw / 2, topY, dw, dh);
+  ctx.drawImage(src, o.x - dw / 2, topY, dw, dh);
   ctx.restore();
 
   drawNameTag(ctx, o.x, feetY, o.name, !!o.isMe);

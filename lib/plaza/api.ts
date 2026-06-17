@@ -13,6 +13,7 @@ export interface PlazaProfile {
   inventory: string[];
   equipped: Look;
   character: string | null;
+  avatar: Record<string, string> | null;
 }
 
 async function parse(res: Response): Promise<PlazaProfile> {
@@ -57,6 +58,16 @@ export async function setCharacter(character: string): Promise<PlazaProfile> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ character }),
+    }),
+  );
+}
+
+export async function saveAvatar(avatar: Record<string, string>): Promise<PlazaProfile> {
+  return parse(
+    await fetch(`${API_BASE}/plaza/avatar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ avatar }),
     }),
   );
 }
