@@ -15,6 +15,7 @@ const SIZE = PAD * 2 + CELL * (N - 1);
 type OmokState = {
   board: number[][]; turn: number; status: "waiting" | "playing" | "done";
   black: number | null; white: number | null; winner: number | null; vsAI: boolean;
+  forbidden: number[][];
 };
 
 /** 오목 룸 — 2인 대국 + 관전, 상대 없으면 AI. 그림퀴즈/돌림판과 독립 세션. */
@@ -29,12 +30,21 @@ export function OmokRoom({
   const myId = participants.find((p) => p.me)?.id ?? -1;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [st, setSt] = useState<OmokState | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const handler = (m: ServerMsg) => { if (m.t === "omok_state") setSt(m); };
+    const handler = (m: ServerMsg) => {
+      if (m.t === "omok_state") setSt(m);
+      else if (m.t === "omok_forbidden") {
+        setNotice(`${m.reason} 자리입니다 — 둘 수 없어요`);
+        if (noticeTimer.current) clearTimeout(noticeTimer.current);
+        noticeTimer.current = setTimeout(() => setNotice(null), 2200);
+      }
+    };
     register(handler);
     send({ t: "omok_sync" });
-    return () => register(null);
+    return () => { register(null); if (noticeTimer.current) clearTimeout(noticeTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -66,6 +76,15 @@ export function OmokRoom({
         ctx.beginPath(); ctx.arc(cx, cy, CELL / 2 - 1.5, 0, Math.PI * 2); ctx.fill();
       }
     }
+    // 흑 금수 자리 표시 (빨간 ✕)
+    if (st?.forbidden?.length) {
+      ctx.strokeStyle = "rgba(224,49,49,0.85)"; ctx.lineWidth = 2;
+      for (const [fx, fy] of st.forbidden) {
+        const cx = PAD + fx * CELL, cy = PAD + fy * CELL, r = 5;
+        ctx.beginPath(); ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
+        ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r); ctx.stroke();
+      }
+    }
   }, [st]);
 
   const myColor = st ? (myId === st.black ? 1 : myId === st.white ? 2 : 0) : 0;
@@ -80,6 +99,12 @@ export function OmokRoom({
     const x = Math.round((px - PAD) / CELL), y = Math.round((py - PAD) / CELL);
     if (x < 0 || x >= N || y < 0 || y >= N) return;
     if (st.board[x][y] !== 0) return;
+    if (st.forbidden?.some(([fx, fy]) => fx === x && fy === y)) {
+      setNotice("금수 자리입니다 — 둘 수 없어요");
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      noticeTimer.current = setTimeout(() => setNotice(null), 2000);
+      return;
+    }
     send({ t: "omok_move", x, y });
   };
 
@@ -122,6 +147,7 @@ export function OmokRoom({
             <canvas ref={canvasRef} width={SIZE} height={SIZE} className="plaza-omok-canvas"
               onPointerDown={click} style={{ cursor: myTurn ? "pointer" : "default" }} />
             {st?.status === "done" && <div className="plaza-omok-over">{statusText()}</div>}
+            {notice && <div className="plaza-omok-notice">⛔ {notice}</div>}
           </div>
           {seat(1)}
 

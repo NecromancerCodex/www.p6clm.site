@@ -26,7 +26,8 @@ export type ServerMsg =
   | { t: "game_round_end"; word: string; scores: Scores }
   | { t: "game_over"; scores: Scores }
   | { t: "wheel_spin"; order: number[]; targetId: number; turns: number; dur: number }
-  | { t: "omok_state"; board: number[][]; turn: number; status: "waiting" | "playing" | "done"; black: number | null; white: number | null; winner: number | null; vsAI: boolean }
+  | { t: "omok_state"; board: number[][]; turn: number; status: "waiting" | "playing" | "done"; black: number | null; white: number | null; winner: number | null; vsAI: boolean; forbidden: number[][] }
+  | { t: "omok_forbidden"; reason: string }
   | { t: "leave"; id: number }
   | { t: "pong" };
 

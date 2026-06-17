@@ -264,7 +264,8 @@ export function PlazaCanvas() {
         case "board_init":
         case "board_clear":
         case "wheel_spin":
-        case "omok_state": {
+        case "omok_state":
+        case "omok_forbidden": {
           boardHandlerRef.current?.(msg); // 열려있는 룸(그림퀴즈/돌림판/오목)으로 전달
           break;
         }

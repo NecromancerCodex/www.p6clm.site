@@ -5014,3 +5014,10 @@ select {
 }
 .plaza-omok-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .plaza-omok-spec { color: #9aa6b5; font-size: 0.85rem; }
+
+/* 광장 오목 — 금수 알림 */
+.plaza-omok-notice {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+  background: rgba(224,49,49,0.95); color: #fff; font-weight: 700; font-size: 0.85rem;
+  padding: 6px 14px; border-radius: 10px; white-space: nowrap; box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+}
