@@ -24,7 +24,8 @@ import GanttChartRaw from "../../../../components/process/GanttChart";
 const GanttChart = GanttChartRaw as unknown as FC<{ tasks: GanttTask[]; height?: number; viewMode?: string; fillWidth?: boolean }>;
 
 // 멀티파싱 임포트 — 공종(디시플린) 슬롯. 순서 = 시공 시퀀스(토목→구조→건축→MEP→조경→가설).
-// active=공정 엔진 보유(토목 civil.py / 구조 타워·모듈러). 나머지는 잠금(🔒, Phase D)·가설은 오버레이.
+// active=공정 엔진 보유(토목 civil / 구조 LLM / 건축 architecture / MEP mep / 조경 landscape = 6공종 완전체).
+// 가설만 잠금(오버레이 — 납품물 아님).
 // 넣은 공종만 공정표에 반영(구독형) — 단일이면 그 공종, 복수면 병합(2·3단계).
 const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; hint: string }[] = [
   // 종합 = REV 같은 전 공종 1파일 → PSet Trade + IFC 타입으로 토목/구조/건축 자동 분리 후 순서대로 생성.
@@ -32,8 +33,8 @@ const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; 
   { key: "토목", label: "토목", icon: "🏗️", active: true, hint: "굴착·흙막이" },
   { key: "구조", label: "구조", icon: "🏢", active: true, hint: "골조" },
   { key: "건축", label: "건축", icon: "🧱", active: true, hint: "마감(조적·창호·타일·도장…)" },
-  { key: "MEP", label: "MEP", icon: "🔧", active: false, hint: "기계·소방·전기·통신" },
-  { key: "조경", label: "조경", icon: "🌳", active: false, hint: "조경" },
+  { key: "MEP", label: "MEP", icon: "🔧", active: true, hint: "기계·소방·전기·통신(설비)" },
+  { key: "조경", label: "조경", icon: "🌳", active: true, hint: "식재·포장·시설물" },
   { key: "가설", label: "가설", icon: "🚧", active: false, hint: "비계·거푸집(오버레이)" },
 ];
 
