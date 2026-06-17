@@ -412,3 +412,161 @@ export function polygonArea(poly: { x: number; y: number }[]): number {
   }
   return Math.abs(a) / 2;
 }
+
+// ── 등고선 생성 (표고점 → IDW 격자 → 마칭스퀘어) ── add ContourCommand 포팅.
+export interface Contour { z: number; major: boolean; points: { x: number; y: number }[]; }
+
+/** nearest-16 IDW(power=2). 최근접점이 maxDist 밖이면 NaN(외삽 방지). */
+function idwZ(x: number, y: number, pts: TerrainPt[], maxDist: number): number {
+  const n = Math.min(16, pts.length);
+  const d2 = new Array<number>(n).fill(Infinity);
+  const zz = new Array<number>(n).fill(0);
+  for (const p of pts) {
+    const dd = (x - p.x) ** 2 + (y - p.y) ** 2;
+    if (dd < 1e-10) return p.z;
+    let mi = 0;
+    for (let i = 1; i < n; i++) if (d2[i] > d2[mi]) mi = i;
+    if (dd < d2[mi]) { d2[mi] = dd; zz[mi] = p.z; }
+  }
+  let minD2 = Infinity;
+  for (let i = 0; i < n; i++) if (d2[i] < minD2) minD2 = d2[i];
+  if (maxDist > 0 && minD2 > maxDist * maxDist) return NaN;
+  let sw = 0, swz = 0;
+  for (let i = 0; i < n; i++) {
+    if (d2[i] === Infinity) continue;
+    const w = 1 / d2[i]; // power 2
+    sw += w; swz += w * zz[i];
+  }
+  return sw > 0 ? swz / sw : NaN;
+}
+
+/** 한 레벨의 마칭스퀘어 선분 [x1,y1,x2,y2]. */
+function contourSegments(grid: Float64Array, W: number, nx: number, ny: number,
+  minX: number, minY: number, dx: number, dy: number, level: number): number[][] {
+  const res: number[][] = [];
+  const edge = (a: number, b: number, ax: number, bx: number) =>
+    Math.abs(b - a) < 1e-10 ? (ax + bx) * 0.5 : ax + ((bx - ax) * (level - a)) / (b - a);
+  for (let iy = 0; iy < ny; iy++) {
+    for (let ix = 0; ix < nx; ix++) {
+      const vbl = grid[iy * W + ix], vbr = grid[iy * W + ix + 1];
+      const vtr = grid[(iy + 1) * W + ix + 1], vtl = grid[(iy + 1) * W + ix];
+      if (Number.isNaN(vbl) || Number.isNaN(vbr) || Number.isNaN(vtr) || Number.isNaN(vtl)) continue;
+      const c = (vbl >= level ? 1 : 0) | (vbr >= level ? 2 : 0) | (vtr >= level ? 4 : 0) | (vtl >= level ? 8 : 0);
+      if (c === 0 || c === 15) continue;
+      const x0 = minX + ix * dx, y0 = minY + iy * dy;
+      const bx2 = edge(vbl, vbr, x0, x0 + dx), by2 = y0;
+      const rx = x0 + dx, ry = edge(vbr, vtr, y0, y0 + dy);
+      const tx = edge(vtl, vtr, x0, x0 + dx), ty = y0 + dy;
+      const lx = x0, ly = edge(vbl, vtl, y0, y0 + dy);
+      switch (c) {
+        case 1: case 14: res.push([lx, ly, bx2, by2]); break;
+        case 2: case 13: res.push([bx2, by2, rx, ry]); break;
+        case 3: case 12: res.push([lx, ly, rx, ry]); break;
+        case 4: case 11: res.push([rx, ry, tx, ty]); break;
+        case 6: case 9: res.push([bx2, by2, tx, ty]); break;
+        case 7: case 8: res.push([lx, ly, tx, ty]); break;
+        case 5:
+          if (vbl + vtr < vbr + vtl) { res.push([lx, ly, tx, ty]); res.push([bx2, by2, rx, ry]); }
+          else { res.push([lx, ly, bx2, by2]); res.push([rx, ry, tx, ty]); }
+          break;
+        case 10:
+          if (vbl + vtr >= vbr + vtl) { res.push([lx, ly, tx, ty]); res.push([bx2, by2, rx, ry]); }
+          else { res.push([lx, ly, bx2, by2]); res.push([rx, ry, tx, ty]); }
+          break;
+      }
+    }
+  }
+  return res;
+}
+
+/** 끝점이 맞닿는 선분들을 이어 폴리선으로. */
+function chainSegments(segs: number[][]): { x: number; y: number }[][] {
+  const TOL = 1e-6;
+  const used = new Array<boolean>(segs.length).fill(false);
+  const out: { x: number; y: number }[][] = [];
+  const endMap = new Map<string, number[]>();
+  const key = (x: number, y: number) => `${Math.round(x / TOL)},${Math.round(y / TOL)}`;
+  const add = (k: string, i: number) => { const l = endMap.get(k); if (l) l.push(i); else endMap.set(k, [i]); };
+  for (let i = 0; i < segs.length; i++) { add(key(segs[i][0], segs[i][1]), i); add(key(segs[i][2], segs[i][3]), i); }
+  const pick = (k: string): number => {
+    const cs = endMap.get(k); if (!cs) return -1;
+    for (const ci of cs) if (!used[ci]) return ci;
+    return -1;
+  };
+  for (let s = 0; s < segs.length; s++) {
+    if (used[s]) continue;
+    used[s] = true;
+    const chain = [{ x: segs[s][0], y: segs[s][1] }, { x: segs[s][2], y: segs[s][3] }];
+    for (;;) {
+      const t = chain[chain.length - 1];
+      const nx2 = pick(key(t.x, t.y));
+      if (nx2 < 0) break;
+      used[nx2] = true;
+      const [a, b, c, d] = segs[nx2];
+      chain.push(Math.abs(a - t.x) < TOL && Math.abs(b - t.y) < TOL ? { x: c, y: d } : { x: a, y: b });
+    }
+    for (;;) {
+      const h = chain[0];
+      const nx2 = pick(key(h.x, h.y));
+      if (nx2 < 0) break;
+      used[nx2] = true;
+      const [a, b, c, d] = segs[nx2];
+      chain.unshift(Math.abs(c - h.x) < TOL && Math.abs(d - h.y) < TOL ? { x: a, y: b } : { x: c, y: d });
+    }
+    out.push(chain);
+  }
+  return out;
+}
+
+/** 표고점 → 등고선 폴리선들. interval=간격(m), majorEvery=주곡선 주기. */
+export function generateContours(terrain: TerrainPt[], interval = 1.0, majorEvery = 5): Contour[] {
+  if (terrain.length < 3 || interval <= 0) return [];
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of terrain) {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+  }
+  const span = Math.max(maxX - minX, maxY - minY) || 1;
+  let nx = Math.min(Math.ceil((maxX - minX) / (span / 200)), 500);
+  let ny = Math.min(Math.ceil((maxY - minY) / (span / 200)), 500);
+  nx = Math.max(nx, 10); ny = Math.max(ny, 10);
+  const dx = (maxX - minX) / nx, dy = (maxY - minY) / ny;
+  const maxDist = Math.sqrt(((maxX - minX) * (maxY - minY)) / terrain.length) * 3.0;
+
+  const W = nx + 1;
+  let grid = new Float64Array(W * (ny + 1));
+  for (let iy = 0; iy <= ny; iy++)
+    for (let ix = 0; ix <= nx; ix++)
+      grid[iy * W + ix] = idwZ(minX + ix * dx, minY + iy * dy, terrain, maxDist);
+
+  // 3×3 스무딩 1회
+  const sm = new Float64Array(W * (ny + 1));
+  for (let iy = 0; iy <= ny; iy++)
+    for (let ix = 0; ix <= nx; ix++) {
+      let sum = 0, cnt = 0;
+      for (let ky = -1; ky <= 1; ky++)
+        for (let kx = -1; kx <= 1; kx++) {
+          const gx = ix + kx, gy = iy + ky;
+          if (gx >= 0 && gx <= nx && gy >= 0 && gy <= ny) {
+            const v = grid[gy * W + gx];
+            if (!Number.isNaN(v)) { sum += v; cnt++; }
+          }
+        }
+      sm[iy * W + ix] = cnt > 0 ? sum / cnt : NaN;
+    }
+  grid = sm;
+
+  let gMin = Infinity, gMax = -Infinity;
+  for (let i = 0; i < grid.length; i++) { const v = grid[i]; if (!Number.isNaN(v)) { if (v < gMin) gMin = v; if (v > gMax) gMax = v; } }
+  if (!Number.isFinite(gMin)) return [];
+  const startZ = Math.ceil(gMin / interval) * interval;
+  const endZ = Math.floor(gMax / interval) * interval;
+
+  const out: Contour[] = [];
+  for (let z = startZ; z <= endZ + 1e-9; z += interval) {
+    const major = Math.abs(Math.round(z / interval) % majorEvery) < 1e-6;
+    const chains = chainSegments(contourSegments(grid, W, nx, ny, minX, minY, dx, dy, z));
+    for (const ch of chains) if (ch.length >= 2) out.push({ z: Math.round(z * 1000) / 1000, major, points: ch });
+  }
+  return out;
+}

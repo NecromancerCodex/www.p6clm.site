@@ -12,8 +12,8 @@ import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
 import { EarthworkSection } from "../../../components/earthwork/EarthworkSection";
 import { BoreholeTable } from "../../../components/earthwork/BoreholeTable";
 import {
-  BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, layerVolumes, makeTerrainPreset, parseEarthworkCsv,
-  polygonArea, prepare,
+  BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, generateContours, layerVolumes, makeTerrainPreset,
+  parseEarthworkCsv, polygonArea, prepare,
   type Borehole, type TerrainPt, type PileItem,
 } from "../../../lib/earthwork/model";
 import { loadBoreholes, saveBoreholes } from "../../../lib/api/earthwork";
@@ -59,6 +59,13 @@ export default function EarthworkPage() {
   const [clip, setClip] = useState(true);
   const useClip = clip && clipLocal.length >= 3;
   const vols = useMemo(() => layerVolumes(model, useClip ? clipLocal : undefined), [model, useClip, clipLocal]);
+  // 등고선 생성 (표고점 → 마칭스퀘어). 끄면 미생성(성능).
+  const [showContour, setShowContour] = useState(false);
+  const [contourInterval, setContourInterval] = useState(1);
+  const contours = useMemo(
+    () => (showContour && extra.terrain.length >= 3 ? generateContours(extra.terrain, contourInterval) : []),
+    [showContour, extra.terrain, contourInterval],
+  );
   const [visible, setVisible] = useState<Record<string, boolean>>(
     () => Object.fromEntries(LAYERS.map((L) => [L.key, true])),
   );
@@ -156,6 +163,18 @@ export default function EarthworkPage() {
             대지경계선 내부만 산정 ({fmt(polygonArea(clipLocal))}㎡)
           </label>
         )}
+        {extra.terrain.length >= 3 && (
+          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer" }}>
+            <input type="checkbox" checked={showContour} onChange={(e) => setShowContour(e.target.checked)} />
+            등고선 생성
+            <input
+              type="number" min={0.1} step={0.5} value={contourInterval}
+              onChange={(e) => setContourInterval(Math.max(0.1, Number(e.target.value) || 1))}
+              style={{ width: 52, padding: "2px 4px", fontSize: 12, border: "1px solid #cbd5e1", borderRadius: 4 }}
+            />
+            m 간격{showContour && contours.length > 0 ? ` · ${contours.length}선` : ""}
+          </label>
+        )}
       </div>
 
       {/* 대표 지형 프리셋 (로컬 미리보기 — DB 저장 안 함) */}
@@ -190,6 +209,7 @@ export default function EarthworkPage() {
           terrain={extra.terrain}
           boundary={extra.boundary}
           piles={extra.piles}
+          contours={contours}
         />
       </div>
 
