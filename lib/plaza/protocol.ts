@@ -48,6 +48,7 @@ export type ClientMsg =
   | { t: "omok_start"; vsAI: boolean }
   | { t: "omok_move"; x: number; y: number }
   | { t: "omok_reset" }
+  | { t: "omok_leave" }
   | { t: "omok_sync" }
   | { t: "ping" };
 

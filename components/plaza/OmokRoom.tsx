@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, RotateCcw, Bot, LogIn } from "lucide-react";
+import { X, RotateCcw, Bot, LogIn, LogOut } from "lucide-react";
 
 import type { ClientMsg, ServerMsg } from "../../lib/plaza/protocol";
 import type { Participant } from "./PlazaCanvas";
@@ -175,6 +175,11 @@ export function OmokRoom({
             {seated && st?.status === "done" && (
               <button type="button" className="plaza-game-start" onClick={() => send({ t: "omok_reset" })}>
                 <RotateCcw size={14} /> 한 판 더
+              </button>
+            )}
+            {seated && (
+              <button type="button" className="plaza-omok-leave" onClick={() => send({ t: "omok_leave" })}>
+                <LogOut size={14} /> 나가기
               </button>
             )}
             {!seated && st?.status === "playing" && <span className="plaza-omok-spec">👀 관전 중</span>}
