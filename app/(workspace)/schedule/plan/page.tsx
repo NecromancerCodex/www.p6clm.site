@@ -51,19 +51,31 @@ function validateSlot(slot: string, summary?: { discipline: string; count: numbe
   if (!summary || !summary.length) return null; // 클라 파싱 폴백 등 — 분포 없음 → 검증 생략
   const m: Record<string, number> = {};
   for (const d of summary) m[d.discipline] = d.count;
-  const schedTotal = SCHEDULABLE.reduce((s, k) => s + (m[k] || 0), 0);
-  const temp = m["가설"] || 0;
-  if (schedTotal === 0) return `⚠️ ${slot} 공정 부재가 없습니다 (가설/미상 위주) — 슬롯이 맞나요?`;
+  const schedTotal = SCHEDULABLE.reduce((s, k) => s + (m[k] || 0), 0) + (m["가설"] || 0);
+  if (schedTotal === 0) return `⚠️ ${slot} 공정 부재가 없습니다 — 슬롯이 맞나요?`;
+  // 무PSet 정상 오분류 보정 — 슬롯별 '호환' 공종. 흙막이 기둥→구조, 마감 벽/슬래브→구조, 버팀보/거푸집→가설.
+  // (검증으로 확인: 무PSet 토목/건축은 분류기가 구조로 봄 → 슬롯이 진실이므로 호환으로 처리)
+  const COMPAT: Record<string, string[]> = {
+    토목: ["토목", "구조", "가설"], 구조: ["구조", "가설"], 건축: ["건축", "구조", "가설"],
+    MEP: ["MEP"], 조경: ["조경", "토목"],
+  };
+  // 타입이 확실한 공종(창호/문→건축, 배관/덕트→MEP, 식재→조경) — 오분류 적어 '슬롯 의심'의 강한 신호.
+  const RELIABLE = ["건축", "MEP", "조경"];
+  const compat = COMPAT[slot] ?? [slot];
   const slotN = m[slot] || 0;
-  const share = slotN / schedTotal;
-  if (share >= 0.5) {
-    return temp > schedTotal
-      ? `ℹ️ ${slot} ${slotN.toLocaleString()}개 + 가설 ${temp.toLocaleString()}개(오버레이)`
-      : null; // 슬롯 공종 우세 — 정상
+  // 슬롯과 무관한 '타입 확실' 공종 비율 — 30%+ 면 진짜 잘못된 파일 의심(창호 파일을 토목 슬롯에 등 실수).
+  const badN = RELIABLE.filter((d) => !compat.includes(d)).reduce((s, k) => s + (m[k] || 0), 0);
+  if (badN >= schedTotal * 0.3) {
+    let dom = slot, domN = slotN;
+    for (const k of SCHEDULABLE) if ((m[k] || 0) > domN) { dom = k; domN = m[k] || 0; }
+    return `⚠️ ${dom} 부재가 많습니다 (${slot} 슬롯) — 파일/슬롯을 확인하세요`;
   }
-  let dom = slot, domN = slotN;
-  for (const k of SCHEDULABLE) if ((m[k] || 0) > domN) { dom = k; domN = m[k] || 0; }
-  return `⚠️ 이 파일은 ${dom} 위주입니다 (${slot} ${Math.round(share * 100)}%) — 슬롯이 맞나요?`;
+  // 슬롯 공종이 직접은 적지만 무PSet상 구조/가설로 분류된 경우 — 경고 아닌 안내(슬롯 기준 정상 처리).
+  const compatN = compat.reduce((s, k) => s + (m[k] || 0), 0);
+  if (slotN < compatN * 0.5 && compat.includes("구조")) {
+    return `ℹ️ 무PSet 파일 — 일부가 구조로 분류되나 ${slot} 슬롯 기준으로 처리됩니다`;
+  }
+  return null;
 }
 
 let _ganttLoad: Promise<void> | null = null;
