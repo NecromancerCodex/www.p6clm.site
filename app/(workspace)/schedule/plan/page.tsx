@@ -121,6 +121,7 @@ export default function SchedulePlanWizard() {
   const [towerCranes, setTowerCranes] = useState(2);
   const [workCrews, setWorkCrews] = useState(3);
   const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
+  const [discCrews, setDiscCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 공종별 작업조(슬롯 밑)
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [formwork, setFormwork] = useState(""); // 거푸집 시스템(골조 기준층 사이클) — 비우면 LLM 기준(재래식급)
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
@@ -317,6 +318,7 @@ export default function SchedulePlanWizard() {
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
+        discipline_crews: discCrews,
         utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
         seasonal_weather: seasonal,
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
@@ -458,7 +460,7 @@ export default function SchedulePlanWizard() {
             <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px" }}>
               넣은 공종만 공정표에 반영됩니다 (예: 구조만 → 구조 공정표 / 토목+구조 → 합쳐서 1개). 시공 순서대로 자동 연결.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, alignItems: "start" }}>
               {DISCIPLINES.map((d, i) => {
                 const filled = slots[d.key];
                 if (!d.active) {
@@ -471,26 +473,55 @@ export default function SchedulePlanWizard() {
                     </div>
                   );
                 }
+                const pr: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#475569", gap: 6 };
+                const isStruct = d.key === "구조" || d.key === "종합";  // 종합=구조 자원 공유(골조 지배)
                 return (
-                  <label key={d.key} title={`${d.label} IFC 업로드 — ${d.hint}`}
-                    style={{ border: `1px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 8, padding: "10px 12px",
-                             background: filled ? "#f0fdf4" : "#eff6ff", cursor: bimBusy ? "wait" : "pointer", display: "block" }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: filled ? "#15803d" : "#1d4ed8" }}>
-                      {filled ? "✓" : `${i + 1}.`} {d.icon} {d.label}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {filled ? (filled.count ? `${filled.count.toLocaleString()}부재 → ${filled.wp} WP` : `${filled.name} · 생성 시 분석`) : `업로드 · ${d.hint}`}
-                      {filled?.ai ? <span style={{ color: "#7c3aed" }}> · 🤖 AI추정 {filled.ai.toLocaleString()}</span> : null}
-                    </div>
-                    {filled?.warn && (
-                      <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.3, whiteSpace: "normal",
-                                    color: filled.warn.startsWith("⚠️") ? "#b91c1c" : "#0369a1" }}>
-                        {filled.warn}
+                  <div key={d.key} style={{ border: `1px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 8, padding: "10px 12px", background: filled ? "#f0fdf4" : "#eff6ff" }}>
+                    <label title={`${d.label} IFC 업로드 — ${d.hint}`} style={{ display: "block", cursor: bimBusy ? "wait" : "pointer" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: filled ? "#15803d" : "#1d4ed8" }}>
+                        {filled ? "✓" : `${i + 1}.`} {d.icon} {d.label}
                       </div>
-                    )}
-                    <input type="file" accept=".ifc" style={{ display: "none" }} disabled={bimBusy}
-                           onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f, d.key); }} />
-                  </label>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {filled ? (filled.count ? `${filled.count.toLocaleString()}부재 → ${filled.wp} WP` : `${filled.name} · 생성 시 분석`) : `업로드 · ${d.hint}`}
+                        {filled?.ai ? <span style={{ color: "#7c3aed" }}> · 🤖 AI추정 {filled.ai.toLocaleString()}</span> : null}
+                      </div>
+                      {filled?.warn && (
+                        <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.3, whiteSpace: "normal", color: filled.warn.startsWith("⚠️") ? "#b91c1c" : "#0369a1" }}>
+                          {filled.warn}
+                        </div>
+                      )}
+                      <input type="file" accept=".ifc" style={{ display: "none" }} disabled={bimBusy}
+                             onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f, d.key); }} />
+                    </label>
+                    {/* 공종별 파라미터 — 슬롯 밑(보기 편하게). 공통값은 ③④ 그대로. */}
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #cbd5e1", display: "flex", flexDirection: "column", gap: 4 }}>
+                      {d.key === "토목" && (
+                        <label style={pr} title="굴착기·CIP장비 등 토목 투입조 — 기간 = 물량 ÷ (생산성 × 투입조)">투입조
+                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} /></label>
+                      )}
+                      {isStruct && (<>
+                        <label style={pr} title="구조 동시 동일공종 작업조">작업조
+                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
+                        <label style={pr} title="양중(모듈/PC설치) 동시 한계">크레인
+                          <input type="number" min={0} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
+                        <label style={pr} title="거푸집 시스템 — 기준층 사이클(재래식 10~12일↔알폼 4~7일/층)">거푸집
+                          <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
+                            <option value="">자동</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option><option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
+                          </select></label>
+                        <label style={pr} title="조강콘크리트 — 양생 ×3/7 단축">조강
+                          <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} /></label>
+                        <label style={pr} title="구조유형 — 공정 순서 좌우(RC/철골/모듈러)">구조유형
+                          <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={structureType} onChange={(e) => setStructureType(e.target.value)}>
+                            <option value="">자동</option><option value="RC">RC</option><option value="철골">철골</option><option value="SRC">SRC</option><option value="PC·모듈러">PC·모듈러</option><option value="혼합">혼합</option>
+                          </select></label>
+                      </>)}
+                      {(d.key === "건축" || d.key === "MEP" || d.key === "조경") && (
+                        <label style={pr} title={`${d.label} 작업조 — 많을수록 ${d.label} 기간 단축`}>작업조
+                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }}
+                                 value={discCrews[d.key] ?? 3} onChange={(e) => setDiscCrews((c) => ({ ...c, [d.key]: Number(e.target.value) }))} /></label>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -508,53 +539,16 @@ export default function SchedulePlanWizard() {
               <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="비워두면 AI 가 추천 (예: 모듈러 공동주택)" />
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
             </Field>
-            <Field label={multiDisc ? "② 공종별 파라미터 — 복수 공종 병합" : "② 공종 / 구조유형 / 시공 전략 — 자동 판정 후 직접 수정 가능"}>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                {/* 복수 공종이면 슬롯이 공종을 정함 → 단일 드롭다운 숨김(혼동 방지). 단일/레거시면 드롭다운. */}
-                {multiDisc ? (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#15803d", padding: "6px 0" }}>
-                    🔗 {filledDiscs.join(" + ")} — 공종별로 따로 생성 후 병합
-                  </span>
-                ) : (
-                  <select className="wz-in" value={discipline} onChange={(e) => setDiscipline(e.target.value)}
-                          title="BIM 공종 자동 판정 — 틀리면 직접 선택">
-                    <option value="">공종: 자동 판정</option>
-                    <option value="토목">토목</option>
-                    <option value="구조">구조</option>
-                    <option value="건축">건축</option>
-                    <option value="MEP">MEP (기계·소방·전기·통신)</option>
-                    <option value="조경">조경</option>
-                  </select>
-                )}
-                {/* 구조유형 — 구조 슬롯이 있으면(또는 단일 구조/자동) 표시. 토목 last 라도 안 가려짐. */}
-                {hasStruct && (
-                  <label className="wz-sub" style={{ display: "flex", flexDirection: "column", fontSize: 11, color: "#475569" }}>
-                    {multiDisc ? "구조유형" : ""}
-                    <select className="wz-in" value={structureType} onChange={(e) => setStructureType(e.target.value)}>
-                      <option value="">구조: 자동 판정</option>
-                      <option value="RC">RC (철근콘크리트)</option>
-                      <option value="철골">철골</option>
-                      <option value="SRC">SRC</option>
-                      <option value="PC·모듈러">PC·모듈러</option>
-                      <option value="혼합">혼합 (RC코어 + 철골)</option>
-                    </select>
-                  </label>
-                )}
-                <label className="wz-sub" style={{ display: "flex", flexDirection: "column", fontSize: 11, color: "#475569" }}>
-                  {multiDisc ? "시공 전략(굴착·골조)" : ""}
-                  <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
-                          title="굴착·골조 전략 — 발주·부지 조건(AI 추정 불가)">
-                    <option value="bottom_up">순타·일괄 (전 구역 지하 → 지상)</option>
-                    <option value="bottom_up_phased">순타·단계 (구역별 지하→지상 연속)</option>
-                    <option value="top_down">역타 (지하·지상 병행)</option>
-                  </select>
-                </label>
-              </div>
-              {multiDisc && (
-                <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
-                  착공일·목표공기·주N일·현장조건은 공통, 구조유형은 구조에만·투입조는 각 공종에 적용됩니다.
-                </p>
-              )}
+            <Field label="② 시공 전략 — 굴착·골조 순서 (발주·부지 조건)">
+              <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
+                      title="굴착·골조 전략 — 발주·부지 조건(AI 추정 불가)">
+                <option value="bottom_up">순타·일괄 (전 구역 지하 → 지상)</option>
+                <option value="bottom_up_phased">순타·단계 (구역별 지하→지상 연속)</option>
+                <option value="top_down">역타 (지하·지상 병행)</option>
+              </select>
+              <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
+                ⓘ 공종은 업로드한 <b>슬롯이 결정</b>(자동판정 불요) · 작업조·크레인·거푸집·구조유형 등 공종별 입력은 <b>각 슬롯 밑</b>에 있습니다.
+              </p>
             </Field>
             <Field label="③ 언제 — 착공일 * / 목표공기">
               <div style={{ display: "flex", gap: 8 }}>
@@ -579,43 +573,16 @@ export default function SchedulePlanWizard() {
                 ⓘ 공휴일(설·추석·법정공휴일)은 자동 제외 · 가동률로 장비·재작업 손실, 계절옵션으로 동절기·우기 반영 → 현실 준공일
               </p>
             </Field>
-            <Field label="④ 자원 — 공종별 투입">
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {(hasStruct || noSlots) && (
-                  <>
-                    <label className="wz-sub" title="구조 양중(모듈/PC설치) 동시 한계">{multiDisc ? "구조 크레인(대)" : "크레인(대)"}
-                      <input type="number" min={0} className="wz-in" value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
-                    <label className="wz-sub" title="구조 동시 동일공종 작업조">{multiDisc ? "구조 작업조(조)" : "작업조(조)"}
-                      <input type="number" min={1} className="wz-in" value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
-                    <label className="wz-sub" title="거푸집 시스템 — 골조 기준층 사이클 결정. 재래식 10~12일/층 ↔ 알폼·시스템폼 4~7일/층. 비우면 LLM 기준(재래식급)">거푸집 시스템
-                      <select className="wz-in" style={{ width: 116 }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
-                        <option value="">자동(기준)</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option>
-                        <option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
-                      </select></label>
-                    <label className="wz-sub" title="조강(조강시멘트) 콘크리트 — 양생기간 약 57% 단축(×3/7). 동절기·급속 사이클에 사용" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} />조강콘크리트</label>
-                  </>
-                )}
-                {hasCivil && (
-                  <label className="wz-sub" title="굴착기·CIP장비 등 토목 투입 장비조 수 — 토목 기간 = 물량 ÷ (표준품셈 생산성 × 투입조)">토목 투입조(대)
-                    <input type="number" min={1} className="wz-in" value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} /></label>
-                )}
-              </div>
-              {(hasStruct || noSlots) && formwork && (
-                <p style={{ fontSize: 11, color: "#0369a1", margin: "6px 0 0" }}>
-                  🏗️ 거푸집 <b>{formwork}</b>{rapidConcrete ? " + 조강콘크리트" : ""} → 골조 기준층 사이클 자동 반영
-                  {formwork === "알폼" || formwork === "시스템폼" ? " (재래식 대비 사이클 약 절반)" : ""}
-                </p>
-              )}
-              {slots["토목"] && civilQty && (
-                <p style={{ fontSize: 11, color: "#0369a1", margin: "6px 0 0" }}>
-                  🏗️ 토목 물량(BIM 도출): 굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
+            {slots["토목"] && civilQty && (
+              <Field label="④ 토목 물량 (BIM 자동 도출)">
+                <p style={{ fontSize: 11, color: "#0369a1", margin: 0 }}>
+                  🏗️ 굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
                   · 굴착체적 ≈ {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥
                   · 흙막이 {(civilQty.pile_count ?? 0).toLocaleString()}공/둘레 {civilQty.perimeter_m}m
-                  <br />→ 투입조 {civilEquip}대 기준으로 토목 기간 자동 산정 (생성 후 활동별 수정 가능)
+                  <br />→ 토목 슬롯의 <b>투입조 {civilEquip}대</b> 기준으로 단계 굴착 기간 자동 산정
                 </p>
-              )}
-            </Field>
+              </Field>
+            )}
             <Field label="⑤ 현장 조건·제약 — BIM에 없는 정보를 알려주세요 (AI가 공정에 반영)">
               <input className="wz-in" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한, 암반 굴착, 도심 반입 제한" />
               <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>

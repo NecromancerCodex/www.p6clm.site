@@ -377,6 +377,7 @@ export interface GenerateScheduleRequest {
   tower_cranes: number;        // 타워크레인 수 — 동시 양중 한계(스태거)
   work_crews: number;          // 작업조 수 — 동시 동일공종 한계
   civil_equipment?: number;    // 토목 투입조(굴착기·CIP장비 대수) — 토목 기간 = 물량 ÷ (생산성 × 투입조)
+  discipline_crews?: Record<string, number>; // 공종별 작업조 {건축, MEP, 조경} — 슬롯 밑 입력, 해당 공종 기간 단축
   civil_quantities?: { depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number }; // 토목 물량(서버 도출)
   utilization_rate?: number;   // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   formwork_system?: string;    // 거푸집 시스템(재래식/유로폼/갱폼/알폼/시스템폼) — 골조 기준층 사이클 결정
