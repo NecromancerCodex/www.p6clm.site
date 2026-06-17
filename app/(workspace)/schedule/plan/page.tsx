@@ -121,6 +121,8 @@ export default function SchedulePlanWizard() {
   const [workCrews, setWorkCrews] = useState(3);
   const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
+  const [formwork, setFormwork] = useState(""); // 거푸집 시스템(골조 기준층 사이클) — 비우면 LLM 기준(재래식급)
+  const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
   const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
   const [constraints, setConstraints] = useState("");
   const [strategy, setStrategy] = useState("bottom_up");
@@ -295,7 +297,8 @@ export default function SchedulePlanWizard() {
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
-        utilization_rate: util, constraints: constraints.trim() || undefined, strategy,
+        utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
+        constraints: constraints.trim() || undefined, strategy,
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
@@ -556,6 +559,13 @@ export default function SchedulePlanWizard() {
                       <input type="number" min={0} className="wz-in" value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
                     <label className="wz-sub" title="구조 동시 동일공종 작업조">{multiDisc ? "구조 작업조(조)" : "작업조(조)"}
                       <input type="number" min={1} className="wz-in" value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
+                    <label className="wz-sub" title="거푸집 시스템 — 골조 기준층 사이클 결정. 재래식 10~12일/층 ↔ 알폼·시스템폼 4~7일/층. 비우면 LLM 기준(재래식급)">거푸집 시스템
+                      <select className="wz-in" style={{ width: 116 }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
+                        <option value="">자동(기준)</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option>
+                        <option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
+                      </select></label>
+                    <label className="wz-sub" title="조강(조강시멘트) 콘크리트 — 양생기간 약 57% 단축(×3/7). 동절기·급속 사이클에 사용" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} />조강콘크리트</label>
                   </>
                 )}
                 {hasCivil && (
@@ -563,6 +573,12 @@ export default function SchedulePlanWizard() {
                     <input type="number" min={1} className="wz-in" value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} /></label>
                 )}
               </div>
+              {(hasStruct || noSlots) && formwork && (
+                <p style={{ fontSize: 11, color: "#0369a1", margin: "6px 0 0" }}>
+                  🏗️ 거푸집 <b>{formwork}</b>{rapidConcrete ? " + 조강콘크리트" : ""} → 골조 기준층 사이클 자동 반영
+                  {formwork === "알폼" || formwork === "시스템폼" ? " (재래식 대비 사이클 약 절반)" : ""}
+                </p>
+              )}
               {slots["토목"] && civilQty && (
                 <p style={{ fontSize: 11, color: "#0369a1", margin: "6px 0 0" }}>
                   🏗️ 토목 물량(BIM 도출): 굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
@@ -808,17 +824,27 @@ export default function SchedulePlanWizard() {
           {stage === "scheduled" && (
             <div style={{ border: "1px solid #e2e8f0", background: "#f8fafc", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#475569", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ flex: 1 }}>
-                📅 공기가 비현실적이면 <b>가동률</b>을 조정하세요 — 공기 = 공수 ÷ 가동률(우천·장비손실 반영). 공휴일은 항상 자동 제외.
+                📅 공기가 비현실적이면 <b>가동률·거푸집 시스템</b>을 조정하세요 — 공기=공수÷가동률(우천·장비손실), 골조는 거푸집 사이클이 좌우. 공휴일 항상 자동 제외.
               </span>
               <label style={{ display: "flex", alignItems: "center", gap: 4 }}>가동률
-                <select className="wz-in" style={{ width: 92 }} value={util} onChange={(e) => setUtil(Number(e.target.value))}>
+                <select className="wz-in" style={{ width: 88 }} value={util} onChange={(e) => setUtil(Number(e.target.value))}>
                   <option value={1.0}>100%</option><option value={0.9}>90%</option>
                   <option value={0.85}>85%</option><option value={0.8}>80%</option><option value={0.7}>70%</option>
                 </select>
               </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>거푸집
+                <select className="wz-in" style={{ width: 104 }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
+                  <option value="">자동</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option>
+                  <option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
+                </select>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} />조강
+              </label>
               <button className="wz-btn" disabled={busy} onClick={() => {
                 setBusy(true);
-                void confirmPlan(planId!, { utilization_rate: util }).then(() => refresh(planId!)).finally(() => setBusy(false));
+                void confirmPlan(planId!, { utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete })
+                  .then(() => refresh(planId!)).finally(() => setBusy(false));
               }}>공기 재계산</button>
             </div>
           )}
