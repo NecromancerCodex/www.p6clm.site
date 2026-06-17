@@ -381,6 +381,7 @@ export interface GenerateScheduleRequest {
   utilization_rate?: number;   // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   formwork_system?: string;    // 거푸집 시스템(재래식/유로폼/갱폼/알폼/시스템폼) — 골조 기준층 사이클 결정
   rapid_concrete?: boolean;    // 조강콘크리트 사용 — 양생기간 단축(×3/7)
+  seasonal_weather?: boolean;  // 계절 비작업일 자동 반영 — 동절기(12·1·2월)·우기(7·8월). 가동률과 별개 축
   milestones?: GenMilestone[]; // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 외부 게이트
   constraints?: string;
   strategy?: string;   // bottom_up(순타)|top_down(역타) — BIM에 없는 발주·부지 조건(사람 선택)
@@ -556,7 +557,7 @@ export async function savePlanActivities(planId: string, activities: PlanActivit
 }
 
 /** 현 단계 컨펌 → 다음 단계. crane/crew 주면 그 자원으로 재스케줄(목표공기 역산 제안 적용) */
-export async function confirmPlan(planId: string, res?: { crane?: number; crew?: number; civil_equipment?: number; utilization_rate?: number; formwork_system?: string; rapid_concrete?: boolean; milestones?: GenMilestone[] }): Promise<{ stage: PlanStage }> {
+export async function confirmPlan(planId: string, res?: { crane?: number; crew?: number; civil_equipment?: number; utilization_rate?: number; formwork_system?: string; rapid_concrete?: boolean; seasonal_weather?: boolean; milestones?: GenMilestone[] }): Promise<{ stage: PlanStage }> {
   return planFetch(`/${planId}/confirm`, { method: "POST", body: JSON.stringify(res ?? {}) });
 }
 

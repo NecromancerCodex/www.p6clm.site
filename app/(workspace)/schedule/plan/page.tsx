@@ -123,6 +123,7 @@ export default function SchedulePlanWizard() {
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [formwork, setFormwork] = useState(""); // 거푸집 시스템(골조 기준층 사이클) — 비우면 LLM 기준(재래식급)
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
+  const [seasonal, setSeasonal] = useState(false); // 계절 비작업일(동절기·우기) — 가동률과 별개 축
   const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
   const [constraints, setConstraints] = useState("");
   const [milestones, setMilestones] = useState<GenMilestone[]>([]); // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 게이트
@@ -299,6 +300,7 @@ export default function SchedulePlanWizard() {
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
+        seasonal_weather: seasonal,
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
         constraints: constraints.trim() || undefined, strategy,
       });
@@ -549,8 +551,13 @@ export default function SchedulePlanWizard() {
                     <option value={0.85}>85%</option><option value={0.8}>80%</option><option value={0.7}>70%</option>
                   </select></label>
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", margin: "6px 0 0" }}
+                     title="동절기(12·1·2월 폭설·혹한)·우기(7·8월 장마) 기상 중단일을 달력에서 자동 제외. 가동률(장비·재작업 손실)과 별개 축이라 중복계산 없음">
+                <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
+                계절 비작업일 자동 반영 (동절기·우기 기상 중단)
+              </label>
               <p style={{ fontSize: 11, color: "#64748b", margin: "4px 0 0" }}>
-                ⓘ 공휴일(설·추석·법정공휴일)은 자동 제외 · 가동률로 우천·장비손실 반영 → 현실 준공일
+                ⓘ 공휴일(설·추석·법정공휴일)은 자동 제외 · 가동률로 장비·재작업 손실, 계절옵션으로 동절기·우기 반영 → 현실 준공일
               </p>
             </Field>
             <Field label="④ 자원 — 공종별 투입">
@@ -885,10 +892,13 @@ export default function SchedulePlanWizard() {
               <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} />조강
               </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }} title="동절기·우기 기상 중단일 자동 반영">
+                <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />계절
+              </label>
               <button className="wz-btn" disabled={busy} onClick={() => {
                 setBusy(true);
                 void confirmPlan(planId!, { utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
-                                            milestones: milestones.filter((m) => m.name.trim() && m.target_date) })
+                                            seasonal_weather: seasonal, milestones: milestones.filter((m) => m.name.trim() && m.target_date) })
                   .then(() => refresh(planId!)).finally(() => setBusy(false));
               }}>공기 재계산</button>
             </div>
