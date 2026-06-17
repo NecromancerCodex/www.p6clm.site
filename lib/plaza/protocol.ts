@@ -44,7 +44,7 @@ export type ClientMsg =
   | { t: "board_open" }
   | { t: "game_start"; difficulty: string }
   | { t: "wheel_spin" }
-  | { t: "omok_join" }
+  | { t: "omok_join"; color: number }
   | { t: "omok_start"; vsAI: boolean }
   | { t: "omok_move"; x: number; y: number }
   | { t: "omok_reset" }

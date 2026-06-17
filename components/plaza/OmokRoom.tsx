@@ -153,9 +153,16 @@ export function OmokRoom({
 
           <div className="plaza-omok-controls">
             {!seated && st?.status !== "playing" && (
-              <button type="button" className="plaza-game-start" onClick={() => send({ t: "omok_join" })}>
-                <LogIn size={14} /> 참가
-              </button>
+              <>
+                <button type="button" className="plaza-game-start"
+                  disabled={st?.black != null} onClick={() => send({ t: "omok_join", color: 1 })}>
+                  <LogIn size={14} /> 흑으로 참가
+                </button>
+                <button type="button" className="plaza-omok-joinw"
+                  disabled={st?.white != null} onClick={() => send({ t: "omok_join", color: 2 })}>
+                  <LogIn size={14} /> 백으로 참가
+                </button>
+              </>
             )}
             {seated && st?.status === "waiting" && (
               <>
