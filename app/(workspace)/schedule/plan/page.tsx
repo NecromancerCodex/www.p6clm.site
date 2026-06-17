@@ -120,6 +120,7 @@ export default function SchedulePlanWizard() {
   const [towerCranes, setTowerCranes] = useState(2);
   const [workCrews, setWorkCrews] = useState(3);
   const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
+  const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
   const [constraints, setConstraints] = useState("");
   const [strategy, setStrategy] = useState("bottom_up");
@@ -294,7 +295,7 @@ export default function SchedulePlanWizard() {
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
-        constraints: constraints.trim() || undefined, strategy,
+        utilization_rate: util, constraints: constraints.trim() || undefined, strategy,
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
@@ -537,7 +538,15 @@ export default function SchedulePlanWizard() {
                 <select className="wz-in" style={{ width: 100 }} value={wdpw} onChange={(e) => setWdpw(Number(e.target.value))}>
                   <option value={5}>주5일</option><option value={6}>주6일</option><option value={7}>주7일</option>
                 </select>
+                <label className="wz-sub" title="가동률 — 실작업 효율(장비고장·경미우천·재작업 손실). 공기=공수÷가동률. 공휴일(설·추석 등)은 자동 제외">가동률
+                  <select className="wz-in" style={{ width: 92 }} value={util} onChange={(e) => setUtil(Number(e.target.value))}>
+                    <option value={1.0}>100%</option><option value={0.9}>90%</option>
+                    <option value={0.85}>85%</option><option value={0.8}>80%</option><option value={0.7}>70%</option>
+                  </select></label>
               </div>
+              <p style={{ fontSize: 11, color: "#64748b", margin: "4px 0 0" }}>
+                ⓘ 공휴일(설·추석·법정공휴일)은 자동 제외 · 가동률로 우천·장비손실 반영 → 현실 준공일
+              </p>
             </Field>
             <Field label="④ 자원 — 공종별 투입">
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -794,6 +803,23 @@ export default function SchedulePlanWizard() {
                 setBusy(true);
                 void confirmPlan(planId!, { civil_equipment: civilEquip }).then(() => refresh(planId!)).finally(() => setBusy(false));
               }}>토목 기간 재계산</button>
+            </div>
+          )}
+          {stage === "scheduled" && (
+            <div style={{ border: "1px solid #e2e8f0", background: "#f8fafc", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#475569", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ flex: 1 }}>
+                📅 공기가 비현실적이면 <b>가동률</b>을 조정하세요 — 공기 = 공수 ÷ 가동률(우천·장비손실 반영). 공휴일은 항상 자동 제외.
+              </span>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>가동률
+                <select className="wz-in" style={{ width: 92 }} value={util} onChange={(e) => setUtil(Number(e.target.value))}>
+                  <option value={1.0}>100%</option><option value={0.9}>90%</option>
+                  <option value={0.85}>85%</option><option value={0.8}>80%</option><option value={0.7}>70%</option>
+                </select>
+              </label>
+              <button className="wz-btn" disabled={busy} onClick={() => {
+                setBusy(true);
+                void confirmPlan(planId!, { utilization_rate: util }).then(() => refresh(planId!)).finally(() => setBusy(false));
+              }}>공기 재계산</button>
             </div>
           )}
           {ganttReady && ganttTasks.length > 0 ? (

@@ -372,6 +372,7 @@ export interface GenerateScheduleRequest {
   work_crews: number;          // 작업조 수 — 동시 동일공종 한계
   civil_equipment?: number;    // 토목 투입조(굴착기·CIP장비 대수) — 토목 기간 = 물량 ÷ (생산성 × 투입조)
   civil_quantities?: { depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number }; // 토목 물량(서버 도출)
+  utilization_rate?: number;   // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   constraints?: string;
   strategy?: string;   // bottom_up(순타)|top_down(역타) — BIM에 없는 발주·부지 조건(사람 선택)
 }
@@ -546,7 +547,7 @@ export async function savePlanActivities(planId: string, activities: PlanActivit
 }
 
 /** 현 단계 컨펌 → 다음 단계. crane/crew 주면 그 자원으로 재스케줄(목표공기 역산 제안 적용) */
-export async function confirmPlan(planId: string, res?: { crane?: number; crew?: number; civil_equipment?: number }): Promise<{ stage: PlanStage }> {
+export async function confirmPlan(planId: string, res?: { crane?: number; crew?: number; civil_equipment?: number; utilization_rate?: number }): Promise<{ stage: PlanStage }> {
   return planFetch(`/${planId}/confirm`, { method: "POST", body: JSON.stringify(res ?? {}) });
 }
 
