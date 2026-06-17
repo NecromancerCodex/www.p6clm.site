@@ -15,7 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, planP6XmlUrl, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError,
-  type GanttTask, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
+  type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
 import { savePlanIfcs } from "../../../../lib/fourd/fileCache";
@@ -125,6 +125,7 @@ export default function SchedulePlanWizard() {
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
   const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
   const [constraints, setConstraints] = useState("");
+  const [milestones, setMilestones] = useState<GenMilestone[]>([]); // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 게이트
   const [strategy, setStrategy] = useState("bottom_up");
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
@@ -298,6 +299,7 @@ export default function SchedulePlanWizard() {
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
+        milestones: milestones.filter((m) => m.name.trim() && m.target_date),
         constraints: constraints.trim() || undefined, strategy,
       });
       setScopeWbs(r.scope);
@@ -599,6 +601,48 @@ export default function SchedulePlanWizard() {
                 ))}
               </div>
             </Field>
+            <Field label="⑥ 외부 마일스톤 — BIM에 없는 인허가 게이트·장납기 자재·계약일 (선택)">
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
+                {([
+                  { name: "착공신고", gates: "전체", kind: "permit" },
+                  { name: "굴토심의 통과", gates: "토목", kind: "permit" },
+                  { name: "지하안전영향평가", gates: "토목", kind: "permit" },
+                  { name: "철골 현장반입", gates: "구조", kind: "material" },
+                  { name: "사용승인(준공)", gates: "전체", kind: "permit" },
+                ] as const).map((p) => (
+                  <button key={p.name} type="button" className="wz-chip"
+                          onClick={() => setMilestones((ms) => ms.some((m) => m.name === p.name) ? ms
+                            : [...ms, { name: p.name, target_date: "", gates: p.gates, kind: p.kind }])}>
+                    + {p.name}
+                  </button>
+                ))}
+              </div>
+              {milestones.map((m, i) => (
+                <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <select className="wz-in" style={{ width: 92 }} value={m.kind}
+                          onChange={(e) => setMilestones((ms) => ms.map((x, j) => j === i ? { ...x, kind: e.target.value } : x))}>
+                    <option value="permit">인허가</option><option value="material">자재반입</option><option value="contract">계약</option>
+                  </select>
+                  <input className="wz-in" style={{ flex: 1, minWidth: 160 }} value={m.name} placeholder="마일스톤명 (예: 수배전반 현장반입)"
+                         onChange={(e) => setMilestones((ms) => ms.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+                  <input type="date" className="wz-in" style={{ width: 150 }} value={m.target_date}
+                         onChange={(e) => setMilestones((ms) => ms.map((x, j) => j === i ? { ...x, target_date: e.target.value } : x))} />
+                  <select className="wz-in" style={{ width: 92 }} value={m.gates} title="이 날짜 이후 착수 가능한 대상 공종"
+                          onChange={(e) => setMilestones((ms) => ms.map((x, j) => j === i ? { ...x, gates: e.target.value } : x))}>
+                    <option value="전체">전체</option><option value="토목">토목</option><option value="구조">구조</option>
+                    <option value="건축">건축</option><option value="MEP">MEP</option><option value="조경">조경</option>
+                  </select>
+                  <button type="button" className="wz-chip" onClick={() => setMilestones((ms) => ms.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+              <button type="button" className="wz-chip"
+                      onClick={() => setMilestones((ms) => [...ms, { name: "", target_date: "", gates: "전체", kind: "permit" }])}>
+                + 직접 추가
+              </button>
+              <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
+                ⓘ 게이트 공종은 해당 날짜 이후에만 착수합니다 (예: 굴토심의 통과일 이전엔 토목 굴착 불가). 장납기 자재(수배전반 12~18개월·철골 9~12개월·엘리베이터·커튼월)는 <b>현장반입일</b>로 입력하세요.
+              </p>
+            </Field>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end", gap: 10 }}>
               {Object.keys(slots).length > 0 && (
                 <span style={{ fontSize: 12, color: "#475569" }}>
@@ -843,7 +887,8 @@ export default function SchedulePlanWizard() {
               </label>
               <button className="wz-btn" disabled={busy} onClick={() => {
                 setBusy(true);
-                void confirmPlan(planId!, { utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete })
+                void confirmPlan(planId!, { utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
+                                            milestones: milestones.filter((m) => m.name.trim() && m.target_date) })
                   .then(() => refresh(planId!)).finally(() => setBusy(false));
               }}>공기 재계산</button>
             </div>

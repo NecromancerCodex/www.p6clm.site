@@ -355,6 +355,12 @@ export interface GenWorkUnit {
   area_m2?: number; // 정량물량 면적 ㎡ (거푸집)
   discipline?: string; // 공종(토목/구조/건축/MEP/조경/가설) — 멀티파싱 병합 분리용
 }
+export interface GenMilestone {
+  name: string;          // 마일스톤명 (예: 굴토심의 통과, 철골 현장반입, 사용승인)
+  target_date: string;   // YYYY-MM-DD — 이 날짜 이후 게이트 공종 착수 가능
+  gates: string;         // 전체|토목|구조|건축|MEP|조경
+  kind: string;          // permit(인허가)|material(자재반입)|contract(계약)
+}
 export interface GenerateScheduleRequest {
   building_type: string;
   scope?: string;
@@ -375,6 +381,7 @@ export interface GenerateScheduleRequest {
   utilization_rate?: number;   // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   formwork_system?: string;    // 거푸집 시스템(재래식/유로폼/갱폼/알폼/시스템폼) — 골조 기준층 사이클 결정
   rapid_concrete?: boolean;    // 조강콘크리트 사용 — 양생기간 단축(×3/7)
+  milestones?: GenMilestone[]; // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 외부 게이트
   constraints?: string;
   strategy?: string;   // bottom_up(순타)|top_down(역타) — BIM에 없는 발주·부지 조건(사람 선택)
 }
@@ -549,7 +556,7 @@ export async function savePlanActivities(planId: string, activities: PlanActivit
 }
 
 /** 현 단계 컨펌 → 다음 단계. crane/crew 주면 그 자원으로 재스케줄(목표공기 역산 제안 적용) */
-export async function confirmPlan(planId: string, res?: { crane?: number; crew?: number; civil_equipment?: number; utilization_rate?: number; formwork_system?: string; rapid_concrete?: boolean }): Promise<{ stage: PlanStage }> {
+export async function confirmPlan(planId: string, res?: { crane?: number; crew?: number; civil_equipment?: number; utilization_rate?: number; formwork_system?: string; rapid_concrete?: boolean; milestones?: GenMilestone[] }): Promise<{ stage: PlanStage }> {
   return planFetch(`/${planId}/confirm`, { method: "POST", body: JSON.stringify(res ?? {}) });
 }
 
