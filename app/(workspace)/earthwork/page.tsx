@@ -62,9 +62,14 @@ export default function EarthworkPage() {
   // 등고선 생성 (표고점 → 마칭스퀘어). 끄면 미생성(성능).
   const [showContour, setShowContour] = useState(false);
   const [contourInterval, setContourInterval] = useState(1);
+  // ##TERRAIN 있으면 그걸로, 없으면 시추공 지표고로 등고선 생성.
+  const terrainForContour = useMemo(
+    () => (extra.terrain.length >= 3 ? extra.terrain : boreholes.map((b) => ({ x: b.x, y: b.y, z: b.el }))),
+    [extra.terrain, boreholes],
+  );
   const contours = useMemo(
-    () => (showContour && extra.terrain.length >= 3 ? generateContours(extra.terrain, contourInterval) : []),
-    [showContour, extra.terrain, contourInterval],
+    () => (showContour && terrainForContour.length >= 3 ? generateContours(terrainForContour, contourInterval) : []),
+    [showContour, terrainForContour, contourInterval],
   );
   const [visible, setVisible] = useState<Record<string, boolean>>(
     () => Object.fromEntries(LAYERS.map((L) => [L.key, true])),
@@ -200,8 +205,11 @@ export default function EarthworkPage() {
               경계 내부만 ({fmt(polygonArea(clipLocal))}㎡)
             </label>
           )}
-          {extra.terrain.length >= 3 && (
-            <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer" }}>
+          {terrainForContour.length >= 3 && (
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer" }}
+              title={extra.terrain.length >= 3 ? "지형 표고점 기반" : "지형 데이터 없음 → 시추공 지표고 기반(평탄하면 간격 0.1m)"}
+            >
               <input type="checkbox" checked={showContour} onChange={(e) => setShowContour(e.target.checked)} />
               등고선
               <input
@@ -209,7 +217,7 @@ export default function EarthworkPage() {
                 onChange={(e) => setContourInterval(Math.max(0.1, Number(e.target.value) || 1))}
                 style={{ width: 50, padding: "2px 5px", fontSize: 12, border: "1px solid #d8dee8", borderRadius: 6 }}
               />
-              m{showContour && contours.length > 0 ? ` · ${contours.length}선` : ""}
+              m{showContour ? ` · ${contours.length}선` : ""}
             </label>
           )}
         </div>
@@ -229,7 +237,7 @@ export default function EarthworkPage() {
             }}
             title="시추공 공번 라벨 표시/숨김"
           >
-            공번 {showLabels ? "ON" : "OFF"}
+            🏷 시추공 라벨 {showLabels ? "ON" : "OFF"}
           </button>
           <span style={{ width: 1, height: 16, background: "#e2e8f0", margin: "0 2px" }} />
           <Layers size={14} strokeWidth={1.8} style={{ color: "#94a3b8" }} />
