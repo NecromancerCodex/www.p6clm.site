@@ -4848,3 +4848,44 @@ select {
   display: block; width: 100%; height: auto; aspect-ratio: 640 / 420;
   background: #fff; cursor: crosshair; touch-action: none;
 }
+
+/* 광장 — 캐치마인드식 그림판 룸 */
+.plaza-room {
+  width: min(980px, 96%); max-height: calc(100% - 20px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: rgba(22, 30, 46, 0.98); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px; box-shadow: 0 16px 60px rgba(0,0,0,0.55); color: #e8edf4;
+}
+.plaza-room-body { display: flex; gap: 10px; padding: 12px; min-height: 0; }
+.plaza-room-side { display: flex; flex-direction: column; gap: 8px; flex: 0 0 130px; }
+.plaza-room-center { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.plaza-pcard {
+  flex: 1; min-height: 0; display: flex; align-items: center; gap: 8px;
+  padding: 8px; border-radius: 10px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+}
+.plaza-pcard.me { border-color: #ffd75e; background: rgba(255,200,40,0.1); }
+.plaza-pcard--empty { justify-content: center; color: #6f7b8a; font-size: 0.76rem; border-style: dashed; }
+.plaza-pcard-av { width: 46px; height: 56px; flex: 0 0 auto; }
+.plaza-pcard-name { font-size: 0.8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.plaza-board-canvas {
+  display: block; width: 100%; height: auto; aspect-ratio: 640 / 420;
+  background: #fff; cursor: crosshair; touch-action: none; border-radius: 8px;
+}
+.plaza-room-chat { display: flex; flex-direction: column; gap: 6px; }
+.plaza-room-chatlog {
+  height: 84px; overflow-y: auto; padding: 6px 8px; border-radius: 8px;
+  background: rgba(0,0,0,0.25); font-size: 0.8rem; line-height: 1.5;
+}
+.plaza-room-chatline { color: #d3dae3; }
+.plaza-room-chatline b { color: #9fd0ff; margin-right: 4px; }
+.plaza-room-chatform { display: flex; gap: 6px; }
+
+@media (max-width: 720px) {
+  .plaza-room-body { flex-wrap: wrap; }
+  .plaza-room-side { flex: 1 1 100%; flex-direction: row; flex-wrap: wrap; }
+  .plaza-room-side .plaza-pcard { flex: 1 1 calc(25% - 6px); flex-direction: column; text-align: center; }
+  .plaza-room-center { order: -1; flex: 1 1 100%; }
+}

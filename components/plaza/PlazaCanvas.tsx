@@ -10,7 +10,7 @@
  * 물리/네트워크 상태는 모두 ref 로 보관해 프레임마다 React 리렌더를 유발하지 않는다.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   plazaWsUrl,
@@ -106,6 +106,18 @@ interface Bubble {
   until: number;
 }
 
+export interface Participant {
+  id: number;
+  name: string;
+  avatar: AvatarConfig;
+  me: boolean;
+}
+export interface ChatLine {
+  id: number;
+  name: string;
+  text: string;
+}
+
 export function PlazaCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -115,6 +127,8 @@ export function PlazaCanvas() {
   const [count, setCount] = useState(1);
   const [chatValue, setChatValue] = useState("");
   const [panel, setPanel] = useState<null | "shop" | "creator" | "paint">(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [chatLog, setChatLog] = useState<ChatLine[]>([]);
 
   // 프로필 스토어 (재화·인벤·아바타)
   const loadProfile = usePlazaStore((s) => s.load);
@@ -139,6 +153,16 @@ export function PlazaCanvas() {
   const avatarCacheRef = useRef<Map<string, ComposedAvatar>>(new Map()); // 합성 결과 캐시
   const composingRef = useRef<Set<string>>(new Set()); // 합성 진행 중
   const boardHandlerRef = useRef<((m: ServerMsg) => void) | null>(null); // 그림판 수신 핸들러
+  const myNameRef = useRef<string>("나");
+
+  // 참가자 카드 목록 갱신 (입장/퇴장/아바타 변경 시) — 최대 8명
+  const refreshParticipants = useCallback(() => {
+    const me: Participant = { id: myIdRef.current, name: myNameRef.current, avatar: myAvatarRef.current, me: true };
+    const others: Participant[] = [...remotesRef.current.values()].map((r) => ({
+      id: r.id, name: r.name, avatar: r.avatar, me: false,
+    }));
+    setParticipants([me, ...others].slice(0, 8));
+  }, []);
 
   // WS 송신 헬퍼 (그림판 등에서 사용)
   const wsSend = (m: ClientMsg) => {
@@ -184,14 +208,17 @@ export function PlazaCanvas() {
       switch (msg.t) {
         case "welcome": {
           myIdRef.current = msg.id;
+          myNameRef.current = msg.name || "나";
           remotesRef.current.clear();
           for (const p of msg.roster) addRemote(p);
           setCount(remotesRef.current.size + 1);
+          refreshParticipants();
           break;
         }
         case "join": {
           addRemote(msg.p);
           setCount(remotesRef.current.size + 1);
+          refreshParticipants();
           break;
         }
         case "state": {
@@ -206,11 +233,13 @@ export function PlazaCanvas() {
             msg.id === myIdRef.current ? -1 : msg.id,
             { text: msg.text, until: performance.now() + 5200 },
           );
+          setChatLog((log) => [...log.slice(-29), { id: msg.id, name: msg.name, text: msg.text }]);
           break;
         }
         case "avatar": {
           const r = remotesRef.current.get(msg.id);
           if (r && msg.a) r.avatar = msg.a;
+          refreshParticipants();
           break;
         }
         case "draw":
@@ -223,6 +252,7 @@ export function PlazaCanvas() {
           remotesRef.current.delete(msg.id);
           bubblesRef.current.delete(msg.id);
           setCount(remotesRef.current.size + 1);
+          refreshParticipants();
           break;
         }
       }
@@ -243,16 +273,17 @@ export function PlazaCanvas() {
       ws.close();
       wsRef.current = null;
     };
-  }, []);
+  }, [refreshParticipants]);
 
   // ── 아바타 동기화: 변경/접속 시 WS avatar 송신 + 게임루프 ref 갱신 ──────────────
   useEffect(() => {
     myAvatarRef.current = avatar || DEFAULT_AVATAR;
+    refreshParticipants();
     const ws = wsRef.current;
     if (avatar && ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ t: "avatar", a: avatar } as ClientMsg));
     }
-  }, [avatar, status]);
+  }, [avatar, status, refreshParticipants]);
 
   // ── 키 입력 ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -496,6 +527,10 @@ export function PlazaCanvas() {
             send={wsSend}
             register={(h) => { boardHandlerRef.current = h; }}
             onClose={() => setPanel(null)}
+            participants={participants}
+            chatLog={chatLog}
+            sendChat={sendChat}
+            onChatFocus={(b) => { inputFocusedRef.current = b; }}
           />
         )}
         {/* 최초(아바타 없음) = 강제 / 툴바 = 편집(닫기 가능) */}

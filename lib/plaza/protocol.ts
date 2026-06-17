@@ -12,7 +12,7 @@ export type AvatarConfig = Record<string, string>;
 
 /** server → client */
 export type ServerMsg =
-  | { t: "welcome"; id: number; roster: PlayerSnapshot[] }
+  | { t: "welcome"; id: number; name: string; roster: PlayerSnapshot[] }
   | { t: "join"; p: PlayerSnapshot }
   | { t: "state"; id: number; x: number; y: number; vx: number; facing: Facing; st: AnimState }
   | { t: "chat"; id: number; name: string; text: string }
