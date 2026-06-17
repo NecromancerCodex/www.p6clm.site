@@ -526,6 +526,18 @@ export function matchAllHybrid(
   const byVia: Record<string, number> = {};
   let matched = 0;
   for (const el of elements) {
+    // ★ 슬롯이 정한 공종(disc)이 진실 — 타입보다 우선. 건축 슬롯 마감 벽/바닥(IfcSlab/Wall)·조명까지
+    //   전부 그 공종 window 로. (타입 기반은 disc 없는 종합 파일용으로 아래에서 처리)
+    if (el.disc === "건축" || el.disc === "MEP" || el.disc === "조경") {
+      const w = el.disc === "MEP" ? codeIdx.mepWindow : el.disc === "조경" ? codeIdx.landscapeWindow : codeIdx.finishWindow;
+      const via = el.disc === "MEP" ? "mep" : el.disc === "조경" ? "landscape" : "finish";
+      const rd: MatchResult = w ? { range: w, via: `${via}:${el.disc}` } : { range: null, via: `${via}:no_act` };
+      ranges.set(el.globalId, rd);
+      if (rd.range) matched++;
+      const tag = rd.range ? el.disc : `${el.disc}무활동`;
+      byVia[tag] = (byVia[tag] ?? 0) + 1;
+      continue;
+    }
     // MEP 설비 부재(배관·덕트·위생·조명·전기) → 설비 window(골조 후). disc/trade/타입 중 하나라도.
     if (el.disc === "MEP" || _MEP_TRADES.has(el.trade ?? "") || _MEP_TYPES.has(el.ifcType)) {
       const rm: MatchResult = codeIdx.mepWindow
@@ -546,9 +558,9 @@ export function matchAllHybrid(
       byVia[rl.range ? "조경" : "조경무활동"] = (byVia[rl.range ? "조경" : "조경무활동"] ?? 0) + 1;
       continue;
     }
-    // 마감/FF&E 타입(창호·문·마감재·커튼월) — 골조 아님. IFC 타입이 진실 →
-    // 건축(마감) 활동 기간(골조 후)에 매칭. finishWindow 없으면(마감 활동 미생성) 미매칭(회색).
-    if (_FINISH_TYPES.has(el.ifcType)) {
+    // 건축(마감) → 마감 활동 기간(골조 후) 매칭. 슬롯이 건축이면(disc/trade) **타입 무관 전부**(마감 벽/바닥은
+    // IfcSlab/IfcWall 이라 _FINISH_TYPES 에 없음 → 슬롯 기준으로 매칭). + 창호/문 타입은 무PSet 에서도 마감.
+    if (el.disc === "건축" || el.trade === "AR" || _FINISH_TYPES.has(el.ifcType)) {
       const r0: MatchResult = codeIdx.finishWindow
         ? { range: codeIdx.finishWindow, via: "finish:건축" }
         : { range: null, via: "finish:no_act" };
