@@ -39,8 +39,22 @@ export const CATEGORY_ORDER = [
 
 // 필수(미착용 불가) vs 선택(없음 허용) 카테고리
 export const OPTIONAL_CATS = new Set([
-  "hair_back", "hair_bonus", "beard", "dress", "gloves", "eyelashes",
+  "hair_back", "hair_bonus", "beard", "dress", "gloves", "eyelashes", "top", "bottom",
 ]);
+
+// 무료(정체성) vs 유료(상점 구매) 카테고리. 백엔드 _FREE_CATS/_PAID_CATS 와 일치.
+export const FREE_CATS = new Set(["body", "pupils", "eyebrows", "eyelashes", "mouth"]);
+export const PAID_CATS = ["hair", "bangs", "hair_back", "hair_bonus", "top", "bottom", "dress", "shoes", "gloves", "beard"];
+export function isPaid(cat: string): boolean { return !FREE_CATS.has(cat); }
+
+// 카테고리별 가격(모양 단위 — 색상 변경은 무료). 백엔드 _CATEGORY_PRICE 와 일치.
+export const CATEGORY_PRICE: Record<string, number> = {
+  hair: 300, bangs: 150, hair_back: 200, hair_bonus: 250,
+  top: 400, bottom: 300, dress: 600, shoes: 200, gloves: 150, beard: 100,
+};
+
+/** 보유/구매 단위 키 = "<cat>:<shape>" (색상 무관). */
+export function partKey(cat: string, shape: string): string { return `${cat}:${shape}`; }
 
 /** 기본 아바타 — 신규 유저가 크리에이터를 안 거쳐도 완전한 캐릭터. */
 export const DEFAULT_AVATAR: AvatarConfig = {

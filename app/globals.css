@@ -4798,3 +4798,11 @@ select {
   .plaza-creator-body { flex-direction: column; }
   .plaza-creator-preview { flex: 0 0 200px; }
 }
+
+/* 광장 — 상점 파츠 썸네일 / 크리에이터 상점 힌트 */
+.plaza-shop-thumb {
+  width: 100%; aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+  background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center;
+}
+.plaza-shop-thumb img { width: 230%; height: 230%; object-fit: contain; object-position: center 22%; }
+.plaza-part-shop-hint { border-style: dashed !important; opacity: 0.7; }

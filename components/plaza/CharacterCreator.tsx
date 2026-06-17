@@ -4,10 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import {
-  loadManifest, composeAvatar, partUrl,
+  loadManifest, composeAvatar, partUrl, partKey, isPaid,
   CATEGORY_LABELS, CATEGORY_ORDER, OPTIONAL_CATS, DEFAULT_AVATAR,
   type PartsManifest, type AvatarConfig,
 } from "../../lib/plaza/parts";
+import { usePlazaStore } from "../../stores/plazaStore";
 
 function parseStem(stem: string | undefined): { shape: string; color: string } {
   const m = (stem || "").match(/^(\d+)([a-z]?)$/);
@@ -27,6 +28,8 @@ export function CharacterCreator({
   const [activeCat, setActiveCat] = useState<string>("body");
   const [busy, setBusy] = useState(false);
   const previewRef = useRef<HTMLCanvasElement | null>(null);
+  const inventory = usePlazaStore((s) => s.inventory);
+  const owned = useMemo(() => new Set(inventory), [inventory]);
 
   useEffect(() => { void loadManifest().then(setManifest); }, []);
 
@@ -122,32 +125,46 @@ export function CharacterCreator({
               </div>
             )}
 
-            {/* 모양 그리드 */}
-            <div className="plaza-creator-grid">
-              {OPTIONAL_CATS.has(activeCat) && (
-                <button
-                  type="button"
-                  className={`plaza-part-card${!config[activeCat] ? " on" : ""}`}
-                  onClick={clearPart}
-                >
-                  <span className="plaza-part-none">없음</span>
-                </button>
-              )}
-              {cat.items.map((shape) => {
-                const stem = `${shape}${curColor}`;
-                const url = partUrl(manifest, activeCat, stem);
-                return (
-                  <button
-                    key={shape}
-                    type="button"
-                    className={`plaza-part-card${curShape === shape ? " on" : ""}`}
-                    onClick={() => setPart(shape, curColor)}
-                  >
-                    {url && <img src={url} alt="" loading="lazy" />}
-                  </button>
-                );
-              })}
-            </div>
+            {/* 모양 그리드 — 유료 카테고리는 보유한 것만 노출 */}
+            {(() => {
+              const paid = isPaid(activeCat);
+              const visible = paid ? cat.items.filter((s) => owned.has(partKey(activeCat, s))) : cat.items;
+              const showNone = OPTIONAL_CATS.has(activeCat);
+              if (paid && visible.length === 0 && !showNone) {
+                return <p className="plaza-panel-empty">아직 보유한 {CATEGORY_LABELS[activeCat]}가 없어요.<br />🛒 상점에서 구매하세요!</p>;
+              }
+              return (
+                <div className="plaza-creator-grid">
+                  {showNone && (
+                    <button
+                      type="button"
+                      className={`plaza-part-card${!config[activeCat] ? " on" : ""}`}
+                      onClick={clearPart}
+                    >
+                      <span className="plaza-part-none">없음</span>
+                    </button>
+                  )}
+                  {visible.map((shape) => {
+                    const url = partUrl(manifest, activeCat, `${shape}${curColor}`);
+                    return (
+                      <button
+                        key={shape}
+                        type="button"
+                        className={`plaza-part-card${curShape === shape ? " on" : ""}`}
+                        onClick={() => setPart(shape, curColor)}
+                      >
+                        {url && <img src={url} alt="" loading="lazy" />}
+                      </button>
+                    );
+                  })}
+                  {paid && (
+                    <div className="plaza-part-card plaza-part-shop-hint">
+                      <span className="plaza-part-none">+ 상점</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 

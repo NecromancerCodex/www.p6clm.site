@@ -27,8 +27,6 @@ import {
   type PartsManifest, type AvatarConfig, type ComposedAvatar,
 } from "../../lib/plaza/parts";
 import { usePlazaStore } from "../../stores/plazaStore";
-import { InventoryPanel } from "./InventoryPanel";
-import { EquipPanel } from "./EquipPanel";
 import { ShopPanel } from "./ShopPanel";
 import { CharacterCreator } from "./CharacterCreator";
 
@@ -117,7 +115,7 @@ export function PlazaCanvas() {
   const [status, setStatus] = useState<"connecting" | "open" | "closed">("connecting");
   const [count, setCount] = useState(1);
   const [chatValue, setChatValue] = useState("");
-  const [panel, setPanel] = useState<null | "inv" | "equip" | "shop" | "creator">(null);
+  const [panel, setPanel] = useState<null | "shop" | "creator">(null);
 
   // 프로필 스토어 (재화·인벤·장착·아바타)
   const equipped = usePlazaStore((s) => s.equipped);
@@ -269,9 +267,8 @@ export function PlazaCanvas() {
         keysRef.current[k] = true;
         e.preventDefault(); // Alt 메뉴 포커스·스페이스 스크롤 방지
       }
-      // I=인벤토리, E=장비 (영문 키, 대소문자 모두)
-      if (k === "i" || k === "I" || k === "ㅑ") { e.preventDefault(); setPanel((p) => (p === "inv" ? null : "inv")); }
-      if (k === "e" || k === "E" || k === "ㄷ") { e.preventDefault(); setPanel((p) => (p === "equip" ? null : "equip")); }
+      // C=캐릭터 크리에이터
+      if (k === "c" || k === "C" || k === "ㅊ") { e.preventDefault(); setPanel((p) => (p === "creator" ? null : "creator")); }
       if (k === "Escape") setPanel(null);
       if (k === "Enter") {
         e.preventDefault();
@@ -481,10 +478,8 @@ export function PlazaCanvas() {
         </span>
         <span className="plaza-hint">← → 이동 · Alt 점프 · ↓+Alt 내려가기 · Enter 채팅</span>
         <div className="plaza-tools">
-          <button type="button" className={`plaza-tool${panel === "inv" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "inv" ? null : "inv"))}>🎒 인벤 <kbd>I</kbd></button>
-          <button type="button" className={`plaza-tool${panel === "equip" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "equip" ? null : "equip"))}>🧢 장비 <kbd>E</kbd></button>
           <button type="button" className={`plaza-tool${panel === "shop" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "shop" ? null : "shop"))}>🛒 상점</button>
-          <button type="button" className={`plaza-tool${panel === "creator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "creator" ? null : "creator"))}>🎨 캐릭터</button>
+          <button type="button" className={`plaza-tool${panel === "creator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "creator" ? null : "creator"))}>🎨 캐릭터 <kbd>C</kbd></button>
         </div>
       </div>
 
@@ -496,8 +491,6 @@ export function PlazaCanvas() {
           className="plaza-canvas"
           tabIndex={0}
         />
-        {panel === "inv" && <InventoryPanel onClose={() => setPanel(null)} />}
-        {panel === "equip" && <EquipPanel onClose={() => setPanel(null)} />}
         {panel === "shop" && <ShopPanel onClose={() => setPanel(null)} />}
         {/* 최초(아바타 없음) = 강제 / 툴바 = 편집(닫기 가능) */}
         {loaded && (!avatar || panel === "creator") && (
