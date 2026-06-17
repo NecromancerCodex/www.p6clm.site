@@ -298,6 +298,11 @@ export function PlazaCanvas() {
           window.setTimeout(() => setGame(null), 8000);
           break;
         }
+        case "gold": {
+          usePlazaStore.getState().setCurrency(msg.currency);
+          setChatLog((log) => [...log.slice(-29), { id: -1, name: "💰", text: `${msg.reason} +1000골드!`, ts: Date.now() }]);
+          break;
+        }
         case "leave": {
           remotesRef.current.delete(msg.id);
           bubblesRef.current.delete(msg.id);

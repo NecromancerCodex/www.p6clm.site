@@ -21,6 +21,7 @@ interface PlazaState {
   load: () => Promise<void>;
   buy: (itemKey: string) => Promise<{ ok: boolean; error?: string }>;
   setAvatar: (config: AvatarConfig) => Promise<void>;
+  setCurrency: (n: number) => void;
 }
 
 export const usePlazaStore = create<PlazaState>((set, get) => ({
@@ -43,6 +44,8 @@ export const usePlazaStore = create<PlazaState>((set, get) => ({
       set({ loading: false });
     }
   },
+
+  setCurrency: (n) => set({ currency: n }),
 
   setAvatar: async (config) => {
     try {
