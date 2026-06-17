@@ -132,6 +132,7 @@ export default function SchedulePlanWizard() {
   // ── 1단계: 입력 폼 ──
   const [buildingType, setBuildingType] = useState("");
   const [scope, setScope] = useState("");
+  const [gfa, setGfa] = useState(""); // 연면적(㎡) — 건축/MEP 물량 기반 기간(선택)
   const [structureType, setStructureType] = useState("");
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
   const [slots, setSlots] = useState<Record<string, { name: string; count?: number; wp?: number; warn?: string | null; ai?: number }>>({}); // 공종별 업로드 현황(count/wp/ai 는 분석 후)
@@ -340,7 +341,7 @@ export default function SchedulePlanWizard() {
         start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
-        discipline_crews: discCrews,
+        discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
         utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
         seasonal_weather: seasonal,
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
@@ -569,6 +570,8 @@ export default function SchedulePlanWizard() {
             <Field label="① 무엇을 — 건물유형 (비우면 생성 시 AI 자동 추천)">
               <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="비워두면 AI 가 추천 (예: 모듈러 공동주택)" />
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
+              <input className="wz-in" type="number" style={{ marginTop: 6 }} value={gfa} onChange={(e) => setGfa(e.target.value)}
+                     placeholder="연면적(㎡, 선택) — 건축·MEP 기간 정밀화" title="연면적 — 마감·설비는 연면적에 비례. 입력하면 부재수 대신 물량 기반 기간" />
             </Field>
             <Field label="② 시공 전략 — 굴착·골조 순서 (발주·부지 조건)">
               <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
