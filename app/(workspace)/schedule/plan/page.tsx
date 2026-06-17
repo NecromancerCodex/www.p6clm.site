@@ -849,6 +849,22 @@ export default function SchedulePlanWizard() {
             </div>
           )}
           {(() => {
+            const lod = (plan?.payload.schedule as Record<string, unknown> | undefined)?.lod as
+              | { level: string; label: string; zones: number; storeys: number; note: string } | undefined;
+            if (!lod) return null;
+            const c = lod.level === "zone" ? { bg: "#dcfce7", bd: "#86efac", fg: "#15803d", icon: "🎯" }
+              : lod.level === "floor" ? { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📐" }
+              : { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" };
+            return (
+              <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "8px 14px", fontSize: 12.5, color: c.fg, marginBottom: 10 }}>
+                {c.icon} <b>상세수준: {lod.label}</b>
+                {lod.zones > 0 && <span> · 구역 {lod.zones}</span>}
+                {lod.storeys > 0 && <span> · 층 {lod.storeys}</span>}
+                <br /><span style={{ color: "#78716c" }}>{lod.note}</span>
+              </div>
+            );
+          })()}
+          {(() => {
             const tgt = (plan?.payload.schedule as Record<string, unknown> | undefined)?.target as
               | { target_days: number; achieved_days?: number; met?: boolean; advice?: string;
                   suggestion?: { crane: number; crew: number; days: number } | null } | undefined;
