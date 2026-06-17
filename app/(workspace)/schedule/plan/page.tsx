@@ -35,7 +35,7 @@ const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; 
   { key: "건축", label: "건축", icon: "🧱", active: true, hint: "마감(조적·창호·타일·도장…)" },
   { key: "MEP", label: "MEP", icon: "🔧", active: true, hint: "기계·소방·전기·통신(설비)" },
   { key: "조경", label: "조경", icon: "🌳", active: true, hint: "식재·포장·시설물" },
-  { key: "가설", label: "가설", icon: "🚧", active: false, hint: "비계·거푸집(오버레이)" },
+  { key: "가설", label: "가설", icon: "🚧", active: true, hint: "비계·동바리·펜스(오버레이)" },
 ];
 
 // 슬롯 검증 — 업로드 파일의 공종 분포(서버 discipline_summary, 흙막이 보정 후)가 슬롯과 맞는지.
@@ -525,6 +525,11 @@ export default function SchedulePlanWizard() {
                         <label style={pr} title={`${d.label} 작업조 — 많을수록 ${d.label} 기간 단축`}>작업조
                           <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }}
                                  value={discCrews[d.key] ?? 3} onChange={(e) => setDiscCrews((c) => ({ ...c, [d.key]: Number(e.target.value) }))} /></label>
+                      )}
+                      {d.key === "가설" && (
+                        <span style={{ fontSize: 10.5, color: "#64748b", lineHeight: 1.4 }}>
+                          오버레이 — 공정표엔 설치·해체 2줄, 4D는 층 따라 표시(별도 공정 X)
+                        </span>
                       )}
                     </div>
                   </div>
