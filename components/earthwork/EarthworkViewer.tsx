@@ -95,12 +95,13 @@ interface Props {
   terrain?: { x: number; y: number; z: number }[]; // 현황 지형 표고점 (CAD 좌표)
   boundary?: { x: number; y: number }[]; // 대지경계선
   piles?: { kind: string; x: number; y: number; dia: number; length: number }[];
+  walls?: { kind: string; points: { x: number; y: number }[] }[]; // 흙막이 벽
   contours?: { z: number; major: boolean; points: { x: number; y: number }[] }[]; // 등고선
 }
 
 export function EarthworkViewer({
   model, visible, boreholes, showLabels,
-  terrain = [], boundary = [], piles = [], contours = [],
+  terrain = [], boundary = [], piles = [], walls = [], contours = [],
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const meshesRef = useRef<Record<string, THREE.Mesh>>({});
@@ -234,6 +235,15 @@ export function EarthworkViewer({
       overlay.add(new THREE.Points(tGeo, new THREE.PointsMaterial({ size: Math.max(span * 0.012, 0.5), vertexColors: true })));
     }
 
+    if (walls.length) {
+      const wallMat = new THREE.LineBasicMaterial({ color: 0xe11d48 }); // 흙막이 벽 (적색)
+      for (const w of walls) {
+        if (w.points.length < 2) continue;
+        const wp = w.points.map((p) => new THREE.Vector3(p.x - model.minX, surfY, p.y - model.minY));
+        overlay.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(wp), wallMat));
+      }
+    }
+
     if (contours.length) {
       const minorMat = new THREE.LineBasicMaterial({ color: 0x9ca3af }); // 세곡선 회색
       const majorMat = new THREE.LineBasicMaterial({ color: 0xf8fafc }); // 주곡선 흰색
@@ -289,7 +299,7 @@ export function EarthworkViewer({
       renderer.dispose();
       if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
     };
-  }, [model, bounds, boreholes, terrain, boundary, piles, contours]);
+  }, [model, bounds, boreholes, terrain, boundary, piles, walls, contours]);
 
   // 공번 라벨 표시 토글
   useEffect(() => {

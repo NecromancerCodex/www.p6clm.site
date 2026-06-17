@@ -226,11 +226,37 @@ export function parseBoreholeCsv(text: string): Borehole[] {
 // ── 통합 토공 데이터 (add CSV ##섹션) ──
 export interface TerrainPt { x: number; y: number; z: number; }
 export interface PileItem { kind: string; x: number; y: number; dia: number; length: number; }
+export interface WallLine { kind: string; points: { x: number; y: number }[]; } // CIP/H-Pile/흙막이 벽
 export interface EarthworkData {
   boreholes: Borehole[];
   terrain: TerrainPt[];
   boundary: { x: number; y: number }[];
   piles: PileItem[];
+  walls: WallLine[];
+}
+
+/** 3×3 선형계 Cramer 풀이. */
+function solve3(
+  a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number,
+  p: number, q: number, r: number,
+): [number, number, number] | null {
+  const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+  if (Math.abs(det) < 1e-12) return null;
+  const dx = p * (e * i - f * h) - b * (q * i - f * r) + c * (q * h - e * r);
+  const dy = a * (q * i - f * r) - p * (d * i - f * g) + c * (d * r - q * g);
+  const dz = a * (e * r - q * h) - b * (d * r - q * g) + p * (d * h - e * g);
+  return [dx / det, dy / det, dz / det];
+}
+
+/** 최소제곱 affine 1축: target ≈ a·cx + b·cy + c. (정규방정식) */
+function fitAffine(src: { cx: number; cy: number }[], tgt: number[]): [number, number, number] | null {
+  let Sxx = 0, Sxy = 0, Sx = 0, Syy = 0, Sy = 0, Stx = 0, Sty = 0, St = 0;
+  for (let i = 0; i < src.length; i++) {
+    const { cx, cy } = src[i], t = tgt[i];
+    Sxx += cx * cx; Sxy += cx * cy; Sx += cx; Syy += cy * cy; Sy += cy;
+    Stx += cx * t; Sty += cy * t; St += t;
+  }
+  return solve3(Sxx, Sxy, Sx, Sxy, Syy, Sy, Sx, Sy, src.length, Stx, Sty, St);
 }
 
 /** "##SECTION" 구분자로 텍스트를 섹션별 라인배열로 분리. */
@@ -251,7 +277,7 @@ function splitSections(text: string): Record<string, string[]> {
  * ##섹션 없으면 일반 시추공 CSV로 폴백. 좌표계: ##섹션은 CAD 좌표(X_cad)로 통일.
  */
 export function parseEarthworkCsv(text: string): EarthworkData {
-  const data: EarthworkData = { boreholes: [], terrain: [], boundary: [], piles: [] };
+  const data: EarthworkData = { boreholes: [], terrain: [], boundary: [], piles: [], walls: [] };
   if (!text.includes("##")) {
     data.boreholes = parseBoreholeCsv(text);
     return data;
@@ -270,12 +296,15 @@ export function parseEarthworkCsv(text: string): EarthworkData {
   };
   const f = (s: string) => parseFloat(s);
 
+  // 시추공 — 측량좌표(X,Y, 실측 m) 우선. el·심도와 단위가 맞아 3D·물량이 정확.
+  const both: { cx: number; cy: number; sx: number; sy: number }[] = [];
   for (const g of rows("BOREHOLES")) {
     const id = g("borehole");
     if (!id) continue;
-    const xc = f(g("X_cad")), yc = f(g("Y_cad"));
-    const x = Number.isFinite(xc) && xc !== 0 ? xc : f(g("X")); // CAD 좌표 우선(통일), 없으면 측량
-    const y = Number.isFinite(yc) && yc !== 0 ? yc : f(g("Y"));
+    const sx = f(g("X")), sy = f(g("Y"));
+    const cx = f(g("X_cad")), cy = f(g("Y_cad"));
+    const hasS = Number.isFinite(sx) && Number.isFinite(sy);
+    const x = hasS ? sx : cx, y = hasS ? sy : cy;
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
     const t: Record<string, number> = {};
     for (const L of LAYERS) t[L.key] = _orZero(f(g(L.key)));
@@ -283,20 +312,48 @@ export function parseEarthworkCsv(text: string): EarthworkData {
       id, x, y, el: _orZero(f(g("surface_EL"))), depth: _orZero(f(g("drill_depth"))),
       gwl: _orZero(f(g("gwl_GL"))), t,
     });
+    if (hasS && Number.isFinite(cx) && Number.isFinite(cy)) both.push({ cx, cy, sx, sy });
   }
+
+  // CAD→측량 affine 역산 — 경계·Pile·Wall·지형은 CAD좌표만 있어, 시추공의 (CAD↔측량) 쌍으로 변환을 추정.
+  let tf = (x: number, y: number) => ({ x, y });
+  if (both.length >= 3) {
+    const src = both.map((b) => ({ cx: b.cx, cy: b.cy }));
+    const ax = fitAffine(src, both.map((b) => b.sx));
+    const ay = fitAffine(src, both.map((b) => b.sy));
+    if (ax && ay) tf = (x, y) => ({ x: ax[0] * x + ax[1] * y + ax[2], y: ay[0] * x + ay[1] * y + ay[2] });
+  }
+
   for (const g of rows("TERRAIN")) {
-    const x = f(g("X_cad")), y = f(g("Y_cad")), z = f(g("Z"));
-    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) data.terrain.push({ x, y, z });
+    const cx = f(g("X_cad")), cy = f(g("Y_cad")), z = f(g("Z"));
+    if (Number.isFinite(cx) && Number.isFinite(cy) && Number.isFinite(z)) {
+      const p = tf(cx, cy);
+      data.terrain.push({ x: p.x, y: p.y, z });
+    }
   }
   for (const g of rows("BOUNDARY")) {
-    const x = f(g("X_cad")), y = f(g("Y_cad"));
-    if (Number.isFinite(x) && Number.isFinite(y)) data.boundary.push({ x, y });
+    const cx = f(g("X_cad")), cy = f(g("Y_cad"));
+    if (Number.isFinite(cx) && Number.isFinite(cy)) data.boundary.push(tf(cx, cy));
   }
   for (const g of rows("PILES")) {
-    const x = f(g("X_cad")), y = f(g("Y_cad"));
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    data.piles.push({ kind: g("kind") || "Pile", x, y, dia: _orZero(f(g("dia_m"))), length: _orZero(f(g("length_m"))) });
+    const cx = f(g("X_cad")), cy = f(g("Y_cad"));
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+    const p = tf(cx, cy);
+    let dia = _orZero(f(g("dia_m")));
+    if (dia > 10) dia /= 1000; // 530 같은 값은 mm 표기 → m
+    data.piles.push({ kind: g("kind") || "Pile", x: p.x, y: p.y, dia, length: _orZero(f(g("length_m"))) });
   }
+  // ##WALLS — w_id 별 폴리선(흙막이 벽 CIP/H-Pile/COUNTER)
+  const wallMap = new Map<string, WallLine>();
+  for (const g of rows("WALLS")) {
+    const cx = f(g("X_cad")), cy = f(g("Y_cad"));
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+    const id = g("w_id") || "1";
+    let w = wallMap.get(id);
+    if (!w) { w = { kind: g("kind") || "Wall", points: [] }; wallMap.set(id, w); }
+    w.points.push(tf(cx, cy));
+  }
+  data.walls = [...wallMap.values()];
   return data;
 }
 

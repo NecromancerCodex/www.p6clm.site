@@ -14,7 +14,7 @@ import { BoreholeTable } from "../../../components/earthwork/BoreholeTable";
 import {
   BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, generateContours, layerVolumes, makeTerrainPreset,
   parseEarthworkCsv, polygonArea, prepare,
-  type Borehole, type TerrainPt, type PileItem,
+  type Borehole, type TerrainPt, type PileItem, type WallLine,
 } from "../../../lib/earthwork/model";
 import { loadBoreholes, saveBoreholes } from "../../../lib/api/earthwork";
 
@@ -44,8 +44,8 @@ const fmt = (n: number) => Math.round(n).toLocaleString();
 export default function EarthworkPage() {
   const [boreholes, setBoreholes] = useState<Borehole[]>(BOREHOLES);
   const [source, setSource] = useState("샘플 (시추 11공)");
-  const [extra, setExtra] = useState<{ terrain: TerrainPt[]; boundary: { x: number; y: number }[]; piles: PileItem[] }>(
-    { terrain: [], boundary: [], piles: [] },
+  const [extra, setExtra] = useState<{ terrain: TerrainPt[]; boundary: { x: number; y: number }[]; piles: PileItem[]; walls: WallLine[] }>(
+    { terrain: [], boundary: [], piles: [], walls: [] },
   );
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -100,12 +100,13 @@ export default function EarthworkPage() {
     }
     setBoreholes(parsed);
     setSec(farthestPair(parsed));
-    setExtra({ terrain: data.terrain, boundary: data.boundary, piles: data.piles });
+    setExtra({ terrain: data.terrain, boundary: data.boundary, piles: data.piles, walls: data.walls });
     // 통합 CSV(##섹션)에서 추가로 들어온 데이터 요약
     const ex: string[] = [];
     if (data.terrain.length) ex.push(`지형 ${data.terrain.length}점`);
     if (data.boundary.length) ex.push(`경계 ${data.boundary.length}점`);
     if (data.piles.length) ex.push(`Pile ${data.piles.length}`);
+    if (data.walls.length) ex.push(`흙막이 ${data.walls.length}`);
     const suffix = ex.length ? ` + ${ex.join(", ")}` : "";
     // DB 저장 (기존 데이터 교체 = 최신만 유지). 백엔드 미가동이면 화면만 갱신.
     try {
@@ -163,11 +164,12 @@ export default function EarthworkPage() {
             </span>
             <span style={{ fontSize: 11, color: "#94a3b8" }}>시추 CSV · add 통합 CSV(##섹션) 지원</span>
           </div>
-          {(extra.terrain.length > 0 || extra.boundary.length > 0 || extra.piles.length > 0) && (
+          {(extra.terrain.length > 0 || extra.boundary.length > 0 || extra.piles.length > 0 || extra.walls.length > 0) && (
             <span style={{ display: "flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
               {extra.terrain.length > 0 && <Chip label={`지형 ${extra.terrain.length}점`} c="#0e7490" />}
               {extra.boundary.length > 0 && <Chip label={`경계 ${extra.boundary.length}점`} c="#15803d" />}
               {extra.piles.length > 0 && <Chip label={`Pile ${extra.piles.length}`} c="#b45309" />}
+              {extra.walls.length > 0 && <Chip label={`흙막이 ${extra.walls.length}`} c="#be123c" />}
             </span>
           )}
         </div>
@@ -259,6 +261,7 @@ export default function EarthworkPage() {
             terrain={extra.terrain}
             boundary={extra.boundary}
             piles={extra.piles}
+            walls={extra.walls}
             contours={contours}
           />
         </div>
