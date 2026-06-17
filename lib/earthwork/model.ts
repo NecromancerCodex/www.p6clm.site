@@ -209,7 +209,7 @@ export function parseBoreholeCsv(text: string): Borehole[] {
     const c = lines[r].split(",");
     const id = (c[idx["borehole"]] ?? "").trim();
     const x = num(c, "X"), y = num(c, "Y");
-    if (!id || !Number.isFinite(x) || !Number.isFinite(y)) continue; // 좌표 없는 행 스킵
+    if (!id || !Number.isFinite(x) || !Number.isFinite(y) || (x === 0 && y === 0)) continue; // 좌표 없는/빈(0,0) 행 스킵
     const t: Record<string, number> = {};
     for (const L of LAYERS) t[L.key] = _orZero(num(c, L.key));
     out.push({
@@ -303,16 +303,16 @@ export function parseEarthworkCsv(text: string): EarthworkData {
     if (!id) continue;
     const sx = f(g("X")), sy = f(g("Y"));
     const cx = f(g("X_cad")), cy = f(g("Y_cad"));
-    const hasS = Number.isFinite(sx) && Number.isFinite(sy);
+    const hasS = Number.isFinite(sx) && Number.isFinite(sy) && !(sx === 0 && sy === 0);
     const x = hasS ? sx : cx, y = hasS ? sy : cy;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || (x === 0 && y === 0)) continue; // (0,0)=빈 시추공 스킵
     const t: Record<string, number> = {};
     for (const L of LAYERS) t[L.key] = _orZero(f(g(L.key)));
     data.boreholes.push({
       id, x, y, el: _orZero(f(g("surface_EL"))), depth: _orZero(f(g("drill_depth"))),
       gwl: _orZero(f(g("gwl_GL"))), t,
     });
-    if (hasS && Number.isFinite(cx) && Number.isFinite(cy)) both.push({ cx, cy, sx, sy });
+    if (hasS && Number.isFinite(cx) && Number.isFinite(cy) && !(cx === 0 && cy === 0)) both.push({ cx, cy, sx, sy });
   }
 
   // CAD→측량 affine 역산 — 경계·Pile·Wall·지형은 CAD좌표만 있어, 시추공의 (CAD↔측량) 쌍으로 변환을 추정.
