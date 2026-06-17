@@ -379,8 +379,15 @@ export function buildGridModel(boreholes: Borehole[], spacing = 2): GridModel {
   const maxY = Math.max(...boreholes.map((b) => b.y));
   const width = maxX - minX;
   const depthY = maxY - minY;
-  const nx = Math.max(2, Math.ceil(width / spacing) + 1);
-  const ny = Math.max(2, Math.ceil(depthY / spacing) + 1);
+  // 격자 칸수 상한 — 좌표 폭이 비정상적으로 크면(잘못된 단위 등) OOM 방지. 칸수만 줄이고 해상도 자동 보정.
+  const MAXN = 160;
+  let nx = Math.max(2, Math.ceil(width / spacing) + 1);
+  let ny = Math.max(2, Math.ceil(depthY / spacing) + 1);
+  if (nx > MAXN || ny > MAXN) {
+    const k = Math.max(nx, ny) / MAXN;
+    nx = Math.max(2, Math.round(nx / k));
+    ny = Math.max(2, Math.round(ny / k));
+  }
   const lx = Array.from({ length: nx }, (_, i) => (i / (nx - 1)) * width);
   const ly = Array.from({ length: ny }, (_, j) => (j / (ny - 1)) * depthY);
 
