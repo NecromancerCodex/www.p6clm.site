@@ -115,6 +115,17 @@ interface ReportData {
   clashes4d: string[]; // 4D Clash — 같은 공간(zone·층)에서 작업 기간 중첩
 }
 
+// 파일명 → 공종(disc) 추측 — 4D 직접 업로드용(플랜 모드는 슬롯 공종이 우선). STRU→구조·ARCH→건축 등.
+// disc 가 있어야 건축/MEP/조경 마감(IfcSlab/Wall)이 공종 window 에 매칭됨.
+const _DISC_KW: [RegExp, string][] = [
+  [/토목|civil/i, "토목"], [/구조|stru/i, "구조"], [/건축|arch/i, "건축"],
+  [/mep|기계|전기|소방|통신|배관|덕트/i, "MEP"], [/조경|landscape/i, "조경"], [/가설|scaffold|temp\b/i, "가설"],
+];
+function discFromName(name: string): string | undefined {
+  for (const [re, d] of _DISC_KW) if (re.test(name)) return d;
+  return undefined;
+}
+
 function Dropzone({
   label,
   accept,
@@ -265,8 +276,9 @@ export default function FourDPage() {
         const buf = await infs[fi].arrayBuffer();
         const tag = infs.length > 1 ? `[${fi + 1}/${infs.length}] ${infs[fi].name} — ` : "";
         const p = await parseIfc(buf, (pr, msg) => setProgress({ p: pr, msg: tag + msg }), skipTrades);
-        // 공종 태그(슬롯/플랜) — 토목.ifc 부재는 disc=토목 → 토공 window 매칭(구조 폴백 방지).
-        const disc = ifcDiscRef.current[infs[fi].name];
+        // 공종 태그 — 플랜 모드는 슬롯 공종(ifcDiscRef), 직접 업로드는 파일명으로 추측(STRU→구조·ARCH→건축).
+        //   disc 가 있어야 건축/MEP/조경 마감(IfcSlab/Wall)이 공종 window 에 매칭됨(구조는 코드매칭이라 무관).
+        const disc = ifcDiscRef.current[infs[fi].name] ?? discFromName(infs[fi].name);
         if (disc) for (const el of p.elements) el.disc = disc;
         parsedList.push(p);
       }
