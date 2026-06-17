@@ -78,6 +78,15 @@ function validateSlot(slot: string, summary?: { discipline: string; count: numbe
   return null;
 }
 
+// 파일명에서 프로젝트 키 추출 — 끝의 공종 토큰·복사본 접미·확장자 제거. 슬롯 간 다른 프로젝트 검출용.
+// (IFC 내부명은 'Default' 등 기본값이 많아 신뢰도 낮음 → 파일명이 더 확실한 신호)
+function projectKey(filename: string): string {
+  let s = filename.replace(/\.[^.]+$/, "").replace(/\s*\(\d+\)\s*$/, "").trim();
+  const m = s.match(/^(.*?)[_\-\s]+(종합|토목|구조|건축|mep|조경|가설|stru\w*|arch\w*|civil\w*|struct\w*|landscape\w*|temp\w*)[\w\-]*$/i);
+  if (m && m[1].trim()) s = m[1];
+  return s.trim().toLowerCase();
+}
+
 let _ganttLoad: Promise<void> | null = null;
 function loadFrappeGantt(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
@@ -537,6 +546,17 @@ export default function SchedulePlanWizard() {
               })}
             </div>
             {bimBusy && <p style={{ fontSize: 12, color: "#2563eb", margin: "8px 0 0" }}>BIM 분석 중…</p>}
+            {(() => {
+              // 슬롯 파일들이 다른 프로젝트인지 검출 — 다르면 합치면 안 됨(좌표·층 어긋남, 공정표 엉킴).
+              const keys = [...new Set(Object.values(slots).map((s) => projectKey(s.name)).filter(Boolean))];
+              if (keys.length <= 1) return null;
+              return (
+                <p style={{ fontSize: 12, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", margin: "8px 0 0" }}>
+                  ⚠️ <b>다른 프로젝트 파일이 섞인 것 같습니다</b> — {Object.entries(slots).map(([k, v]) => `${k}(${v.name})`).join(" · ")}
+                  <br />좌표·층 체계가 달라 공정표·4D가 어긋납니다. <b>같은 프로젝트 파일인지 확인</b>하세요.
+                </p>
+              );
+            })()}
             {Object.keys(slots).length > 1 && (
               <p style={{ fontSize: 12, color: "#15803d", margin: "8px 0 0" }}>
                 🔗 복수 공종 병합 — {Object.keys(slots).join(" + ")}을(를) 시공순서로 연결해 1개 공정표로 생성합니다.

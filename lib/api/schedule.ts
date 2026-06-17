@@ -471,6 +471,7 @@ export interface IfcWorkUnitsResult {
   discipline_summary?: { discipline: string; count: number }[];   // 공종 분포(흙막이 보정 후)
   civil_quantities?: { depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number }; // 토목 물량(서버 placement 도출)
   suggested_equip?: number;      // 물량 기반 권장 토목 투입조(목표 굴착공기 기준) — 대형현장 비현실 기본값 방지
+  project_name?: string;         // IFC 프로젝트/건물명 — 슬롯 간 다른 프로젝트 섞임 검출(보조 신호)
   element_summary: { type: string; count: number; names?: string[] }[];
   unknown_types?: { type: string; count: number; names?: string[] }[]; // 미상(분류 실패) IFC타입
   ai_classified?: number;        // AI 가 이름·타입으로 추정 분류한 부재 수(확정과 구분)
