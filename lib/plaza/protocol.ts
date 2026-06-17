@@ -40,7 +40,7 @@ export type ClientMsg =
   | { t: "draw"; pts: number[][]; c: string; w: number }
   | { t: "board_clear" }
   | { t: "board_open" }
-  | { t: "game_start" }
+  | { t: "game_start"; difficulty: string }
   | { t: "wheel_spin" }
   | { t: "ping" };
 

@@ -10,6 +10,12 @@ import { AvatarThumb } from "./AvatarThumb";
 const BW = 640, BH = 420;
 const COLORS = ["#222222", "#e03131", "#f08c00", "#f5c518", "#2f9e44", "#1971c2", "#7048e8", "#e64980", "#ffffff"];
 const SIZES = [3, 6, 12, 22];
+const DIFFS = [
+  { key: "easy", label: "이지" },
+  { key: "normal", label: "노말" },
+  { key: "hard", label: "하드" },
+  { key: "extreme", label: "익스트림" },
+];
 
 function PlayerCard({ p, game, bubble }: { p: Participant | null; game: GameView | null; bubble?: string }) {
   if (!p) return <div className="plaza-pcard plaza-pcard--empty">비어 있음</div>;
@@ -46,7 +52,7 @@ export function PaintBoard({
   participants: Participant[];
   chatLog: ChatLine[];
   game: GameView | null;
-  startGame: () => void;
+  startGame: (difficulty: string) => void;
 }) {
   const myId = participants.find((p) => p.me)?.id ?? -1;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -54,6 +60,7 @@ export function PaintBoard({
   const [color, setColor] = useState("#222222");
   const [width, setWidth] = useState(6);
   const [eraser, setEraser] = useState(false);
+  const [difficulty, setDifficulty] = useState("normal");
   const [remain, setRemain] = useState(0);
   const [nowMs, setNowMs] = useState(0);
   const chatLogRef = useRef<HTMLDivElement | null>(null);
@@ -160,9 +167,19 @@ export function PaintBoard({
             <span className="plaza-game-status">참가 {participants.length}명 · 2명 이상이면 시작 가능</span>
           )}
           {!game && (
-            <button type="button" className="plaza-game-start" disabled={participants.length < 2} onClick={startGame}>
-              <Play size={14} /> 게임 시작
-            </button>
+            <div className="plaza-diff-wrap">
+              <div className="plaza-diff">
+                {DIFFS.map((d) => (
+                  <button key={d.key} type="button"
+                    className={`plaza-diff-btn${difficulty === d.key ? " on" : ""}`}
+                    onClick={() => setDifficulty(d.key)}>{d.label}</button>
+                ))}
+              </div>
+              <button type="button" className="plaza-game-start" disabled={participants.length < 2}
+                onClick={() => startGame(difficulty)}>
+                <Play size={14} /> 게임 시작
+              </button>
+            </div>
           )}
           <button type="button" className="plaza-panel-x" onClick={onClose} aria-label="닫기"><X size={16} /></button>
         </div>

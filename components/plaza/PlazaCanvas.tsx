@@ -578,7 +578,7 @@ export function PlazaCanvas() {
             participants={participants}
             chatLog={chatLog}
             game={game}
-            startGame={() => wsSend({ t: "game_start" })}
+            startGame={(difficulty) => wsSend({ t: "game_start", difficulty })}
           />
         )}
         {panel === "wheel" && (

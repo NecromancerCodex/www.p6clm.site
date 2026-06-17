@@ -4978,3 +4978,13 @@ select {
   border: 6px solid transparent; border-top-color: #fff;
 }
 .plaza-room-chathint { color: #8d99a8; font-size: 0.78rem; text-align: center; padding: 6px 0; }
+
+/* 광장 그림퀴즈 — 난이도 선택 */
+.plaza-diff-wrap { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.plaza-diff { display: inline-flex; gap: 4px; }
+.plaza-diff-btn {
+  padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 0.76rem; font-weight: 700;
+  border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #c2ccd8;
+}
+.plaza-diff-btn:hover { background: rgba(255,255,255,0.12); }
+.plaza-diff-btn.on { background: var(--primary); border-color: var(--primary); color: #fff; }
