@@ -269,6 +269,22 @@ const _MEP_TYPES = new Set([
 const _MEP_TRADES = new Set(["ME", "FP", "EL", "TC"]);
 const _LANDSCAPE_TYPES = new Set(["IfcGeographicElement"]);
 
+// 부재 공종 분류 — 섞인 파일(건축 IFC에 조경·구조 IFC에 흙막이) 분리. 파일 슬롯(fileDisc)이 기본,
+// 단 이름·타입이 확실한 타 공종은 override. 구조/미상은 fileDisc 로(애매한 마감벽→구조 오분류는 슬롯이 덮음).
+const _LAND_NM = /조경|식재|수목|교목|관목|잔디|지피|화단|파고라|planter|landscap/i;
+const _CIVIL_NM4 = /흙막이|토류|버팀|띠장|복공판|cip|scw|어스앵커|엄지말뚝|h-?pile|지하연속벽|diaphragm|slurry/i;
+export function classifyDisc(
+  el: { ifcType: string; name?: string | null; trade?: string | null; disc?: string | null },
+  fileDisc?: string,
+): string {
+  const nm = el.name || "";
+  if (_MEP_TRADES.has(el.trade ?? "") || _MEP_TYPES.has(el.ifcType)) return "MEP";
+  if (el.trade === "LS" || _LANDSCAPE_TYPES.has(el.ifcType) || _LAND_NM.test(nm)) return "조경";
+  if (el.trade === "CV" || _CIVIL_NM4.test(nm)) return "토목";
+  if (el.trade === "AR" || _FINISH_TYPES.has(el.ifcType)) return "건축";
+  return fileDisc || el.disc || "";   // 구조/미상 → 파일 슬롯(애매한 것)
+}
+
 // 스케줄 op(CR/MD/FT/PR) → 부재 카테고리. BIM 부재(classifyIfcType)와 같은 축으로 통일해
 // trade(ST/MO)·wt(WAL/SLB/COL) 코드 차이를 무시하고 구역 단위 매칭을 살린다.
 function opToCat(op: string): Category {

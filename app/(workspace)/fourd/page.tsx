@@ -23,6 +23,7 @@ import {
   buildCodeIndex,
   buildScheduleIndex,
   canonStorey,
+  classifyDisc,
   classifyIfcType,
   decodeActId,
   expandModularUnits,
@@ -276,10 +277,10 @@ export default function FourDPage() {
         const buf = await infs[fi].arrayBuffer();
         const tag = infs.length > 1 ? `[${fi + 1}/${infs.length}] ${infs[fi].name} — ` : "";
         const p = await parseIfc(buf, (pr, msg) => setProgress({ p: pr, msg: tag + msg }), skipTrades);
-        // 공종 태그 — 플랜 모드는 슬롯 공종(ifcDiscRef), 직접 업로드는 파일명으로 추측(STRU→구조·ARCH→건축).
-        //   disc 가 있어야 건축/MEP/조경 마감(IfcSlab/Wall)이 공종 window 에 매칭됨(구조는 코드매칭이라 무관).
-        const disc = ifcDiscRef.current[infs[fi].name] ?? discFromName(infs[fi].name);
-        if (disc) for (const el of p.elements) el.disc = disc;
+        // 공종 태그 — 파일 슬롯(플랜) 또는 파일명 추측이 '기본', 단 섞인 파일 분리: 건축 IFC의 조경 포장→조경,
+        //   구조 IFC의 흙막이 pile→토목 등 확실한 타 공종은 classifyDisc 가 override(이름·타입). 애매한 건 슬롯.
+        const fileDisc = ifcDiscRef.current[infs[fi].name] ?? discFromName(infs[fi].name);
+        for (const el of p.elements) { const d = classifyDisc(el, fileDisc); if (d) el.disc = d; }
         parsedList.push(p);
       }
       const parsed = mergeParsed(parsedList);

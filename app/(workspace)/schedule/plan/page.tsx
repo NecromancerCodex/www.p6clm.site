@@ -302,12 +302,15 @@ export default function SchedulePlanWizard() {
       for (const [disc, file] of entries) {
         setInferReason(`분석 중 — ${disc} (${file.name})…`);
         const r = await analyzeSlotFile(file);
-        // 슬롯이 진실: 종합 슬롯만 분류기로 전 공종 분리(PSet Trade+IFC타입), 나머지(토목/구조/건축)는
-        // 슬롯 공종으로 강제 → "토목은 토목만, 구조는 구조만, 건축은 건축만". 혼합 파일은 종합 슬롯 사용.
+        // 슬롯 = 기본 공종. 단 실제 파일은 섞임(건축 IFC에 조경·구조 IFC에 흙막이 pile) → 분류기가
+        // **확실히 잡은 타 공종(토목·MEP·조경)은 살리고**, 애매한 것(마감벽→구조 오분류 등)만 슬롯으로 강제.
+        // 종합 슬롯은 전부 분류기. (예: 건축 슬롯의 "조경-화강석포장"→조경, 구조 슬롯의 흙막이 pile→토목)
         const comprehensive = disc === "종합";
+        const KEEP = new Set(["토목", "MEP", "조경"]);   // 이름·타입이 확실한 공종(분류기 신뢰)
         allWu.push(...(comprehensive
           ? (r.work_units as GenWorkUnit[])
-          : (r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))));
+          : (r.work_units as GenWorkUnit[]).map((w) =>
+              KEEP.has(String(w.discipline || "")) ? w : { ...w, discipline: disc })));
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
         if (r.civil_quantities) cq = r.civil_quantities;
         if (r.suggested_equip) setCivilEquip(r.suggested_equip);  // 물량 기반 권장 투입조 자동 반영(대형현장 현실화)
