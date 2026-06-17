@@ -193,27 +193,27 @@ export function EarthworkViewer({
     // ── 통합 데이터 오버레이: 대지경계선 + Pile + 지형 표고점 ──
     const overlay = new THREE.Group();
     const surfY = bounds.maxE; // 지표 근처 표고
+    // 오버레이 라인 — depthTest off 로 불투명 지층에 가려지지 않고 항상 보이게.
+    const ovLine = (pts: THREE.Vector3[], color: number) => {
+      const ln = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true }),
+      );
+      ln.renderOrder = 3;
+      overlay.add(ln);
+    };
 
     if (boundary.length >= 3) {
       const bpts = boundary.map((p) => new THREE.Vector3(p.x - model.minX, surfY + span * 0.01, p.y - model.minY));
       bpts.push(bpts[0].clone()); // 닫기
-      overlay.add(new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(bpts),
-        new THREE.LineBasicMaterial({ color: 0x22c55e }),
-      ));
+      ovLine(bpts, 0x22c55e);
     }
 
     if (piles.length) {
+      const len = span * 0.08; // 위치 표시용 짧은 막대 (실제 심도 아님)
       for (const p of piles) {
         const px = p.x - model.minX, pz = p.y - model.minY;
-        const len = p.length > 0 ? p.length : span * 0.15;
-        overlay.add(new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(px, surfY, pz),
-            new THREE.Vector3(px, surfY - len, pz),
-          ]),
-          new THREE.LineBasicMaterial({ color: 0xe0892b }),
-        ));
+        ovLine([new THREE.Vector3(px, surfY, pz), new THREE.Vector3(px, surfY - len, pz)], 0xf59e0b);
       }
     }
 
@@ -236,11 +236,10 @@ export function EarthworkViewer({
     }
 
     if (walls.length) {
-      const wallMat = new THREE.LineBasicMaterial({ color: 0xe11d48 }); // 흙막이 벽 (적색)
       for (const w of walls) {
         if (w.points.length < 2) continue;
-        const wp = w.points.map((p) => new THREE.Vector3(p.x - model.minX, surfY, p.y - model.minY));
-        overlay.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(wp), wallMat));
+        const wp = w.points.map((p) => new THREE.Vector3(p.x - model.minX, surfY + span * 0.005, p.y - model.minY));
+        ovLine(wp, 0xe11d48); // 흙막이 벽 (적색)
       }
     }
 
