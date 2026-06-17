@@ -375,13 +375,6 @@ export default function SchedulePlanWizard() {
   };
   const removeAct = (i: number) => { setActs((prev) => prev.filter((_, j) => j !== i)); setDirty(true); };
 
-  // ── 멀티파싱 파라미터 가시성 — 단일 discipline 이 아니라 '채워진 슬롯' 기준 ──
-  // (토목+구조 동시 업로드 시 구조유형이 'discipline=토목'에 가려지던 버그 수정)
-  const filledDiscs = Object.keys(slots);
-  const multiDisc = filledDiscs.length >= 2;
-  const noSlots = filledDiscs.length === 0;
-  const hasStruct = !!slots["구조"] || (noSlots && (discipline === "" || discipline === "구조"));
-  const hasCivil = !!slots["토목"];
 
   // ════════════════ 렌더 ════════════════
   return (
