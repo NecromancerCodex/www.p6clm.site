@@ -122,21 +122,6 @@ function drawNameTag(ctx: CanvasRenderingContext2D, x: number, feetY: number, na
 // 합성 이미지를 허리에서 잘라 좌/우 다리 조각을 반대로 회전(시저 워크)시킨다.
 // (옷·신발이 통짜라 분리 레이어가 없으므로 이미지 분할이 유일한 방법)
 const CHAR_H = 104; // 표시 높이(px)
-const HIP = 0.56;   // 허리 분할 지점 (위→아래 비율)
-
-/** 다리 조각 — 힙 피벗 기준 회전 후 그리기. */
-function drawLegPiece(
-  ctx: CanvasRenderingContext2D, src: CanvasImageSource,
-  sx: number, sy: number, sw: number, sh: number,
-  dx: number, dy: number, dw: number, dh: number,
-  px: number, py: number, ang: number,
-) {
-  ctx.save();
-  ctx.translate(px, py); ctx.rotate(ang); ctx.translate(-px, -py);
-  ctx.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh);
-  ctx.restore();
-}
-
 export function drawStaticChar(
   ctx: CanvasRenderingContext2D, o: ChibiOpts, src: CanvasImageSource, srcW: number, srcH: number,
 ) {
@@ -171,22 +156,12 @@ export function drawStaticChar(
   ctx.save();
   if (o.facing === "l") { ctx.translate(o.x, 0); ctx.scale(-1, 1); ctx.translate(-o.x, 0); }
 
+  // 걷기 = 통짜 이미지를 발 기준으로 살짝 좌우 흔들기(찢김 없음).
   if (walk) {
-    const hipSrcY = srcH * HIP;
-    const legSrcH = srcH - hipSrcY;
-    const upperDH = dh * HIP;
-    const legDH = dh - upperDH;
-    const hipY = topY + upperDH;
-    const ang = Math.sin(o.now / 150) * 0.11; // 다리 스윙 각 (~6°, 찢김 최소화)
-    // 다리(뒤) — 좌/우 반대 회전, 허리 피벗
-    drawLegPiece(ctx, src, 0, hipSrcY, srcW / 2, legSrcH, left, hipY, dw / 2, legDH, o.x, hipY, ang);
-    drawLegPiece(ctx, src, srcW / 2, hipSrcY, srcW / 2, legSrcH, o.x, hipY, dw / 2, legDH, o.x, hipY, -ang);
-    // 상체(앞) — 허리보다 살짝 더 아래까지 덮어 이음새/찢김 가림
-    const ovS = srcH * 0.05, ovD = dh * 0.05;
-    ctx.drawImage(src, 0, 0, srcW, hipSrcY + ovS, left, topY, dw, upperDH + ovD);
-  } else {
-    ctx.drawImage(src, left, topY, dw, dh);
+    const sway = Math.sin(o.now / 150) * 0.045; // ~2.6° 흔들림
+    ctx.translate(o.x, feetY); ctx.rotate(sway); ctx.translate(-o.x, -feetY);
   }
+  ctx.drawImage(src, left, topY, dw, dh);
   ctx.restore();
 
   drawNameTag(ctx, o.x, feetY, o.name, !!o.isMe);
