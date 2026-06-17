@@ -4943,3 +4943,22 @@ select {
   width: fit-content; max-width: 100%; word-break: break-word;
 }
 .plaza-chatlog-line b { color: #ffe066; margin-right: 4px; }
+
+/* 광장 — 돌림판(룰렛) */
+.plaza-wheel-wrap {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  padding: 18px 0 8px; min-height: 340px;
+}
+.plaza-wheel { display: block; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.4)); }
+.plaza-wheel-pointer {
+  position: absolute; top: 6px; left: 50%; transform: translateX(-50%);
+  width: 0; height: 0; z-index: 2;
+  border-left: 13px solid transparent; border-right: 13px solid transparent;
+  border-top: 24px solid #ffd43b; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5));
+}
+.plaza-wheel-result {
+  position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+  background: rgba(20,28,44,0.95); color: #ffe066; font-weight: 800; font-size: 1rem;
+  padding: 6px 16px; border-radius: 10px; border: 1px solid rgba(255,215,94,0.5);
+  white-space: nowrap;
+}

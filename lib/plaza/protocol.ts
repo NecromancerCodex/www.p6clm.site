@@ -25,6 +25,7 @@ export type ServerMsg =
   | { t: "game_correct"; id: number; name: string; scores: Scores }
   | { t: "game_round_end"; word: string; scores: Scores }
   | { t: "game_over"; scores: Scores }
+  | { t: "wheel_spin"; order: number[]; targetId: number; turns: number; dur: number }
   | { t: "leave"; id: number }
   | { t: "pong" };
 
@@ -40,6 +41,7 @@ export type ClientMsg =
   | { t: "board_clear" }
   | { t: "board_open" }
   | { t: "game_start" }
+  | { t: "wheel_spin" }
   | { t: "ping" };
 
 /** 그림판 폴리라인 스트로크 */

@@ -4,30 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { X, Trash2, Eraser, Pencil, Send, Play } from "lucide-react";
 
 import type { ClientMsg, ServerMsg, Stroke } from "../../lib/plaza/protocol";
-import { loadManifest, composeAvatar, type AvatarConfig } from "../../lib/plaza/parts";
 import type { Participant, ChatLine, GameView } from "./PlazaCanvas";
+import { AvatarThumb } from "./AvatarThumb";
 
 const BW = 640, BH = 420;
 const COLORS = ["#222222", "#e03131", "#f08c00", "#f5c518", "#2f9e44", "#1971c2", "#7048e8", "#e64980", "#ffffff"];
 const SIZES = [3, 6, 12, 22];
-
-function AvatarThumb({ config }: { config: AvatarConfig }) {
-  const ref = useRef<HTMLCanvasElement | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void loadManifest().then((m) => composeAvatar(m, config)).then((res) => {
-      if (!alive || !res) return;
-      const c = ref.current; if (!c) return;
-      const ctx = c.getContext("2d"); if (!ctx) return;
-      ctx.clearRect(0, 0, c.width, c.height);
-      const scale = Math.min(c.width / res.w, c.height / res.h);
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(res.canvas, (c.width - res.w * scale) / 2, c.height - res.h * scale, res.w * scale, res.h * scale);
-    });
-    return () => { alive = false; };
-  }, [config]);
-  return <canvas ref={ref} width={54} height={64} className="plaza-pcard-av" />;
-}
 
 function PlayerCard({ p, game }: { p: Participant | null; game: GameView | null }) {
   if (!p) return <div className="plaza-pcard plaza-pcard--empty">비어 있음</div>;
@@ -159,7 +141,7 @@ export function PaintBoard({
     <div className="plaza-board-backdrop" onClick={onClose}>
       <div className="plaza-room" onClick={(e) => e.stopPropagation()}>
         <div className="plaza-panel-head">
-          <span className="plaza-panel-title">🎯 캐치마인드</span>
+          <span className="plaza-panel-title">🎯 그림퀴즈</span>
           {game ? (
             <span className="plaza-game-status">
               라운드 {game.round}/{game.total} · 출제자 <b>{drawerName}</b>

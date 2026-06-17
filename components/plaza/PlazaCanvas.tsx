@@ -29,6 +29,7 @@ import { usePlazaStore } from "../../stores/plazaStore";
 import { ShopPanel } from "./ShopPanel";
 import { CharacterCreator } from "./CharacterCreator";
 import { PaintBoard } from "./PaintBoard";
+import { WheelRoom } from "./WheelRoom";
 
 // ── 월드 / 물리 상수 ──────────────────────────────────────────────────────────
 // 월드 = 배경 이미지(town.png) 원본 크기 1384×768 와 1:1.
@@ -140,7 +141,7 @@ export function PlazaCanvas() {
   const [status, setStatus] = useState<"connecting" | "open" | "closed">("connecting");
   const [count, setCount] = useState(1);
   const [chatValue, setChatValue] = useState("");
-  const [panel, setPanel] = useState<null | "shop" | "creator" | "paint">(null);
+  const [panel, setPanel] = useState<null | "shop" | "creator" | "paint" | "wheel">(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [chatLog, setChatLog] = useState<ChatLine[]>([]);
   const [game, setGame] = useState<GameView | null>(null);
@@ -259,8 +260,9 @@ export function PlazaCanvas() {
         }
         case "draw":
         case "board_init":
-        case "board_clear": {
-          boardHandlerRef.current?.(msg); // 그림판으로 전달
+        case "board_clear":
+        case "wheel_spin": {
+          boardHandlerRef.current?.(msg); // 열려있는 룸(그림퀴즈/돌림판)으로 전달
           break;
         }
         case "game_state": {
@@ -553,7 +555,8 @@ export function PlazaCanvas() {
         <div className="plaza-tools">
           <button type="button" className={`plaza-tool${panel === "shop" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "shop" ? null : "shop"))}>🛒 상점</button>
           <button type="button" className={`plaza-tool${panel === "creator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "creator" ? null : "creator"))}>🎨 캐릭터 <kbd>C</kbd></button>
-          <button type="button" className={`plaza-tool${panel === "paint" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "paint" ? null : "paint"))}>🖌️ 그림판</button>
+          <button type="button" className={`plaza-tool${panel === "paint" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "paint" ? null : "paint"))}>🎯 그림퀴즈</button>
+          <button type="button" className={`plaza-tool${panel === "wheel" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "wheel" ? null : "wheel"))}>🎡 돌림판</button>
         </div>
       </div>
 
@@ -577,6 +580,17 @@ export function PlazaCanvas() {
             onChatFocus={(b) => { inputFocusedRef.current = b; }}
             game={game}
             startGame={() => wsSend({ t: "game_start" })}
+          />
+        )}
+        {panel === "wheel" && (
+          <WheelRoom
+            send={wsSend}
+            register={(h) => { boardHandlerRef.current = h; }}
+            onClose={() => setPanel(null)}
+            participants={participants}
+            chatLog={chatLog}
+            sendChat={sendChat}
+            onChatFocus={(b) => { inputFocusedRef.current = b; }}
           />
         )}
         {/* 최초(아바타 없음) = 강제 / 툴바 = 편집(닫기 가능) */}
