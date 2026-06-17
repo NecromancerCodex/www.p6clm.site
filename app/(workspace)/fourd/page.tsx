@@ -307,15 +307,30 @@ export default function FourDPage() {
         const ew = codeIndex.earthworkWindow;
         const bnum = (s: string) => { const m = /B\s*0*(\d+)/i.exec(s); return m ? parseInt(m[1], 10) : 0; };
         const civilEls = parsed.elements.filter((e) => e.disc === "토목" || e.trade === "CV" || e.trade === "TW");
-        const stoSet = [...new Set(civilEls.map((e) => canonStorey(e.storey4d ?? e.storeyName ?? "") || "").filter(Boolean))];
-        stoSet.sort((a, b) => bnum(a) - bnum(b)); // B1 → B5 (굴착 top-down)
-        if (stoSet.length > 1 && ew.end > ew.start) {
-          const span = (ew.end - ew.start) / stoSet.length;
-          const ord = new Map(stoSet.map((s, i) => [s, i]));
+        // ① 지하 B레벨 기반 — 잘 태깅된 흙막이(B1→B5 top-down). 2개 이상 B레벨이 있을 때만.
+        const bLevels = [...new Set(civilEls.map((e) => canonStorey(e.storey4d ?? e.storeyName ?? "") || "")
+          .filter((s) => bnum(s) > 0))].sort((a, b) => bnum(a) - bnum(b));
+        if (bLevels.length > 1 && ew.end > ew.start) {
+          const span = (ew.end - ew.start) / bLevels.length;
+          const ord = new Map(bLevels.map((s, i) => [s, i]));
           for (const e of civilEls) {
-            const s = canonStorey(e.storey4d ?? e.storeyName ?? "") || "";
-            const i = ord.get(s) ?? 0;
-            ranges.set(e.globalId, { range: { start: ew.start + i * span, end: ew.start + (i + 1) * span }, via: `earthwork:${s || "토목"}` });
+            const i = ord.get(canonStorey(e.storey4d ?? e.storeyName ?? "") || "");
+            if (i != null) ranges.set(e.globalId, { range: { start: ew.start + i * span, end: ew.start + (i + 1) * span }, via: `earthwork:B${bnum(bLevels[i])}` });
+          }
+        } else if (ew.end > ew.start) {
+          // ② Z(표고) 깊이 밴드 폴백 — 층 미태깅 토목(흙막이 말뚝 등). 부재 배치 Y(cy)로 top-down 굴착
+          //    순서 복원(PSet·층 배정 불요). 토목은 본질이 깊이 단위라 표고 staging 이 자연스러움.
+          const ys = civilEls.map((e) => e.cy).filter((v) => Number.isFinite(v)) as number[];
+          if (ys.length) {
+            const top = Math.max(...ys), bot = Math.min(...ys);
+            const N = top > bot ? 6 : 1;                  // 굴착 ~6단(lift). 평평하면 1단.
+            const band = top > bot ? (top - bot) / N : 1;
+            const span = (ew.end - ew.start) / N;
+            for (const e of civilEls) {
+              const y = Number.isFinite(e.cy) ? (e.cy as number) : top;
+              const i = top > bot ? Math.min(N - 1, Math.max(0, Math.floor((top - y) / band))) : 0;  // 얕은 곳(top) 먼저
+              ranges.set(e.globalId, { range: { start: ew.start + i * span, end: ew.start + (i + 1) * span }, via: `earthwork:D${i + 1}` });
+            }
           }
         }
       }
