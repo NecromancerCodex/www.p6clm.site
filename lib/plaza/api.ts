@@ -1,18 +1,14 @@
 /**
- * 광장 프로필/상점/장착 REST 클라이언트.
+ * 광장 프로필/상점/아바타 REST 클라이언트.
  *
- * Backend: /api/v1/plaza/{profile,shop/buy,equip}  (api_router, 세션 쿠키 인증)
+ * Backend: /api/v1/plaza/{profile,shop/buy,avatar}  (api_router, 세션 쿠키 인증)
  * Frontend proxy: /api/clm (next.config rewrite → /api/v1)
  */
-import type { Look } from "./protocol";
-
 const API_BASE = "/api/clm";
 
 export interface PlazaProfile {
   currency: number;
   inventory: string[];
-  equipped: Look;
-  character: string | null;
   avatar: Record<string, string> | null;
 }
 
@@ -38,26 +34,6 @@ export async function buyItem(itemKey: string): Promise<PlazaProfile> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ item_key: itemKey }),
-    }),
-  );
-}
-
-export async function equipItem(slot: string, itemKey: string | null): Promise<PlazaProfile> {
-  return parse(
-    await fetch(`${API_BASE}/plaza/equip`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slot, item_key: itemKey }),
-    }),
-  );
-}
-
-export async function setCharacter(character: string): Promise<PlazaProfile> {
-  return parse(
-    await fetch(`${API_BASE}/plaza/character`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ character }),
     }),
   );
 }

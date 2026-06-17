@@ -8,8 +8,7 @@
  *    .p6clm.site 도메인이라 ai.p6clm.site 서브도메인으로 자동 전달된다(구글 로그인과 동일).
  */
 
-/** 장착 외형 — 슬롯 → item_key */
-export type Look = Record<string, string>;
+export type AvatarConfig = Record<string, string>;
 
 /** server → client */
 export type ServerMsg =
@@ -17,9 +16,7 @@ export type ServerMsg =
   | { t: "join"; p: PlayerSnapshot }
   | { t: "state"; id: number; x: number; y: number; vx: number; facing: Facing; st: AnimState }
   | { t: "chat"; id: number; name: string; text: string }
-  | { t: "look"; id: number; eq: Look }
-  | { t: "char"; id: number; c: string }
-  | { t: "avatar"; id: number; a: Record<string, string> }
+  | { t: "avatar"; id: number; a: AvatarConfig }
   | { t: "leave"; id: number }
   | { t: "pong" };
 
@@ -27,9 +24,7 @@ export type ServerMsg =
 export type ClientMsg =
   | { t: "move"; x: number; y: number; vx: number; facing: Facing; st: AnimState }
   | { t: "chat"; text: string }
-  | { t: "look"; eq: Look }
-  | { t: "char"; c: string }
-  | { t: "avatar"; a: Record<string, string> }
+  | { t: "avatar"; a: AvatarConfig }
   | { t: "ping" };
 
 export type Facing = "l" | "r";
@@ -42,9 +37,7 @@ export interface PlayerSnapshot {
   y: number;
   facing: Facing;
   st: AnimState;
-  look?: Look;
-  character?: string | null;
-  avatar?: Record<string, string> | null;
+  avatar?: AvatarConfig | null;
 }
 
 /** 백엔드 WS 엔드포인트 URL. http(s) 베이스를 ws(s) 로 변환. */

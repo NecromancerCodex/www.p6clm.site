@@ -19,7 +19,6 @@ import {
   type ClientMsg,
   type ServerMsg,
   type PlayerSnapshot,
-  type Look,
 } from "../../lib/plaza/protocol";
 import { drawChibi, drawStaticChar, roundRect } from "../../lib/plaza/render";
 import {
@@ -98,7 +97,6 @@ interface RemotePlayer {
   vx: number;
   facing: Facing;
   st: AnimState;
-  look: Look; // 장착 외형
   avatar: AvatarConfig; // 크리에이터 합성 설정
 }
 
@@ -117,8 +115,7 @@ export function PlazaCanvas() {
   const [chatValue, setChatValue] = useState("");
   const [panel, setPanel] = useState<null | "shop" | "creator">(null);
 
-  // 프로필 스토어 (재화·인벤·장착·아바타)
-  const equipped = usePlazaStore((s) => s.equipped);
+  // 프로필 스토어 (재화·인벤·아바타)
   const loadProfile = usePlazaStore((s) => s.load);
   const loaded = usePlazaStore((s) => s.loaded);
   const avatar = usePlazaStore((s) => s.avatar);
@@ -136,7 +133,6 @@ export function PlazaCanvas() {
   const inputFocusedRef = useRef(false);
   const bgRef = useRef<HTMLImageElement | null>(null);
   const fgRef = useRef<HTMLImageElement | null>(null); // 선택: 전경 컷아웃 PNG
-  const myLookRef = useRef<Look>({}); // 내 장착 외형 (게임 루프용)
   const myAvatarRef = useRef<AvatarConfig>(DEFAULT_AVATAR); // 내 아바타 설정 (게임 루프용)
   const manifestRef = useRef<PartsManifest | null>(null);
   const avatarCacheRef = useRef<Map<string, ComposedAvatar>>(new Map()); // 합성 결과 캐시
@@ -204,11 +200,6 @@ export function PlazaCanvas() {
           );
           break;
         }
-        case "look": {
-          const r = remotesRef.current.get(msg.id);
-          if (r) r.look = msg.eq || {};
-          break;
-        }
         case "avatar": {
           const r = remotesRef.current.get(msg.id);
           if (r && msg.a) r.avatar = msg.a;
@@ -227,7 +218,7 @@ export function PlazaCanvas() {
       if (p.id === myIdRef.current) return;
       remotesRef.current.set(p.id, {
         id: p.id, name: p.name, x: p.x, y: p.y, tx: p.x, ty: p.y,
-        vx: 0, facing: p.facing, st: p.st, look: p.look || {},
+        vx: 0, facing: p.facing, st: p.st,
         avatar: p.avatar || DEFAULT_AVATAR,
       });
     }
@@ -239,15 +230,6 @@ export function PlazaCanvas() {
       wsRef.current = null;
     };
   }, []);
-
-  // ── 장착 외형 동기화: 변경/접속 시 WS look 송신 ───────────────────────────────
-  useEffect(() => {
-    myLookRef.current = equipped;
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ t: "look", eq: equipped } as ClientMsg));
-    }
-  }, [equipped, status]);
 
   // ── 아바타 동기화: 변경/접속 시 WS avatar 송신 + 게임루프 ref 갱신 ──────────────
   useEffect(() => {
@@ -355,13 +337,13 @@ export function PlazaCanvas() {
       for (const r of remotesRef.current.values()) {
         drawPlayer({
           x: r.x, y: r.y, facing: r.facing, st: r.st, bodyColor: colorFor(r.id),
-          name: r.name, now, look: r.look, bubble: bubbleFor(r.id, now),
+          name: r.name, now, bubble: bubbleFor(r.id, now),
         }, r.avatar);
       }
       const LL = localRef.current;
       drawPlayer({
         x: LL.x, y: LL.y, facing: LL.facing, st: LL.st, bodyColor: colorFor(myIdRef.current),
-        name: "나", now, look: myLookRef.current, isMe: true, bubble: bubbleFor(-1, now),
+        name: "나", now, isMe: true, bubble: bubbleFor(-1, now),
       }, myAvatarRef.current);
 
       // ── 전경(foreground) — 투명 컷아웃 PNG(town_fg.png) 가 있을 때만 캐릭터 위에 덮음.

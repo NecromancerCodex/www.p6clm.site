@@ -1,12 +1,10 @@
 /**
- * 광장 캐릭터/아이템 렌더링 — 순수 canvas 함수 (자산 없음, 도형으로 그림).
+ * 광장 캐릭터 렌더링 — 순수 canvas 함수.
  *
- * drawChibi: 2등신(머리 큰 비율) 캐릭터 + 장착 외형(모자/상의/무기/망토) 오버레이.
- * drawItemIcon: 인벤/상점 패널용 아이템 아이콘.
- * 외형 데이터는 lib/plaza/catalog.ts (slot+kind+color) 가 결정.
+ * drawStaticChar: 합성 아바타(파츠) + 의사 스켈레톤 모션.
+ * drawChibi: 아바타 합성 전 폴백용 간단 치비.
  */
-import { CATALOG, getItem, type Item } from "./catalog";
-import type { AnimState, Facing, Look } from "./protocol";
+import type { AnimState, Facing } from "./protocol";
 
 // ── 공유 프리미티브 ─────────────────────────────────────────────────────────────
 export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -47,19 +45,8 @@ export interface ChibiOpts {
   bodyColor: string;
   name: string;
   now: number;
-  look?: Look;
   isMe?: boolean;
   bubble?: { text: string };
-}
-
-interface Layout {
-  x: number;
-  feetY: number;
-  bodyTopY: number;
-  bodyBottomY: number;
-  headCX: number;
-  headCY: number;
-  dir: number; // 1=오른쪽, -1=왼쪽
 }
 
 export function drawChibi(ctx: CanvasRenderingContext2D, o: ChibiOpts) {
@@ -69,18 +56,11 @@ export function drawChibi(ctx: CanvasRenderingContext2D, o: ChibiOpts) {
   const bodyBottomY = feetY - LEG_LEN - bob;
   const bodyTopY = bodyBottomY - BODY_H;
   const headCY = bodyTopY - HEAD_R + 6;
-  const L: Layout = { x: o.x, feetY, bodyTopY, bodyBottomY, headCX: o.x, headCY, dir };
-  const look = o.look || {};
-  const top = getItem(look.top);
-
   ctx.save();
 
   // 그림자
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   ctx.beginPath(); ctx.ellipse(o.x, feetY + 1, BODY_W * 0.5, 5, 0, 0, Math.PI * 2); ctx.fill();
-
-  // 망토 (몸 뒤)
-  if (look.cape) drawCape(ctx, getItem(look.cape)!, L, o.now);
 
   // 다리 (걷기 스윙)
   const swing = o.st === "walk" ? Math.sin(o.now / 80) * 4 : 0;
@@ -88,20 +68,16 @@ export function drawChibi(ctx: CanvasRenderingContext2D, o: ChibiOpts) {
   drawLeg(ctx, o.x + 6, bodyBottomY, -swing);
 
   // 뒤쪽 팔
-  drawArm(ctx, o.x - dir * (BODY_W / 2 - 1), bodyTopY + 5, top ? (top.color2 || top.color) : o.bodyColor);
+  drawArm(ctx, o.x - dir * (BODY_W / 2 - 1), bodyTopY + 5, o.bodyColor);
 
-  // 몸통 (상의)
+  // 몸통
   const bx = o.x - BODY_W / 2;
-  ctx.fillStyle = top ? top.color : o.bodyColor;
+  ctx.fillStyle = o.bodyColor;
   roundRect(ctx, bx, bodyTopY, BODY_W, BODY_H, 7); ctx.fill();
   if (o.isMe) { ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2; ctx.stroke(); }
-  if (top) drawTopDetail(ctx, top, L);
 
-  // 앞쪽 팔 + 무기
-  const handX = o.x + dir * (BODY_W / 2 - 1);
-  const handY = bodyTopY + 5;
-  drawArm(ctx, handX, handY, top ? (top.color2 || top.color) : o.bodyColor);
-  if (look.weapon) drawWeapon(ctx, getItem(look.weapon)!, handX + dir * 4, handY + 4, 1, dir);
+  // 앞쪽 팔
+  drawArm(ctx, o.x + dir * (BODY_W / 2 - 1), bodyTopY + 5, o.bodyColor);
 
   // 머리
   ctx.fillStyle = SKIN;
@@ -121,9 +97,6 @@ export function drawChibi(ctx: CanvasRenderingContext2D, o: ChibiOpts) {
   // 볼터치
   ctx.fillStyle = "rgba(255,150,150,0.45)";
   ctx.beginPath(); ctx.arc(o.x - 6, eyeY + 5, 2.6, 0, Math.PI * 2); ctx.arc(o.x + 8, eyeY + 5, 2.6, 0, Math.PI * 2); ctx.fill();
-
-  // 모자 (머리 위)
-  if (look.hat) drawHat(ctx, getItem(look.hat)!, o.x, headCY, 1, dir);
 
   // 이름표
   drawNameTag(ctx, o.x, feetY, o.name, !!o.isMe);
@@ -234,97 +207,6 @@ function drawArm(ctx: CanvasRenderingContext2D, x: number, y: number, color: str
   ctx.beginPath(); ctx.arc(x, y + 14, 4, 0, Math.PI * 2); ctx.fill();
 }
 
-// ── 장비 (몸 위) ─────────────────────────────────────────────────────────────────
-function drawHat(ctx: CanvasRenderingContext2D, item: Item, cx: number, cy: number, s: number, dir: number) {
-  const topY = cy - HEAD_R * s;
-  ctx.save();
-  if (item.kind === "hardhat") {
-    ctx.fillStyle = item.color;
-    ctx.beginPath(); ctx.arc(cx, topY + 6 * s, 15 * s, Math.PI, 0); ctx.fill();
-    roundRect(ctx, cx - 19 * s, topY + 4 * s, 38 * s, 5 * s, 2 * s); ctx.fill(); // 챙
-    ctx.fillStyle = item.color2 || item.color; // 능선
-    roundRect(ctx, cx - 2 * s, topY - 9 * s, 4 * s, 16 * s, 2 * s); ctx.fill();
-  } else if (item.kind === "cap") {
-    ctx.fillStyle = item.color;
-    ctx.beginPath(); ctx.arc(cx, topY + 5 * s, 14 * s, Math.PI, 0); ctx.fill();
-    ctx.fillStyle = item.color2 || item.color;
-    roundRect(ctx, cx + dir * 4 * s, topY + 3 * s, dir * 18 * s, 4 * s, 2 * s); ctx.fill(); // 챙
-  } else if (item.kind === "crown") {
-    ctx.fillStyle = item.color;
-    const w = 30 * s, h = 16 * s, bx = cx - w / 2, by = topY - 2 * s;
-    ctx.beginPath();
-    ctx.moveTo(bx, by + h);
-    ctx.lineTo(bx, by + 4 * s); ctx.lineTo(bx + w * 0.2, by + h * 0.55);
-    ctx.lineTo(bx + w * 0.5, by - 2 * s); ctx.lineTo(bx + w * 0.8, by + h * 0.55);
-    ctx.lineTo(bx + w, by + 4 * s); ctx.lineTo(bx + w, by + h);
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = item.color2 || "#ff5d8f";
-    ctx.beginPath(); ctx.arc(cx, by + h * 0.7, 2.6 * s, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawTopDetail(ctx: CanvasRenderingContext2D, item: Item, L: Layout) {
-  const cx = L.x, ty = L.bodyTopY;
-  ctx.save();
-  if (item.kind === "vest") {
-    ctx.fillStyle = item.color2 || "#fff"; // 반사 띠
-    roundRect(ctx, cx - BODY_W / 2 + 3, ty + 5, BODY_W - 6, 3, 1); ctx.fill();
-    roundRect(ctx, cx - BODY_W / 2 + 3, ty + 10, BODY_W - 6, 3, 1); ctx.fill();
-  } else if (item.kind === "suit") {
-    ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1.5; // 라펠
-    ctx.beginPath(); ctx.moveTo(cx, ty + 1); ctx.lineTo(cx - 6, ty + 10); ctx.moveTo(cx, ty + 1); ctx.lineTo(cx + 6, ty + 10); ctx.stroke();
-    ctx.fillStyle = item.color2 || "#c0392b"; // 넥타이
-    ctx.beginPath(); ctx.moveTo(cx, ty + 2); ctx.lineTo(cx - 2.5, ty + 6); ctx.lineTo(cx, ty + 14); ctx.lineTo(cx + 2.5, ty + 6); ctx.closePath(); ctx.fill();
-  } else {
-    ctx.fillStyle = "rgba(0,0,0,0.12)"; // 단추선
-    roundRect(ctx, cx - 1, ty + 3, 2, BODY_H - 6, 1); ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawWeapon(ctx: CanvasRenderingContext2D, item: Item, x: number, y: number, s: number, dir: number) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(dir, 1);
-  if (item.kind === "hammer") {
-    ctx.fillStyle = item.color2 || "#7a4a22"; // 손잡이
-    roundRect(ctx, -2 * s, -2 * s, 4 * s, 22 * s, 2 * s); ctx.fill();
-    ctx.fillStyle = item.color; // 머리
-    roundRect(ctx, -9 * s, -8 * s, 18 * s, 9 * s, 2 * s); ctx.fill();
-  } else if (item.kind === "wrench") {
-    ctx.fillStyle = item.color;
-    roundRect(ctx, -2 * s, -2 * s, 4 * s, 22 * s, 2 * s); ctx.fill();
-    ctx.beginPath(); ctx.arc(0, -6 * s, 6 * s, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = item.color2 || "#6e747d";
-    ctx.beginPath(); ctx.arc(0, -6 * s, 2.6 * s, 0, Math.PI * 2); ctx.fill();
-  } else if (item.kind === "drill") {
-    ctx.fillStyle = item.color; // 본체
-    roundRect(ctx, -6 * s, -4 * s, 14 * s, 12 * s, 3 * s); ctx.fill();
-    ctx.fillStyle = item.color2 || "#414549"; // 손잡이
-    roundRect(ctx, -5 * s, 6 * s, 6 * s, 14 * s, 2 * s); ctx.fill();
-    ctx.fillStyle = "#cfd3d8"; // 비트
-    roundRect(ctx, 7 * s, -1 * s, 12 * s, 4 * s, 1 * s); ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawCape(ctx: CanvasRenderingContext2D, item: Item, L: Layout, now: number) {
-  const wave = Math.sin(now / 200) * 4;
-  ctx.save();
-  const g = ctx.createLinearGradient(0, L.bodyTopY, 0, L.feetY);
-  g.addColorStop(0, item.color);
-  g.addColorStop(1, item.color2 || item.color);
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(L.x - BODY_W / 2 + 2, L.bodyTopY + 1);
-  ctx.lineTo(L.x + BODY_W / 2 - 2, L.bodyTopY + 1);
-  ctx.quadraticCurveTo(L.x + BODY_W / 2 + 6 + wave, L.feetY - 8, L.x + 8 + wave, L.feetY - 2);
-  ctx.lineTo(L.x - 8 + wave, L.feetY - 2);
-  ctx.quadraticCurveTo(L.x - BODY_W / 2 - 6 + wave, L.feetY - 8, L.x - BODY_W / 2 + 2, L.bodyTopY + 1);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
 
 // ── 말풍선 ──────────────────────────────────────────────────────────────────────
 function drawBubble(ctx: CanvasRenderingContext2D, cx: number, bottomY: number, text: string) {
@@ -350,53 +232,3 @@ function drawBubble(ctx: CanvasRenderingContext2D, cx: number, bottomY: number, 
   ctx.restore();
 }
 
-// ── 아이템 아이콘 (패널용) ─────────────────────────────────────────────────────────
-/** size×size 박스 중앙에 아이템을 그린다. */
-export function drawItemIcon(ctx: CanvasRenderingContext2D, item: Item, size: number) {
-  const cx = size / 2, cy = size / 2;
-  ctx.clearRect(0, 0, size, size);
-  if (item.slot === "hat") {
-    drawHat(ctx, item, cx, cy + size * 0.18, size / 34, 1);
-  } else if (item.slot === "weapon") {
-    ctx.save(); ctx.translate(0, -size * 0.18); drawWeapon(ctx, item, cx, cy, size / 26, 1); ctx.restore();
-  } else if (item.slot === "top") {
-    drawTopIcon(ctx, item, cx, cy, size / 40);
-  } else if (item.slot === "cape") {
-    drawCapeIcon(ctx, item, cx, cy, size / 40);
-  }
-}
-
-function drawTopIcon(ctx: CanvasRenderingContext2D, item: Item, cx: number, cy: number, s: number) {
-  const w = 26 * s, h = 22 * s;
-  ctx.fillStyle = item.color;
-  // 몸통
-  roundRect(ctx, cx - w / 2, cy - h / 2 + 3 * s, w, h, 5 * s); ctx.fill();
-  // 소매
-  roundRect(ctx, cx - w / 2 - 6 * s, cy - h / 2 + 4 * s, 8 * s, 10 * s, 3 * s); ctx.fill();
-  roundRect(ctx, cx + w / 2 - 2 * s, cy - h / 2 + 4 * s, 8 * s, 10 * s, 3 * s); ctx.fill();
-  // 디테일
-  if (item.kind === "vest") {
-    ctx.fillStyle = item.color2 || "#fff";
-    roundRect(ctx, cx - w / 2 + 3 * s, cy - 3 * s, w - 6 * s, 3 * s, 1); ctx.fill();
-    roundRect(ctx, cx - w / 2 + 3 * s, cy + 4 * s, w - 6 * s, 3 * s, 1); ctx.fill();
-  } else if (item.kind === "suit") {
-    ctx.fillStyle = item.color2 || "#c0392b";
-    ctx.beginPath(); ctx.moveTo(cx, cy - h / 2 + 4 * s); ctx.lineTo(cx - 3 * s, cy); ctx.lineTo(cx, cy + 8 * s); ctx.lineTo(cx + 3 * s, cy); ctx.closePath(); ctx.fill();
-  }
-}
-
-function drawCapeIcon(ctx: CanvasRenderingContext2D, item: Item, cx: number, cy: number, s: number) {
-  const g = ctx.createLinearGradient(0, cy - 14 * s, 0, cy + 16 * s);
-  g.addColorStop(0, item.color); g.addColorStop(1, item.color2 || item.color);
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.moveTo(cx - 10 * s, cy - 14 * s);
-  ctx.lineTo(cx + 10 * s, cy - 14 * s);
-  ctx.lineTo(cx + 15 * s, cy + 16 * s);
-  ctx.lineTo(cx - 15 * s, cy + 16 * s);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.2)";
-  roundRect(ctx, cx - 10 * s, cy - 14 * s, 20 * s, 4 * s, 2); ctx.fill();
-}
-
-export { CATALOG };
