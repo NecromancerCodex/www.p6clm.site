@@ -113,7 +113,7 @@ export default function SchedulePlanWizard() {
   const [scope, setScope] = useState("");
   const [structureType, setStructureType] = useState("");
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
-  const [slots, setSlots] = useState<Record<string, { name: string; count?: number; wp?: number; warn?: string | null }>>({}); // 공종별 업로드 현황(count/wp 는 생성 시 분석 후)
+  const [slots, setSlots] = useState<Record<string, { name: string; count?: number; wp?: number; warn?: string | null; ai?: number }>>({}); // 공종별 업로드 현황(count/wp/ai 는 분석 후)
   const slotFilesRef = useRef<Record<string, File>>({}); // 공종별 원본 IFC(File) — 4D 전달용(공종 태그 보존)
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10)); // 오늘 기본 — 업로드+버튼 원클릭(필요시 수정)
   const [durationMonths, setDurationMonths] = useState("");
@@ -285,7 +285,7 @@ export default function SchedulePlanWizard() {
           : (r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))));
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
         if (r.civil_quantities) cq = r.civil_quantities;
-        setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary) } }));
+        setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary), ai: r.ai_classified } }));
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
       setWorkUnits(allWu); setZones([...zoneSet]); setStoreys([...storeySet]); setCivilQty(cq);
@@ -480,6 +480,7 @@ export default function SchedulePlanWizard() {
                     </div>
                     <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {filled ? (filled.count ? `${filled.count.toLocaleString()}부재 → ${filled.wp} WP` : `${filled.name} · 생성 시 분석`) : `업로드 · ${d.hint}`}
+                      {filled?.ai ? <span style={{ color: "#7c3aed" }}> · 🤖 AI추정 {filled.ai.toLocaleString()}</span> : null}
                     </div>
                     {filled?.warn && (
                       <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.3, whiteSpace: "normal",
