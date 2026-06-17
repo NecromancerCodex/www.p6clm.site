@@ -13,9 +13,9 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, planP6XmlUrl, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlUrl, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError,
-  type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
+  type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
 import { savePlanIfcs } from "../../../../lib/fourd/fileCache";
@@ -128,6 +128,8 @@ export default function SchedulePlanWizard() {
   const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
   const [constraints, setConstraints] = useState("");
   const [milestones, setMilestones] = useState<GenMilestone[]>([]); // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 게이트
+  const [diff, setDiff] = useState<IfcDiffResult | null>(null); // 설계변경 영향분석 결과
+  const [diffBusy, setDiffBusy] = useState(false);
   const [strategy, setStrategy] = useState("bottom_up");
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
@@ -244,6 +246,21 @@ export default function SchedulePlanWizard() {
         element_summary: [...typeCount.entries()].sort((a, b) => b[1] - a[1]).map(([type, count]) => ({ type, count, names: [...(typeNames.get(type) ?? [])] })),
         element_count: parsed.elements.length,
       };
+    }
+  };
+
+  // ── 설계변경 영향분석 — 새 IFC 버전 업로드 → work_unit 추출(분석 재사용) → 옛 버전과 diff. ──
+  const onDiffFile = async (file: File) => {
+    if (!planId) return;
+    setDiffBusy(true); setErr(null);
+    try {
+      const r = await analyzeSlotFile(file);
+      const res = await ifcDiff(planId, r.work_units as unknown[]);
+      setDiff(res);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "설계변경 분석 실패");
+    } finally {
+      setDiffBusy(false);
     }
   };
 
@@ -902,6 +919,53 @@ export default function SchedulePlanWizard() {
                                             seasonal_weather: seasonal, milestones: milestones.filter((m) => m.name.trim() && m.target_date) })
                   .then(() => refresh(planId!)).finally(() => setBusy(false));
               }}>공기 재계산</button>
+            </div>
+          )}
+          {stage === "scheduled" && (
+            <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#92400e", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ flex: 1 }}>
+                  🔄 <b>설계변경 영향분석</b> — 수정된 IFC(새 버전)를 올리면 옛 버전과 비교해 추가·삭제·물량변경 부재와 <b>영향받는 Activity</b>를 찾아냅니다.
+                </span>
+                <label className="wz-btn" style={{ cursor: diffBusy ? "wait" : "pointer", opacity: diffBusy ? 0.6 : 1 }}>
+                  {diffBusy ? "분석 중…" : "📂 새 IFC 비교"}
+                  <input type="file" accept=".ifc" style={{ display: "none" }} disabled={diffBusy}
+                         onChange={(e) => { const f = e.target.files?.[0]; if (f) void onDiffFile(f); e.target.value = ""; }} />
+                </label>
+              </div>
+              {diff && (
+                <div style={{ marginTop: 8, fontSize: 12 }}>
+                  {!diff.summary.has_change ? (
+                    <p style={{ color: "#15803d", margin: 0 }}>✅ 설계변경 없음 — 옛 버전과 동일(공정표 재산정 불필요).</p>
+                  ) : (
+                    <>
+                      <p style={{ margin: "0 0 6px", fontWeight: 600 }}>
+                        변경 {diff.summary.changed_buckets} · 추가 {diff.summary.added_buckets} · 삭제 {diff.summary.deleted_buckets} → 영향 Activity <b>{diff.summary.affected_activities}개</b> (재산정 권장)
+                      </p>
+                      {diff.changed.map((c, i) => (
+                        <div key={`c${i}`} style={{ padding: "3px 0", borderTop: "1px solid #fde68a" }}>
+                          <span style={{ color: (c.delta ?? 0) > 0 ? "#b91c1c" : "#1d4ed8", fontWeight: 600 }}>
+                            ✏️ {c.discipline} {c.zone !== "-" ? `${c.zone} ` : ""}{c.storey !== "-" ? `${c.storey}F ` : ""}{c.element_type} {c.old_count}→{c.new_count} ({(c.pct ?? 0) > 0 ? "+" : ""}{c.pct}%)
+                          </span>
+                          {c.affected_activities.length > 0 && <span style={{ color: "#78716c" }}> → {c.affected_activities.map((a) => a.name).slice(0, 4).join(", ")}{c.affected_activities.length > 4 ? ` 외 ${c.affected_activities.length - 4}` : ""}</span>}
+                        </div>
+                      ))}
+                      {diff.added.map((a, i) => (
+                        <div key={`a${i}`} style={{ padding: "3px 0", borderTop: "1px solid #fde68a", color: "#047857" }}>
+                          ➕ 신규: {a.discipline} {a.zone !== "-" ? `${a.zone} ` : ""}{a.storey !== "-" ? `${a.storey}F ` : ""}{a.element_type} {a.count}개 (신규 공정 검토)
+                        </div>
+                      ))}
+                      {diff.deleted.map((d, i) => (
+                        <div key={`d${i}`} style={{ padding: "3px 0", borderTop: "1px solid #fde68a", color: "#9f1239" }}>
+                          ➖ 삭제: {d.discipline} {d.zone !== "-" ? `${d.zone} ` : ""}{d.storey !== "-" ? `${d.storey}F ` : ""}{d.element_type} {d.count}개
+                          {d.affected_activities.length > 0 && <span style={{ color: "#78716c" }}> → {d.affected_activities.map((a) => a.name).slice(0, 4).join(", ")} 삭제 검토</span>}
+                        </div>
+                      ))}
+                      <p style={{ margin: "6px 0 0", color: "#78716c" }}>ⓘ 물량변경은 기간 ∝ 물량 → 영향 Activity 기간 재산정 권장. 자동 변경 아님(PM 검토).</p>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {ganttReady && ganttTasks.length > 0 ? (

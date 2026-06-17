@@ -561,6 +561,23 @@ export async function confirmPlan(planId: string, res?: { crane?: number; crew?:
   return planFetch(`/${planId}/confirm`, { method: "POST", body: JSON.stringify(res ?? {}) });
 }
 
+// ── 설계변경 영향분석(IFC diff) ──────────────────────────────────────────────
+export interface IfcDiffBucket {
+  zone: string; storey: string; discipline: string; element_type: string;
+  count?: number; old_count?: number; new_count?: number; delta?: number; pct?: number | null;
+  affected_activities: { code: string; name: string }[];
+}
+export interface IfcDiffResult {
+  added: IfcDiffBucket[];
+  deleted: IfcDiffBucket[];
+  changed: IfcDiffBucket[];
+  summary: { added_buckets: number; deleted_buckets: number; changed_buckets: number; affected_activities: number; has_change: boolean };
+}
+/** 새 IFC work_units 를 플랜의 옛 버전과 비교 — 추가/삭제/물량변경 + 영향 Activity. */
+export async function ifcDiff(planId: string, workUnits: unknown[]): Promise<IfcDiffResult> {
+  return planFetch(`/${planId}/ifc-diff`, { method: "POST", body: JSON.stringify({ work_units: workUnits }) });
+}
+
 /** P6 XML 다운로드 URL */
 export function planP6XmlUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/p6xml`;
