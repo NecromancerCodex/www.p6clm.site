@@ -144,50 +144,75 @@ function drawNameTag(ctx: CanvasRenderingContext2D, x: number, feetY: number, na
   ctx.fillText(name, x, feetY + 17);
 }
 
-// ── 정지 이미지 캐릭터 + 절차적 모션 ─────────────────────────────────────────────
-// 캐릭터 = 단일 치비 일러스트(여백 트림됨, 하단=발). 걷기 프레임이 없으므로
-// 코드로 모션을 입힌다: idle 숨쉬기, walk 통통 튀기, jump 살짝 늘이기.
-const CHAR_H = 104; // 표시 높이(px). 폭은 원본 비율.
+// ── 정지 이미지 캐릭터 + 의사(pseudo) 스켈레톤 모션 ───────────────────────────────
+// 캐릭터 = 단일 치비 일러스트(여백 트림, 하단=발). 걷기 프레임이 없어서
+// 합성 이미지를 허리에서 잘라 좌/우 다리 조각을 반대로 회전(시저 워크)시킨다.
+// (옷·신발이 통짜라 분리 레이어가 없으므로 이미지 분할이 유일한 방법)
+const CHAR_H = 104; // 표시 높이(px)
+const HIP = 0.56;   // 허리 분할 지점 (위→아래 비율)
+
+/** 다리 조각 — 힙 피벗 기준 회전 후 그리기. */
+function drawLegPiece(
+  ctx: CanvasRenderingContext2D, src: CanvasImageSource,
+  sx: number, sy: number, sw: number, sh: number,
+  dx: number, dy: number, dw: number, dh: number,
+  px: number, py: number, ang: number,
+) {
+  ctx.save();
+  ctx.translate(px, py); ctx.rotate(ang); ctx.translate(-px, -py);
+  ctx.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh);
+  ctx.restore();
+}
 
 export function drawStaticChar(
   ctx: CanvasRenderingContext2D, o: ChibiOpts, src: CanvasImageSource, srcW: number, srcH: number,
 ) {
   if (!srcH) return;
   const baseScale = CHAR_H / srcH;
+  const walk = o.st === "walk";
 
-  // 절차적 모션
-  let bobY = 0, sx = 1, sy = 1;
-  if (o.st === "walk") {
-    bobY = -Math.abs(Math.sin(o.now / 120)) * 7;           // 통통 점프하듯
-    const t = Math.sin(o.now / 120);
-    sx = 1 + t * 0.03; sy = 1 - t * 0.03;                   // 약한 스쿼시
-  } else if (o.st === "jump") {
-    sy = 1.06; sx = 0.96;                                   // 점프 시 늘이기
-  } else {
-    bobY = Math.sin(o.now / 650) * 1.6;                     // idle 숨쉬기
-    sy = 1 + Math.sin(o.now / 650) * 0.015;
-  }
+  // 비걷기 모션 (idle 숨쉬기 / jump 늘이기)
+  let bobY = 0, sy = 1, sxs = 1;
+  if (o.st === "jump") { sy = 1.06; sxs = 0.96; }
+  else if (walk) { bobY = -Math.abs(Math.sin(o.now / 140)) * 3; } // 걸음 상하
+  else { bobY = Math.sin(o.now / 650) * 1.6; sy = 1 + Math.sin(o.now / 650) * 0.015; }
 
-  const dw = srcW * baseScale * sx;
+  const dw = srcW * baseScale * sxs;
   const dh = CHAR_H * sy;
   const feetY = o.y;
   const topY = feetY - dh + bobY;
+  const left = o.x - dw / 2;
 
   ctx.save();
-  // 그림자 (튈 때 작아짐)
-  const shScale = 1 - Math.min(0.5, Math.abs(bobY) / 20);
+  // 그림자
+  const shScale = 1 - Math.min(0.4, Math.abs(bobY) / 20);
   ctx.fillStyle = "rgba(0,0,0,0.22)";
   ctx.beginPath(); ctx.ellipse(o.x, feetY, dw * 0.3 * shScale, 5 * shScale, 0, 0, Math.PI * 2); ctx.fill();
 
-  if (o.isMe) { // 내 캐릭터 강조 링
+  if (o.isMe) {
     ctx.strokeStyle = "rgba(255,224,102,0.8)"; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.ellipse(o.x, feetY + 1, dw * 0.32, 6, 0, 0, Math.PI * 2); ctx.stroke();
   }
 
-  ctx.imageSmoothingEnabled = true; // 고해상 일러스트 — 부드럽게 축소
+  ctx.imageSmoothingEnabled = true;
   ctx.save();
   if (o.facing === "l") { ctx.translate(o.x, 0); ctx.scale(-1, 1); ctx.translate(-o.x, 0); }
-  ctx.drawImage(src, o.x - dw / 2, topY, dw, dh);
+
+  if (walk) {
+    const hipSrcY = srcH * HIP;
+    const legSrcH = srcH - hipSrcY;
+    const upperDH = dh * HIP;
+    const legDH = dh - upperDH;
+    const hipY = topY + upperDH;
+    const ang = Math.sin(o.now / 140) * 0.24; // 다리 스윙 각 (~14°)
+    // 다리(뒤) — 좌/우 반대 회전, 허리 피벗
+    drawLegPiece(ctx, src, 0, hipSrcY, srcW / 2, legSrcH, left, hipY, dw / 2, legDH, o.x, hipY, ang);
+    drawLegPiece(ctx, src, srcW / 2, hipSrcY, srcW / 2, legSrcH, o.x, hipY, dw / 2, legDH, o.x, hipY, -ang);
+    // 상체(앞) — 허리 이음새를 덮는다
+    ctx.drawImage(src, 0, 0, srcW, hipSrcY, left, topY, dw, upperDH);
+  } else {
+    ctx.drawImage(src, left, topY, dw, dh);
+  }
   ctx.restore();
 
   drawNameTag(ctx, o.x, feetY, o.name, !!o.isMe);
