@@ -4928,3 +4928,18 @@ select {
   margin-left: auto; font-size: 0.66rem; font-weight: 800; color: #1a2332;
   background: #51cf66; padding: 2px 6px; border-radius: 6px;
 }
+
+/* 광장 — 화면 좌하단 채팅 로그(메모리, 휘발성) */
+.plaza-chatlog {
+  position: absolute; left: 14px; bottom: 14px; z-index: 5;
+  width: min(340px, 52%); max-height: 168px; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 2px;
+  pointer-events: none;
+}
+.plaza-chatlog-line {
+  font-size: 0.8rem; line-height: 1.45; color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.7);
+  background: rgba(14,23,38,0.35); padding: 1px 7px; border-radius: 6px;
+  width: fit-content; max-width: 100%; word-break: break-word;
+}
+.plaza-chatlog-line b { color: #ffe066; margin-right: 4px; }

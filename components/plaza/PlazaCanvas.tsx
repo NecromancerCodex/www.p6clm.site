@@ -587,6 +587,15 @@ export function PlazaCanvas() {
             onClose={avatar ? () => setPanel(null) : undefined}
           />
         )}
+
+        {/* 광장 채팅 로그 (메모리, DB 저장 안 함) */}
+        {chatLog.length > 0 && (
+          <div className="plaza-chatlog">
+            {chatLog.slice(-9).map((l, i) => (
+              <div key={i} className="plaza-chatlog-line"><b>{l.name}</b> {l.text}</div>
+            ))}
+          </div>
+        )}
       </div>
 
       <form
