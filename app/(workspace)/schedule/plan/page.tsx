@@ -286,6 +286,7 @@ export default function SchedulePlanWizard() {
           : (r.work_units as GenWorkUnit[]).map((w) => ({ ...w, discipline: disc }))));
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
         if (r.civil_quantities) cq = r.civil_quantities;
+        if (r.suggested_equip) setCivilEquip(r.suggested_equip);  // 물량 기반 권장 투입조 자동 반영(대형현장 현실화)
         setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary), ai: r.ai_classified } }));
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
@@ -572,7 +573,9 @@ export default function SchedulePlanWizard() {
                   🏗️ 굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
                   · 굴착체적 ≈ {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥
                   · 흙막이 {(civilQty.pile_count ?? 0).toLocaleString()}공/둘레 {civilQty.perimeter_m}m
-                  <br />→ 토목 슬롯의 <b>투입조 {civilEquip}대</b> 기준으로 단계 굴착 기간 자동 산정
+                  <br />→ 물량 기반 <b>권장 투입조 {civilEquip}조</b>(굴착기+덤프 세트) 기준 ·
+                  굴착 ≈ {Math.ceil((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0) / (600 * Math.max(1, civilEquip)) / 26)}개월 추정
+                  (토목 슬롯에서 투입조 조정 가능 — 늘릴수록 단축)
                 </p>
               </Field>
             )}
