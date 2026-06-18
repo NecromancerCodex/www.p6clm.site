@@ -139,14 +139,14 @@ export default function SchedulePlanWizard() {
   const slotFilesRef = useRef<Record<string, File>>({}); // 공종별 원본 IFC(File) — 4D 전달용(공종 태그 보존)
   const [startDate] = useState(() => new Date().toISOString().slice(0, 10)); // 폴백(공종 카드 착공일이 우선)
   const [durationMonths] = useState("");  // 폴백(공종 카드 마감일로 산출)
-  const [wdpw, setWdpw] = useState(6);
+  const [wdpw] = useState(6);  // 폴백(공종 카드 근무가 우선)
   const [towerCranes, setTowerCranes] = useState(2);
   const [workCrews, setWorkCrews] = useState(3);
   const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
   const [discCrews, setDiscCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 공종별 작업조(슬롯 밑)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
-  const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; strategy?: string; notes?: string }>>({});
-  const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; strategy: string; notes: string }>) =>
+  const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string }>>({});
+  const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; wdpw: string; strategy: string; notes: string }>) =>
     setDiscSet((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [formwork, setFormwork] = useState(""); // 거푸집 시스템(골조 기준층 사이클) — 비우면 LLM 기준(재래식급)
@@ -347,6 +347,7 @@ export default function SchedulePlanWizard() {
     const prim = discSet["종합"] || discSet["구조"] || Object.values(discSet)[0] || {};
     const projUtil = prim.util ? Number(prim.util) : util;
     const projStrategy = prim.strategy || strategy;
+    const projWdpw = prim.wdpw ? Number(prim.wdpw) : wdpw;
     const finishes = Object.values(discSet).map((s) => s.finish).filter(Boolean).sort();
     const lastFinish = finishes[finishes.length - 1];
     let projMonths = durationMonths ? Number(durationMonths) : undefined;
@@ -361,7 +362,7 @@ export default function SchedulePlanWizard() {
         structure_type: structureType.trim() || undefined, discipline: discipline.trim() || undefined,
         zones, storeys, work_units: workUnits, methods: [],
         start_date: projStart, duration_months: projMonths,
-        work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
+        work_days_per_week: projWdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
         utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
@@ -531,60 +532,60 @@ export default function SchedulePlanWizard() {
                       <input type="file" accept=".ifc" style={{ display: "none" }} disabled={bimBusy}
                              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f, d.key); }} />
                     </label>
-                    {/* 공종별 파라미터 — 슬롯 밑(보기 편하게). 공통값은 ③④ 그대로. */}
-                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #cbd5e1", display: "flex", flexDirection: "column", gap: 4 }}>
-                      {d.key === "토목" && (
-                        <label style={pr} title="굴착기·CIP장비 등 토목 투입조 — 기간 = 물량 ÷ (생산성 × 투입조)">투입조
-                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} /></label>
-                      )}
-                      {isStruct && (<>
-                        <label style={pr} title="구조 동시 동일공종 작업조">작업조
-                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
-                        <label style={pr} title="양중(모듈/PC설치) 동시 한계">크레인
-                          <input type="number" min={0} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
-                        <label style={pr} title="거푸집 시스템 — 기준층 사이클(재래식 10~12일↔알폼 4~7일/층)">거푸집
-                          <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
-                            <option value="">자동</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option><option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
-                          </select></label>
-                        <label style={pr} title="조강콘크리트 — 양생 ×3/7 단축">조강
-                          <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} /></label>
-                        <label style={pr} title="구조유형 — 공정 순서 좌우(RC/철골/모듈러)">구조유형
-                          <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={structureType} onChange={(e) => setStructureType(e.target.value)}>
-                            <option value="">자동</option><option value="RC">RC</option><option value="철골">철골</option><option value="SRC">SRC</option><option value="PC·모듈러">PC·모듈러</option><option value="혼합">혼합</option>
-                          </select></label>
-                      </>)}
-                      {(d.key === "건축" || d.key === "MEP" || d.key === "조경") && (
-                        <label style={pr} title={`${d.label} 작업조 — 많을수록 ${d.label} 기간 단축`}>작업조
-                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }}
-                                 value={discCrews[d.key] ?? 3} onChange={(e) => setDiscCrews((c) => ({ ...c, [d.key]: Number(e.target.value) }))} /></label>
-                      )}
-                      {d.key === "가설" && (
-                        <span style={{ fontSize: 10.5, color: "#64748b", lineHeight: 1.4 }}>
-                          오버레이 — 공정표엔 설치·해체 2줄, 4D는 층 따라 표시(별도 공정 X)
-                        </span>
-                      )}
-                    </div>
-                    {/* 공종별 분리 입력 — 비우면 프로젝트 기본값(②) 적용 */}
+                    {/* 공종별 입력(규격 통일) — 공통 6필드 + 공종 전용 파라미터를 한 박스에 */}
                     <div style={{ marginTop: 10, padding: "10px 12px", background: "#f8fafc", border: "1px solid #eef2f7", borderRadius: 8, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center" }}>
                       <label style={pr} title="WBS 개수 — 비우면 BIM 자동(구역×층)">WBS개수
                         <input type="number" min={1} className="wz-in" style={{ width: 64, padding: "2px 4px" }} placeholder="자동"
                                value={discSet[d.key]?.wbs ?? ""} onChange={(e) => setDS(d.key, { wbs: e.target.value })} /></label>
-                      <label style={pr} title="이 공종 착공일 — 비우면 프로젝트 착공일">착공일
+                      <label style={pr} title="이 공종 착공일">착공일
                         <input type="date" className="wz-in" style={{ width: 142, padding: "2px 4px" }}
                                value={discSet[d.key]?.start ?? ""} onChange={(e) => setDS(d.key, { start: e.target.value })} /></label>
                       <label style={pr} title="이 공종 마감일(목표)">마감일
                         <input type="date" className="wz-in" style={{ width: 142, padding: "2px 4px" }}
                                value={discSet[d.key]?.finish ?? ""} onChange={(e) => setDS(d.key, { finish: e.target.value })} /></label>
-                      <label style={pr} title="이 공종 가동률 — 비우면 프로젝트 기본">가동률
-                        <select className="wz-in" style={{ width: 80, padding: "2px 4px" }}
+                      <label style={pr} title="이 공종 가동률 — 비우면 85%">가동률
+                        <select className="wz-in" style={{ width: 78, padding: "2px 4px" }}
                                 value={discSet[d.key]?.util ?? ""} onChange={(e) => setDS(d.key, { util: e.target.value })}>
                           <option value="">기본</option><option value="1">100%</option><option value="0.9">90%</option><option value="0.85">85%</option><option value="0.8">80%</option><option value="0.7">70%</option>
                         </select></label>
-                      <label style={pr} title="이 공종 시공 전략 — 비우면 프로젝트 기본">시공전략
-                        <select className="wz-in" style={{ width: 152, padding: "2px 4px" }}
+                      <label style={pr} title="이 공종 주당 근무일 — 비우면 주6일">근무
+                        <select className="wz-in" style={{ width: 78, padding: "2px 4px" }}
+                                value={discSet[d.key]?.wdpw ?? ""} onChange={(e) => setDS(d.key, { wdpw: e.target.value })}>
+                          <option value="">기본</option><option value="5">주5일</option><option value="6">주6일</option><option value="7">주7일</option>
+                        </select></label>
+                      <label style={pr} title="이 공종 시공 전략">시공전략
+                        <select className="wz-in" style={{ width: 150, padding: "2px 4px" }}
                                 value={discSet[d.key]?.strategy ?? ""} onChange={(e) => setDS(d.key, { strategy: e.target.value })}>
                           <option value="">기본</option><option value="bottom_up">순타·일괄</option><option value="bottom_up_phased">순타·단계</option><option value="top_down">역타</option>
                         </select></label>
+                      {d.key === "토목" && (
+                        <label style={pr} title="굴착기·CIP장비 등 토목 투입조">투입조
+                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} /></label>
+                      )}
+                      {isStruct && (<>
+                        <label style={pr} title="구조 동시 작업조">작업조
+                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
+                        <label style={pr} title="양중 동시 한계">크레인
+                          <input type="number" min={0} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
+                        <label style={pr} title="거푸집 시스템(기준층 사이클)">거푸집
+                          <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
+                            <option value="">자동</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option><option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
+                          </select></label>
+                        <label style={pr} title="조강콘크리트 — 양생 단축">조강
+                          <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} /></label>
+                        <label style={pr} title="구조유형">구조유형
+                          <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={structureType} onChange={(e) => setStructureType(e.target.value)}>
+                            <option value="">자동</option><option value="RC">RC</option><option value="철골">철골</option><option value="SRC">SRC</option><option value="PC·모듈러">PC·모듈러</option><option value="혼합">혼합</option>
+                          </select></label>
+                      </>)}
+                      {(d.key === "건축" || d.key === "MEP" || d.key === "조경") && (
+                        <label style={pr} title={`${d.label} 작업조`}>작업조
+                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }}
+                                 value={discCrews[d.key] ?? 3} onChange={(e) => setDiscCrews((c) => ({ ...c, [d.key]: Number(e.target.value) }))} /></label>
+                      )}
+                      {d.key === "가설" && (
+                        <span style={{ fontSize: 10.5, color: "#64748b" }}>오버레이 — 공정표 설치·해체 2줄, 4D는 층 따라</span>
+                      )}
                     </div>
                     <input className="wz-in" style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "4px 8px" }} placeholder="참고사항 (이 공종 메모)"
                            value={discSet[d.key]?.notes ?? ""} onChange={(e) => setDS(d.key, { notes: e.target.value })} />
@@ -618,21 +619,13 @@ export default function SchedulePlanWizard() {
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
               <input className="wz-in" type="number" style={{ marginTop: 6 }} value={gfa} onChange={(e) => setGfa(e.target.value)}
                      placeholder="연면적(㎡, 선택) — 건축·MEP 기간 정밀화" title="연면적 — 마감·설비는 연면적에 비례. 입력하면 부재수 대신 물량 기반 기간" />
-            </Field>
-            <Field label="② 프로젝트 기본 — 근무·기상 (착공일·공기·가동률·전략은 각 공종 카드에)">
-              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <label className="wz-sub" title="주당 근무일">근무
-                  <select className="wz-in" style={{ width: 96 }} value={wdpw} onChange={(e) => setWdpw(Number(e.target.value))}>
-                    <option value={5}>주5일</option><option value={6}>주6일</option><option value={7}>주7일</option>
-                  </select></label>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#475569" }}
-                       title="동절기(12·1·2월)·우기(7·8월) 기상 중단일을 달력에서 자동 제외. 가동률과 별개 축(중복계산 없음)">
-                  <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
-                  계절 비작업일 자동 반영 (동절기·우기)
-                </label>
-              </div>
-              <p style={{ fontSize: 11, color: "#64748b", margin: "8px 0 0", lineHeight: 1.5 }}>
-                ⓘ <b>착공일·목표공기·가동률·시공전략</b>은 각 <b>공종 카드</b>에서 따로 설정합니다 · 공휴일(설·추석·법정)은 자동 제외
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#475569", marginTop: 8 }}
+                     title="동절기(12·1·2월)·우기(7·8월) 기상 중단일 자동 제외 — 현장(부지) 공통. 가동률과 별개 축">
+                <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
+                계절 비작업일 자동 반영 (동절기·우기 — 현장 공통)
+              </label>
+              <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0", lineHeight: 1.5 }}>
+                ⓘ 착공일·목표공기·가동률·근무·시공전략은 각 <b>공종 카드</b>에서 설정 · 공휴일 자동 제외
               </p>
             </Field>
             {slots["토목"] && civilQty && (
