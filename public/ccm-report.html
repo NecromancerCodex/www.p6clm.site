@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>건설 형상관리(CCM) — PMIS-X 적용 보고서</title>
+<style>
+  :root{
+    --ink:#1a2230; --sub:#5b6675; --line:#e6e9ef; --bg:#f6f8fb;
+    --brand:#1f5fff; --brand2:#0e9f6e; --accent:#f5b301; --soft:#eef3ff;
+    --p1:#1f5fff; --p2:#e0680f; --p3:#0e9f6e;
+    --card:#fff; --shadow:0 6px 24px rgba(20,30,60,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Pretendard','Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto;padding:0 22px}
+  code{background:#eef1f6;padding:1px 6px;border-radius:5px;font-size:.92em}
+  /* HERO */
+  .hero{background:linear-gradient(135deg,#0e1b3a,#1f3a7a 60%,#1f5fff);color:#fff;padding:54px 0 56px}
+  .tag{display:inline-block;background:rgba(255,255,255,.15);color:#cfe0ff;font-size:13px;
+    font-weight:600;padding:5px 12px;border-radius:20px;margin-bottom:16px}
+  .hero h1{font-size:33px;line-height:1.3;font-weight:800;letter-spacing:-.5px}
+  .hero h1 b{color:var(--accent)}
+  .define{margin-top:18px;background:rgba(255,255,255,.1);border-left:4px solid var(--accent);
+    border-radius:0 12px 12px 0;padding:16px 20px;font-size:16.5px;color:#eef4ff;max-width:760px;line-height:1.7}
+  .define b{color:#fff;font-weight:800}
+  .hero .meta{margin-top:20px;font-size:13px;color:#9fb3dd}
+  /* SECTION */
+  section{padding:44px 0}
+  .kicker{font-size:13px;font-weight:700;color:var(--brand);letter-spacing:1px;text-transform:uppercase}
+  h2{font-size:25px;font-weight:800;margin:8px 0 6px;letter-spacing:-.4px}
+  .lead{color:var(--sub);font-size:15.5px;max-width:740px;margin-bottom:26px}
+  /* 3 PILLARS */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .pcard:before{content:'';position:absolute;top:0;left:0;right:0;height:5px}
+  .pcard.p1:before{background:var(--p1)}.pcard.p2:before{background:var(--p2)}.pcard.p3:before{background:var(--p3)}
+  .pcard .pn{font-size:13px;font-weight:800;letter-spacing:.5px;margin-bottom:8px}
+  .pcard.p1 .pn{color:var(--p1)}.pcard.p2 .pn{color:var(--p2)}.pcard.p3 .pn{color:var(--p3)}
+  .pcard h3{font-size:19px;font-weight:800;margin-bottom:8px;letter-spacing:-.3px}
+  .pcard p{font-size:14px;color:var(--sub)}
+  .pcard .ico{font-size:30px;margin-bottom:10px;display:block}
+  /* ARCH */
+  .arch{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;margin:4px 0}
+  .node{background:#fff;border:2px solid var(--line);border-radius:14px;padding:18px 22px;text-align:center;min-width:235px;box-shadow:var(--shadow)}
+  .node.ssot{border-color:#0e9f6e;background:#f1fbf6}.node.gen{border-color:var(--brand);background:#f3f7ff}
+  .node h4{font-size:16px;font-weight:800;margin-bottom:3px}.node small{color:var(--sub);font-size:12.5px;display:block}
+  .arrow{display:flex;flex-direction:column;align-items:center;color:var(--sub);font-size:11.5px;padding:0 14px}
+  .arrow .ln{font-size:22px;color:var(--brand)}
+  /* PILLAR BLOCK header */
+  .pill-h{display:flex;align-items:center;gap:12px;margin:34px 0 14px}
+  .pill-h .badge{font-size:14px;font-weight:800;color:#fff;padding:7px 14px;border-radius:24px}
+  .pill-h.p1 .badge{background:var(--p1)}.pill-h.p2 .badge{background:var(--p2)}.pill-h.p3 .badge{background:var(--p3)}
+  .pill-h h3{font-size:20px;font-weight:800;letter-spacing:-.3px}
+  .pill-h span.s{color:var(--sub);font-size:14px;font-weight:500}
+  /* USE CASES */
+  .uc{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+    display:grid;grid-template-columns:280px 1fr;overflow:hidden;margin-bottom:16px}
+  .uc .shot{background:#0f1830;position:relative;min-height:176px;display:flex;align-items:center;justify-content:center;padding:14px}
+  .uc .body{padding:20px 24px}
+  .uc h3{font-size:17.5px;font-weight:800;margin-bottom:6px}
+  .uc p{font-size:13.5px;color:var(--sub);margin-bottom:12px}
+  .uc .links a{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;
+    text-decoration:none;color:var(--brand);background:var(--soft);padding:7px 11px;border-radius:9px;margin:0 7px 7px 0;border:1px solid #dbe6ff}
+  .uc .links a:hover{filter:brightness(.97)}
+  .mk{width:100%;height:100%}
+  .mk-label{position:absolute;top:9px;left:11px;font-size:10px;color:#8aa0d6;font-weight:700;letter-spacing:.4px}
+  .gnode{fill:#1f5fff}.gnode.a{fill:#f5b301}.gnode.b{fill:#0e9f6e}
+  .gedge{stroke:#3b5fa8;stroke-width:1.4;opacity:.6}.gtxt{fill:#cdd9f5;font-size:9px;font-weight:600}
+  .floor{fill:#2a3d6b}.floor.done{fill:#0e9f6e}.floor.now{fill:#f5b301}.floor.chg{fill:#ff5d5d}
+  .gb{fill:#3b5fa8}.gb.c{fill:#1f5fff}.col{fill:#1b2a4d}.cardm{fill:#33477a}.cardm.g{fill:#0e9f6e}
+  /* table */
+  table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);font-size:13.5px}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line)}
+  th{background:#0e1b3a;color:#fff;font-weight:700;font-size:13px}
+  td.us{color:#0e9f6e;font-weight:700}tr:last-child td{border-bottom:none}
+  /* note */
+  .note{background:#fff8e6;border:1px solid #f3e0a8;border-radius:14px;padding:18px 22px;font-size:14px}
+  .note h4{font-size:15px;margin-bottom:8px;color:#9a6b00}.note li{margin-left:18px;color:#705100;margin-bottom:4px}
+  .ok{color:#0e9f6e;font-weight:700}
+  .quote{background:linear-gradient(135deg,#1f5fff,#0e9f6e);color:#fff;border-radius:18px;padding:34px 30px;text-align:center}
+  .quote h2{color:#fff;font-size:24px}.quote p{font-size:15px;color:#eaf1ff;margin-top:8px}
+  footer{padding:28px 0 50px;text-align:center;color:#9aa6b6;font-size:12.5px}
+  @media(max-width:780px){.grid3{grid-template-columns:1fr}.uc{grid-template-columns:1fr}.hero h1{font-size:25px}.arch{flex-direction:column}.arrow{transform:rotate(90deg)}}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero"><div class="wrap">
+  <span class="tag">건설 형상관리 · K-CAX 지식그래프</span>
+  <h1>CCM<b>(건설 형상관리)</b> 개념과<br>PMIS-X 적용 사례</h1>
+  <div class="define">
+    <b>CCM이란?</b> 건설 데이터의 <b>기준을 한곳에 모아 보여주고</b>,
+    그 <b>기준이 바뀔 때를 통제</b>하며, <b>실제 공정이 기준과 맞는지 확인</b>하는 관리 체계.
+  </div>
+  <div class="meta">2026.06 · 작성: 장호현 · 범위: PMIS-X 통합 플랫폼</div>
+</div></div>
+
+<!-- 1. 3 PILLARS -->
+<section>
+  <div class="wrap">
+    <div class="kicker">CCM = 3가지</div>
+    <h2>CCM은 결국 3가지입니다</h2>
+    <p class="lead">복잡해 보이지만, 건설 형상관리는 이 세 가지가 한 묶음입니다. PMIS-X는 이 셋을 모두 화면으로 구현했습니다.</p>
+    <div class="grid3">
+      <div class="pcard p1">
+        <span class="ico">📂</span>
+        <div class="pn">① 모아 보여주기</div>
+        <h3>기준을 모아 보여주기</h3>
+        <p>흩어진 도면·공정·법령·문서를 한곳에 모아 가시화. 무엇이 "정답(기준)"인지 누구나 본다.</p>
+      </div>
+      <div class="pcard p2">
+        <span class="ico">🔁</span>
+        <div class="pn">② 변경 통제</div>
+        <h3>기준 변경을 통제하기</h3>
+        <p>기준이 바뀌면 영향분석 → 승인 → 반영. 변경이 어디에 영향을 주는지 추적한다.</p>
+      </div>
+      <div class="pcard p3">
+        <span class="ico">✅</span>
+        <div class="pn">③ 일치 확인</div>
+        <h3>현실과 기준의 일치 확인</h3>
+        <p>실제 공정이 계획(기준)대로 가는지 검증. 어긋나면 바로 드러난다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. 구조 -->
+<section style="padding-top:4px">
+  <div class="wrap">
+    <div class="kicker">Architecture</div>
+    <h2>PMIS-X는 어떻게 형상관리를 하나?</h2>
+    <p class="lead">데이터 코어와 AI 엔진이 역할로 나뉘어, 형상관리 제1원칙 <b>"하나의 진실원천, 중복저장 금지"</b>를 구현합니다.</p>
+    <div class="arch">
+      <div class="node ssot"><h4>PMIS-X 데이터 코어</h4><small>진실원천(SSOT)</small><small>저장 · 버전 · 결재 · 상태</small></div>
+      <div class="arrow"><span class="ln">⇄</span><span>연동</span></div>
+      <div class="node gen"><h4>PMIS-X AI 엔진</h4><small>합성 · 가공</small><small>AI생성 · 공정 · 4D · 지식그래프</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. USE CASES -->
+<section style="padding-top:4px">
+  <div class="wrap">
+    <div class="kicker">Use Cases · Screens</div>
+    <h2>3가지 기준으로 본 활용 사례 — 화면으로</h2>
+    <p class="lead">CCM 3기둥이 각각 PMIS-X의 어느 화면인지.</p>
+
+    <!-- PILLAR 1 -->
+    <div class="pill-h p1"><span class="badge">①</span><h3>기준을 모아 보여주기</h3><span class="s">— 도면·공정·법령을 한곳에</span></div>
+
+    <div class="uc">
+      <div class="shot"><span class="mk-label">공정계획 위저드</span>
+        <svg class="mk" viewBox="0 0 280 168" preserveAspectRatio="xMidYMid meet">
+          <line x1="34" y1="24" x2="34" y2="146" stroke="#3b5fa8" stroke-width="1"/>
+          <rect class="gb c" x="40" y="36" width="120" height="13" rx="3"/>
+          <rect class="gb" x="80" y="58" width="150" height="13" rx="3"/>
+          <rect class="gb c" x="110" y="80" width="110" height="13" rx="3"/>
+          <rect class="gb" x="140" y="102" width="100" height="13" rx="3"/>
+          <rect class="gb c" x="60" y="124" width="90" height="13" rx="3"/>
+        </svg></div>
+      <div class="body">
+        <h3>BIM → 공정표(기준) 자동 생성</h3>
+        <p>IFC만 올리면 공종 자동분류 → WBS·공정표 베이스라인을 자동 생성. 프로젝트의 "기준 일정"을 한 번에 세웁니다.</p>
+        <div class="links"><a href="#">PMIS-X · 공정계획 위저드 →</a>
+          <a href="#">PMIS-X · 설계도서/EDMS</a></div>
+      </div>
+    </div>
+
+    <div class="uc">
+      <div class="shot"><span class="mk-label">지식그래프</span>
+        <svg class="mk" viewBox="0 0 280 168" preserveAspectRatio="xMidYMid meet">
+          <line class="gedge" x1="140" y1="84" x2="64" y2="42"/><line class="gedge" x1="140" y1="84" x2="56" y2="126"/>
+          <line class="gedge" x1="140" y1="84" x2="220" y2="46"/><line class="gedge" x1="140" y1="84" x2="224" y2="122"/>
+          <circle class="gnode" cx="140" cy="84" r="16"/><text class="gtxt" x="140" y="87" text-anchor="middle">문서</text>
+          <circle class="gnode a" cx="64" cy="42" r="12"/><text class="gtxt" x="64" y="28" text-anchor="middle">법령</text>
+          <circle class="gnode b" cx="56" cy="126" r="12"/><text class="gtxt" x="56" y="148" text-anchor="middle">시방서</text>
+          <circle class="gnode a" cx="220" cy="46" r="12"/><text class="gtxt" x="220" y="32" text-anchor="middle">KCS</text>
+          <circle class="gnode b" cx="224" cy="122" r="12"/><text class="gtxt" x="224" y="144" text-anchor="middle">안전</text>
+        </svg></div>
+      <div class="body">
+        <h3>지식그래프 — 산출물 ↔ 법령·시방 연결해 보여주기</h3>
+        <p>문서·공정·법령·시방서를 그래프로 연결(13만+ 노드). "이 문서가 어느 법·시방에 근거하는가"를 모아 보여줍니다. <b>K-CAX 핵심 기술.</b></p>
+        <div class="links"><a href="#">PMIS-X · AI 대화 →</a>
+          <a href="#">PMIS-X · 온톨로지</a></div>
+      </div>
+    </div>
+
+    <!-- PILLAR 2 -->
+    <div class="pill-h p2"><span class="badge">②</span><h3>기준 변경을 통제하기</h3><span class="s">— 바뀌면 영향분석 → 승인</span></div>
+
+    <div class="uc">
+      <div class="shot"><span class="mk-label">설계변경 영향분석 (IFC diff)</span>
+        <svg class="mk" viewBox="0 0 280 168" preserveAspectRatio="xMidYMid meet">
+          <rect class="floor done" x="100" y="116" width="80" height="18" rx="2"/>
+          <rect class="floor done" x="100" y="94" width="80" height="18" rx="2"/>
+          <rect class="floor now" x="100" y="72" width="80" height="18" rx="2"/>
+          <rect class="floor chg" x="100" y="50" width="80" height="18" rx="2"/>
+          <rect class="floor" x="100" y="28" width="80" height="18" rx="2"/>
+          <text class="gtxt" x="196" y="62" fill="#ff8d8d">◀ 변경 +18%</text>
+          <text class="gtxt" x="196" y="84" fill="#f5b301">◀ 진행중</text>
+        </svg></div>
+      <div class="body">
+        <h3>설계변경 영향분석 (IFC diff)</h3>
+        <p>수정된 BIM을 올리면 추가·삭제·물량변화(%)를 자동 비교하고 <b>영향받는 공정 작업</b>을 짚어줍니다. 기준 변경을 통제하는 핵심 화면.</p>
+        <div class="links"><a href="#">PMIS-X · 4D 설계변경 분석 →</a>
+          <a href="#">PMIS-X · 결재</a></div>
+      </div>
+    </div>
+
+    <!-- PILLAR 3 -->
+    <div class="pill-h p3"><span class="badge">③</span><h3>현실과 기준의 일치 확인하기</h3><span class="s">— 계획대로 가는지 검증</span></div>
+
+    <div class="uc">
+      <div class="shot"><span class="mk-label">4D 시뮬레이션</span>
+        <svg class="mk" viewBox="0 0 280 168" preserveAspectRatio="xMidYMid meet">
+          <rect class="floor done" x="105" y="118" width="70" height="16" rx="2"/>
+          <rect class="floor done" x="105" y="98" width="70" height="16" rx="2"/>
+          <rect class="floor now" x="105" y="78" width="70" height="16" rx="2"/>
+          <rect class="floor" x="105" y="58" width="70" height="16" rx="2"/>
+          <rect class="floor" x="105" y="38" width="70" height="16" rx="2"/>
+          <rect x="40" y="146" width="200" height="6" rx="3" fill="#33477a"/>
+          <rect x="40" y="146" width="110" height="6" rx="3" fill="#0e9f6e"/>
+          <circle cx="150" cy="149" r="6" fill="#f5b301"/>
+        </svg></div>
+      <div class="body">
+        <h3>4D 시뮬레이션 — 계획 vs 실제 시간순</h3>
+        <p>공정표 ↔ BIM 부재를 연결해 슬라이더로 시간순 시공 진행을 봅니다. 기준(계획)대로 골조가 올라가는지 눈으로 검증.</p>
+        <div class="links"><a href="#">PMIS-X · 4D 대시보드 →</a></div>
+      </div>
+    </div>
+
+    <div class="uc">
+      <div class="shot"><span class="mk-label">공정 진도율 / 검증</span>
+        <svg class="mk" viewBox="0 0 280 168" preserveAspectRatio="xMidYMid meet">
+          <rect class="col" x="14" y="30" width="76" height="124" rx="6"/>
+          <rect class="col" x="102" y="30" width="76" height="124" rx="6"/>
+          <rect class="col" x="190" y="30" width="76" height="124" rx="6"/>
+          <text class="gtxt" x="52" y="24" text-anchor="middle">대기</text><text class="gtxt" x="140" y="24" text-anchor="middle">진행</text><text class="gtxt" x="228" y="24" text-anchor="middle">완료</text>
+          <rect class="cardm" x="22" y="42" width="60" height="15" rx="3"/><rect class="cardm" x="22" y="63" width="60" height="15" rx="3"/>
+          <rect class="cardm" x="110" y="42" width="60" height="15" rx="3"/>
+          <rect class="cardm g" x="198" y="42" width="60" height="15" rx="3"/><rect class="cardm g" x="198" y="63" width="60" height="15" rx="3"/><rect class="cardm g" x="198" y="84" width="60" height="15" rx="3"/>
+        </svg></div>
+      <div class="body">
+        <h3>공정 진도율 · 자재 QC — 실적 검증</h3>
+        <p>대기/진행/완료 상태와 주간·월간 집계로 실적을 기록하고, 자재 품질(QC)·데이터 신뢰도(LOD)·BIM 섞임을 검증. 현실이 기준과 맞는지 확인.</p>
+        <div class="links"><a href="#">PMIS-X · 공정 진도율 →</a>
+          <a href="#">PMIS-X · 자재 QC</a>
+          <a href="#">PMIS-X · 공사일보</a></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- 4. 차별점 -->
+<section style="padding-top:4px">
+  <div class="wrap">
+    <div class="kicker">Why Us</div>
+    <h2>일반 PMIS와 무엇이 다른가</h2>
+    <p class="lead"></p>
+    <table>
+      <tr><th>3기둥</th><th>항목</th><th>일반 PMIS</th><th>PMIS-X</th></tr>
+      <tr><td>①모아보기</td><td>기준 일정</td><td>수동 작성</td><td class="us">BIM에서 공정 자동 생성</td></tr>
+      <tr><td>①모아보기</td><td>추적성</td><td>수작업 문서 링크</td><td class="us">지식그래프 자동 연결</td></tr>
+      <tr><td>②변경통제</td><td>설계변경 영향</td><td>사람이 수동 파악</td><td class="us">IFC diff 자동 영향분석</td></tr>
+      <tr><td>③일치확인</td><td>계획 vs 실제</td><td>엑셀 대조</td><td class="us">4D 시간순 시각 검증</td></tr>
+      <tr><td>전체</td><td>진실원천</td><td>부서별 중복 저장</td><td class="us">단일 SSOT + 중복금지</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 5. 정직 현황 -->
+<section style="padding-top:4px">
+  <div class="wrap">
+    <div class="note">
+      <h4>📌 현황 (보고용 정직 체크)</h4>
+      <ul>
+        <li><span class="ok">구현 완료</span> — 3기둥 모두: 모아보기(공정·그래프)·변경통제(IFC diff)·일치확인(4D·진도율), 단일 진실원천 아키텍처</li>
+        <li>🔶 향후 — 설계변경 → 결재 자동기표(②의 end-to-end 연결) 고도화</li>
+        <li>🔶 향후 — 베이스라인 N차 vs M차 시각 비교 화면 확장</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 6. 슬로건 -->
+<section style="padding-top:4px">
+  <div class="wrap">
+    <div class="quote">
+      <h2>"모아 보여주고 · 변경을 통제하고 · 일치를 확인한다"</h2>
+      <p>지식그래프 기반 건설 형상관리(CCM) — 기준을 한곳에, 변경은 추적, 현실은 검증.</p>
+    </div>
+  </div>
+</section>
+
+<footer>CCM 적용 보고서 · PMIS-X · 2026.06 · 내부 검토용</footer>
+
+</body>
+</html>
