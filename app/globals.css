@@ -1325,6 +1325,10 @@ select {
 
 .cbot-msg-row.user {
   justify-content: flex-end;
+  /* 이미지+텍스트 동시 전송 시 세로 스택(이미지 위·텍스트 아래) — 텍스트가 이미지 높이로 늘어나는 것 방지 */
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 .cbot-msg-row.assistant {
