@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
 
     const upstream = await fetch(`${API_URL}/api/v1/cbot/chat/image`, {
       method: "POST",
+      // cookie: 로그인 owner 컨텍스트 전파(세션 소유권 — 없으면 매번 새 세션 생김)
+      headers: { cookie: req.headers.get("cookie") ?? "" },
       body: formData,
       // Content-Type 헤더는 자동으로 multipart/form-data; boundary=... 가 설정됨
     });

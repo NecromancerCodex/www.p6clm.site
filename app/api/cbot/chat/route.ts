@@ -5,9 +5,10 @@ import { API_URL } from "../../../../lib/config";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { message, history = [] } = body as {
+    const { message, history = [], session_id = null } = body as {
       message: string;
       history: Array<{ role: string; content: string }>;
+      session_id?: number | null;
     };
 
     if (!message?.trim()) {
@@ -15,10 +16,14 @@ export async function POST(req: NextRequest) {
     }
 
     // CLM 백엔드 cbot 엔드포인트 프록시
+    //  session_id: 세션 영속화(없으면 매번 새 세션 생김) / cookie: 로그인 owner 컨텍스트 전파(세션 소유권)
     const upstream = await fetch(`${API_URL}/api/v1/cbot/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, history }),
+      headers: {
+        "Content-Type": "application/json",
+        cookie: req.headers.get("cookie") ?? "",
+      },
+      body: JSON.stringify({ message, history, session_id }),
     });
 
     if (!upstream.ok) {
