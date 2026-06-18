@@ -144,6 +144,10 @@ export default function SchedulePlanWizard() {
   const [workCrews, setWorkCrews] = useState(3);
   const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
   const [discCrews, setDiscCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 공종별 작업조(슬롯 밑)
+  // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
+  const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; strategy?: string; notes?: string }>>({});
+  const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; strategy: string; notes: string }>) =>
+    setDiscSet((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [formwork, setFormwork] = useState(""); // 거푸집 시스템(골조 기준층 사이클) — 비우면 LLM 기준(재래식급)
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
@@ -481,7 +485,7 @@ export default function SchedulePlanWizard() {
             <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px" }}>
               넣은 공종만 공정표에 반영됩니다 (예: 구조만 → 구조 공정표 / 토목+구조 → 합쳐서 1개). 시공 순서대로 자동 연결.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, alignItems: "start" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {DISCIPLINES.map((d, i) => {
                 const filled = slots[d.key];
                 if (!d.active) {
@@ -547,6 +551,30 @@ export default function SchedulePlanWizard() {
                         </span>
                       )}
                     </div>
+                    {/* 공종별 분리 입력 — 비우면 프로젝트 기본값(③④) 적용 */}
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #cbd5e1", display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                      <label style={pr} title="WBS 개수 — 비우면 BIM 자동(구역×층)">WBS개수
+                        <input type="number" min={1} className="wz-in" style={{ width: 64, padding: "2px 4px" }} placeholder="자동"
+                               value={discSet[d.key]?.wbs ?? ""} onChange={(e) => setDS(d.key, { wbs: e.target.value })} /></label>
+                      <label style={pr} title="이 공종 착공일 — 비우면 프로젝트 착공일">착공일
+                        <input type="date" className="wz-in" style={{ width: 142, padding: "2px 4px" }}
+                               value={discSet[d.key]?.start ?? ""} onChange={(e) => setDS(d.key, { start: e.target.value })} /></label>
+                      <label style={pr} title="이 공종 마감일(목표)">마감일
+                        <input type="date" className="wz-in" style={{ width: 142, padding: "2px 4px" }}
+                               value={discSet[d.key]?.finish ?? ""} onChange={(e) => setDS(d.key, { finish: e.target.value })} /></label>
+                      <label style={pr} title="이 공종 가동률 — 비우면 프로젝트 기본">가동률
+                        <select className="wz-in" style={{ width: 80, padding: "2px 4px" }}
+                                value={discSet[d.key]?.util ?? ""} onChange={(e) => setDS(d.key, { util: e.target.value })}>
+                          <option value="">기본</option><option value="1">100%</option><option value="0.9">90%</option><option value="0.85">85%</option><option value="0.8">80%</option><option value="0.7">70%</option>
+                        </select></label>
+                      <label style={pr} title="이 공종 시공 전략 — 비우면 프로젝트 기본">시공전략
+                        <select className="wz-in" style={{ width: 152, padding: "2px 4px" }}
+                                value={discSet[d.key]?.strategy ?? ""} onChange={(e) => setDS(d.key, { strategy: e.target.value })}>
+                          <option value="">기본</option><option value="bottom_up">순타·일괄</option><option value="bottom_up_phased">순타·단계</option><option value="top_down">역타</option>
+                        </select></label>
+                    </div>
+                    <input className="wz-in" style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "4px 8px" }} placeholder="참고사항 (이 공종 메모)"
+                           value={discSet[d.key]?.notes ?? ""} onChange={(e) => setDS(d.key, { notes: e.target.value })} />
                   </div>
                 );
               })}
