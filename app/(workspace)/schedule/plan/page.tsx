@@ -137,8 +137,8 @@ export default function SchedulePlanWizard() {
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
   const [slots, setSlots] = useState<Record<string, { name: string; count?: number; wp?: number; warn?: string | null; ai?: number }>>({}); // 공종별 업로드 현황(count/wp/ai 는 분석 후)
   const slotFilesRef = useRef<Record<string, File>>({}); // 공종별 원본 IFC(File) — 4D 전달용(공종 태그 보존)
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10)); // 오늘 기본 — 업로드+버튼 원클릭(필요시 수정)
-  const [durationMonths, setDurationMonths] = useState("");
+  const [startDate] = useState(() => new Date().toISOString().slice(0, 10)); // 폴백(공종 카드 착공일이 우선)
+  const [durationMonths] = useState("");  // 폴백(공종 카드 마감일로 산출)
   const [wdpw, setWdpw] = useState(6);
   const [towerCranes, setTowerCranes] = useState(2);
   const [workCrews, setWorkCrews] = useState(3);
@@ -159,7 +159,7 @@ export default function SchedulePlanWizard() {
   const [diffBusy, setDiffBusy] = useState(false);
   const [brief, setBrief] = useState<string | null>(null); // AI 리스크 브리핑
   const [briefBusy, setBriefBusy] = useState(false);
-  const [strategy, setStrategy] = useState("bottom_up");
+  const [strategy] = useState("bottom_up");  // 폴백(공종 카드 시공전략이 우선)
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
   const [storeys, setStoreys] = useState<string[]>([]);
@@ -340,21 +340,34 @@ export default function SchedulePlanWizard() {
   // ── [버튼 2] 생성 — 분석된 work_unit + (검토한) 건물유형·공종·구조유형으로 공정표 생성. ──
   const onStart = async () => {
     if (!workUnits.length) { setErr("먼저 '분석 & 추천'을 실행하세요"); return; }
-    if (!startDate) { setErr("착공일을 입력하세요"); return; }
+    // 공종 카드에서 프로젝트 기본 도출 (Phase1: 백엔드는 전역값만 — 가장 이른 착공일 + 대표공종 값. 공종별 적용=Phase2)
+    const starts = Object.values(discSet).map((s) => s.start).filter(Boolean).sort();
+    const projStart = starts[0] || startDate;
+    if (!projStart) { setErr("공종 카드에 착공일을 1개 이상 입력하세요"); return; }
+    const prim = discSet["종합"] || discSet["구조"] || Object.values(discSet)[0] || {};
+    const projUtil = prim.util ? Number(prim.util) : util;
+    const projStrategy = prim.strategy || strategy;
+    const finishes = Object.values(discSet).map((s) => s.finish).filter(Boolean).sort();
+    const lastFinish = finishes[finishes.length - 1];
+    let projMonths = durationMonths ? Number(durationMonths) : undefined;
+    if (lastFinish) {
+      const md = (new Date(lastFinish + "T00:00:00").getTime() - new Date(projStart + "T00:00:00").getTime()) / 86400000 / 30.4;
+      if (md > 0) projMonths = Math.round(md);
+    }
     setBusy(true); setErr(null);
     try {
       const r = await startPlan({
         building_type: buildingType.trim() || "건물", scope: scope.trim() || undefined,
         structure_type: structureType.trim() || undefined, discipline: discipline.trim() || undefined,
         zones, storeys, work_units: workUnits, methods: [],
-        start_date: startDate, duration_months: durationMonths ? Number(durationMonths) : undefined,
+        start_date: projStart, duration_months: projMonths,
         work_days_per_week: wdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
-        utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
+        utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
         seasonal_weather: seasonal,
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
-        constraints: constraints.trim() || undefined, strategy,
+        constraints: constraints.trim() || undefined, strategy: projStrategy,
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
@@ -501,7 +514,7 @@ export default function SchedulePlanWizard() {
                 const pr: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#475569", gap: 6 };
                 const isStruct = d.key === "구조" || d.key === "종합";  // 종합=구조 자원 공유(골조 지배)
                 return (
-                  <div key={d.key} style={{ border: `1px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 8, padding: "10px 12px", background: filled ? "#f0fdf4" : "#eff6ff" }}>
+                  <div key={d.key} style={{ border: `1px solid ${filled ? "#bbf7d0" : "#dbeafe"}`, borderLeft: `4px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 10, padding: "14px 16px", background: "#fff", boxShadow: "0 1px 4px rgba(15,23,42,0.06)" }}>
                     <label title={`${d.label} IFC 업로드 — ${d.hint}`} style={{ display: "block", cursor: bimBusy ? "wait" : "pointer" }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: filled ? "#15803d" : "#1d4ed8" }}>
                         {filled ? "✓" : `${i + 1}.`} {d.icon} {d.label}
@@ -551,8 +564,8 @@ export default function SchedulePlanWizard() {
                         </span>
                       )}
                     </div>
-                    {/* 공종별 분리 입력 — 비우면 프로젝트 기본값(③④) 적용 */}
-                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #cbd5e1", display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+                    {/* 공종별 분리 입력 — 비우면 프로젝트 기본값(②) 적용 */}
+                    <div style={{ marginTop: 10, padding: "10px 12px", background: "#f8fafc", border: "1px solid #eef2f7", borderRadius: 8, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center" }}>
                       <label style={pr} title="WBS 개수 — 비우면 BIM 자동(구역×층)">WBS개수
                         <input type="number" min={1} className="wz-in" style={{ width: 64, padding: "2px 4px" }} placeholder="자동"
                                value={discSet[d.key]?.wbs ?? ""} onChange={(e) => setDS(d.key, { wbs: e.target.value })} /></label>
@@ -606,38 +619,20 @@ export default function SchedulePlanWizard() {
               <input className="wz-in" type="number" style={{ marginTop: 6 }} value={gfa} onChange={(e) => setGfa(e.target.value)}
                      placeholder="연면적(㎡, 선택) — 건축·MEP 기간 정밀화" title="연면적 — 마감·설비는 연면적에 비례. 입력하면 부재수 대신 물량 기반 기간" />
             </Field>
-            <Field label="② 시공 전략 — 굴착·골조 순서 (발주·부지 조건)">
-              <select className="wz-in" value={strategy} onChange={(e) => setStrategy(e.target.value)}
-                      title="굴착·골조 전략 — 발주·부지 조건(AI 추정 불가)">
-                <option value="bottom_up">순타·일괄 (전 구역 지하 → 지상)</option>
-                <option value="bottom_up_phased">순타·단계 (구역별 지하→지상 연속)</option>
-                <option value="top_down">역타 (지하·지상 병행)</option>
-              </select>
-              <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
-                ⓘ 공종은 업로드한 <b>슬롯이 결정</b>(자동판정 불요) · 작업조·크레인·거푸집·구조유형 등 공종별 입력은 <b>각 슬롯 밑</b>에 있습니다.
-              </p>
-            </Field>
-            <Field label="③ 언제 — 착공일 * / 목표공기">
-              <div style={{ display: "flex", gap: 8 }}>
-                <input type="date" className="wz-in" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                <input type="number" className="wz-in" style={{ width: 110 }} value={durationMonths}
-                       onChange={(e) => setDurationMonths(e.target.value)} placeholder="개월" />
-                <select className="wz-in" style={{ width: 100 }} value={wdpw} onChange={(e) => setWdpw(Number(e.target.value))}>
-                  <option value={5}>주5일</option><option value={6}>주6일</option><option value={7}>주7일</option>
-                </select>
-                <label className="wz-sub" title="가동률 — 실작업 효율(장비고장·경미우천·재작업 손실). 공기=공수÷가동률. 공휴일(설·추석 등)은 자동 제외">가동률
-                  <select className="wz-in" style={{ width: 92 }} value={util} onChange={(e) => setUtil(Number(e.target.value))}>
-                    <option value={1.0}>100%</option><option value={0.9}>90%</option>
-                    <option value={0.85}>85%</option><option value={0.8}>80%</option><option value={0.7}>70%</option>
+            <Field label="② 프로젝트 기본 — 근무·기상 (착공일·공기·가동률·전략은 각 공종 카드에)">
+              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <label className="wz-sub" title="주당 근무일">근무
+                  <select className="wz-in" style={{ width: 96 }} value={wdpw} onChange={(e) => setWdpw(Number(e.target.value))}>
+                    <option value={5}>주5일</option><option value={6}>주6일</option><option value={7}>주7일</option>
                   </select></label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#475569" }}
+                       title="동절기(12·1·2월)·우기(7·8월) 기상 중단일을 달력에서 자동 제외. 가동률과 별개 축(중복계산 없음)">
+                  <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
+                  계절 비작업일 자동 반영 (동절기·우기)
+                </label>
               </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#475569", margin: "6px 0 0" }}
-                     title="동절기(12·1·2월 폭설·혹한)·우기(7·8월 장마) 기상 중단일을 달력에서 자동 제외. 가동률(장비·재작업 손실)과 별개 축이라 중복계산 없음">
-                <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
-                계절 비작업일 자동 반영 (동절기·우기 기상 중단)
-              </label>
-              <p style={{ fontSize: 11, color: "#64748b", margin: "4px 0 0" }}>
-                ⓘ 공휴일(설·추석·법정공휴일)은 자동 제외 · 가동률로 장비·재작업 손실, 계절옵션으로 동절기·우기 반영 → 현실 준공일
+              <p style={{ fontSize: 11, color: "#64748b", margin: "8px 0 0", lineHeight: 1.5 }}>
+                ⓘ <b>착공일·목표공기·가동률·시공전략</b>은 각 <b>공종 카드</b>에서 따로 설정합니다 · 공휴일(설·추석·법정)은 자동 제외
               </p>
             </Field>
             {slots["토목"] && civilQty && (
