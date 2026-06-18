@@ -595,6 +595,11 @@ export function planP6XmlUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/p6xml`;
 }
 
+/** P6 XML 다운로드 URL — import 전용(짧은 Activity Id). 4D용 planP6XmlUrl(긴 4D코드)과 분리. */
+export function planP6XmlDownloadUrl(planId: string): string {
+  return `${API_BASE}/schedule/plan/${planId}/p6xml-export`;
+}
+
 /** P6 XER 다운로드 URL (Primavera import 가장 호환) */
 export function planXerUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/xer`;

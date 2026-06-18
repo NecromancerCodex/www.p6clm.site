@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError,
   type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk,
 } from "../../../../lib/api/schedule";
@@ -829,7 +829,7 @@ export default function SchedulePlanWizard() {
                 <button className="wz-btn green" disabled={busy} onClick={() => void onConfirm()}>베이스라인 확정</button>
               )}
               {planId && (
-                <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planP6XmlUrl(planId)}>P6 XML 다운로드</a>
+                <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planP6XmlDownloadUrl(planId)}>P6 XML 다운로드</a>
               )}
               {planId && (
                 <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planXerUrl(planId)}>P6 XER 다운로드</a>
