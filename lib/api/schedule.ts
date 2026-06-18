@@ -594,3 +594,8 @@ export async function riskBrief(planId: string): Promise<{ brief: string }> {
 export function planP6XmlUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/p6xml`;
 }
+
+/** P6 XER 다운로드 URL (Primavera import 가장 호환) */
+export function planXerUrl(planId: string): string {
+  return `${API_BASE}/schedule/plan/${planId}/xer`;
+}

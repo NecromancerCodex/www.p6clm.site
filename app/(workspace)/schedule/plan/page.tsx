@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlUrl, riskBrief, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError,
   type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk,
 } from "../../../../lib/api/schedule";
@@ -830,6 +830,9 @@ export default function SchedulePlanWizard() {
               )}
               {planId && (
                 <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planP6XmlUrl(planId)}>P6 XML 다운로드</a>
+              )}
+              {planId && (
+                <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planXerUrl(planId)}>P6 XER 다운로드</a>
               )}
               {planId && (
                 <a className="wz-btn" style={{ textDecoration: "none" }} href={`/fourd?plan=${planId}`}
