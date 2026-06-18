@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>p6 CLM — 건설 현장 AI 플랫폼 소개</title>
+<title>건설 특화 멀티모달 AI — 활용 사례</title>
 <style>
   :root{
     --ink:#16203a; --sub:#5b6675; --line:#e6e9ef; --bg:#f5f7fb;
@@ -22,7 +22,7 @@
   .logo b{font-size:18px;font-weight:800}.logo span{font-size:12.5px;color:#9fb3dd;display:block}
   .hero h1{font-size:37px;line-height:1.28;font-weight:800;letter-spacing:-.6px}
   .hero h1 b{color:var(--accent)}
-  .hero .sub{margin-top:16px;font-size:17px;color:#cdd9f5;max-width:720px;line-height:1.7}
+  .hero .sub{margin-top:16px;font-size:17px;color:#cdd9f5;max-width:740px;line-height:1.7}
   .hero .pills{margin-top:24px;display:flex;gap:9px;flex-wrap:wrap}
   .hero .pill{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);color:#dfe9ff;font-size:13px;font-weight:600;padding:7px 13px;border-radius:22px}
   .hero .meta{margin-top:24px;font-size:13px;color:#8fa3ce}
@@ -37,9 +37,9 @@
   .star svg{width:100%;height:auto}
   .star .desc h3{font-size:20px;font-weight:800;margin-bottom:10px}
   .star .desc p{font-size:14.5px;color:var(--sub);margin-bottom:12px}
-  .star .desc .li{display:flex;gap:9px;font-size:14px;margin-bottom:8px;align-items:flex-start}
+  .star .desc .li{display:flex;gap:9px;font-size:14.5px;margin-bottom:10px;align-items:flex-start}
   .star .desc .li b{color:var(--ink)}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--brand);margin-top:7px;flex:none}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--brand);margin-top:8px;flex:none}
   /* FEATURE blocks */
   .feat{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:26px}
   .feat .top{display:grid;grid-template-columns:54px 1fr;gap:14px;padding:22px 26px 14px;align-items:start}
@@ -63,6 +63,12 @@
   .precision th{background:#fdf3d6;font-weight:700}
   .precision tr:last-child td{border-bottom:none}
   .precision .hi{color:#0e9f6e;font-weight:700}
+  /* future cards */
+  .futgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:22px}
+  .futcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;box-shadow:var(--shadow)}
+  .futcard .ic{font-size:26px;margin-bottom:8px;display:block}
+  .futcard h4{font-size:16px;font-weight:800;margin-bottom:5px}
+  .futcard p{font-size:13.5px;color:var(--sub)}
   /* diff table */
   table.cmp{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;box-shadow:var(--shadow);font-size:13.5px}
   table.cmp th,table.cmp td{padding:13px 15px;text-align:left;border-bottom:1px solid var(--line)}
@@ -76,6 +82,7 @@
   @media(max-width:820px){
     .star-grid{grid-template-columns:1fr}
     .feat .shot.two{grid-template-columns:1fr}
+    .futgrid{grid-template-columns:1fr}
     .hero h1{font-size:27px}
   }
 </style>
@@ -84,17 +91,17 @@
 
 <!-- HERO -->
 <div class="hero"><div class="wrap">
-  <div class="logo"><div class="mk">⛑️</div><div><b>p6 CLM</b><span>건설 현장 AI 플랫폼</span></div></div>
-  <h1>건설의 전 과정을, <b>온톨로지를 물고 있는<br>멀티모달 AI 에이전트</b>가 끌고 갑니다</h1>
-  <p class="sub">표준품셈·시방서·법령·과거 공정표를 담은 <b style="color:#fff">건설 온톨로지(AI의 외부 기억)</b>를 두고, 스타 에이전트
-     <b style="color:#fff">Cbot</b>이 매 단계 이 기억을 검색해 근거로 삼아 — 공정표 자동생성 · 4D 시뮬레이션 · 보고서 작성 · 현장 감찰을 하나로 오케스트레이션합니다.</p>
+  <div class="logo"><div class="mk">⛑️</div><div><b>p6 CLM</b><span>건설 현장 AI</span></div></div>
+  <h1>사진·음성·말로 시키는<br><b>건설 특화 멀티모달 AI</b></h1>
+  <p class="sub">표준품셈·시방서·법령·과거 공정표를 <b style="color:#fff">훈련시킨 건설 전용 AI</b>입니다.
+     사진 한 장, 말 한마디면 — 공정표 · 4D · 보고서를 만들어 줍니다.</p>
   <div class="pills">
-    <span class="pill">🤖 멀티모달 스타 에이전트</span>
-    <span class="pill">🧠 건설 온톨로지 에이전틱 서치</span>
-    <span class="pill">📅 자동 공정표 (P6 호환)</span>
+    <span class="pill">🖼️ 사진 이해</span>
+    <span class="pill">🎤 음성·전화·무전</span>
+    <span class="pill">📅 공정표 자동</span>
     <span class="pill">🏗️ 4D 시뮬레이션</span>
-    <span class="pill">📄 AI 보고서</span>
-    <span class="pill">⛰️ 토공·지반 모델링</span>
+    <span class="pill">📄 보고서 자동</span>
+    <span class="pill">⛰️ 토공·지반</span>
   </div>
   <div class="meta">2026.06 · 작성: 장호현 · 제품 소개 / 홍보용</div>
 </div></div>
@@ -103,19 +110,16 @@
 <section>
   <div class="wrap">
     <div class="kicker">Concept</div>
-    <h2>CLM이란? — 건설 AI 운영체제</h2>
-    <p class="lead">흩어진 현장 업무(계획·시공관리·문서·감찰)를 하나의 AI 에이전트가 끌고 갑니다. 핵심은 두 가지 —
-       <b>① 건설 지식을 담은 온톨로지(AI의 기억)</b>, <b>② 그 기억을 검색해 일하는 스타 에이전트 Cbot</b>.</p>
+    <h2>두 가지가 특별합니다</h2>
+    <p class="lead">일반 AI와 다릅니다 — ① <b>멀티모달</b>: 사진·음성·전화·무전을 다 알아듣고, ② <b>건설 지식을 훈련</b>: 표준품셈·시방서·법령을 익혀 정확하게 답합니다.</p>
     <div class="star">
       <div class="star-grid">
         <svg viewBox="0 0 320 250" preserveAspectRatio="xMidYMid meet">
-          <!-- edges -->
           <g stroke="#c5d3f0" stroke-width="2">
             <line x1="160" y1="125" x2="160" y2="40"/><line x1="160" y1="125" x2="60" y2="70"/>
             <line x1="160" y1="125" x2="260" y2="70"/><line x1="160" y1="125" x2="55" y2="190"/>
             <line x1="160" y1="125" x2="265" y2="190"/><line x1="160" y1="125" x2="160" y2="225"/>
           </g>
-          <!-- satellites -->
           <g font-size="11" font-weight="700" text-anchor="middle">
             <circle cx="160" cy="40" r="26" fill="#eef3ff" stroke="#1f5fff" stroke-width="1.5"/><text x="160" y="37" fill="#1f5fff">공정표</text><text x="160" y="50" fill="#1f5fff">생성</text>
             <circle cx="60" cy="70" r="26" fill="#effaf4" stroke="#0e9f6e" stroke-width="1.5"/><text x="60" y="67" fill="#0e9f6e">4D</text><text x="60" y="80" fill="#0e9f6e">시뮬</text>
@@ -124,163 +128,177 @@
             <circle cx="265" cy="190" r="26" fill="#eef3ff" stroke="#1f5fff" stroke-width="1.5"/><text x="265" y="187" fill="#1f5fff">현장</text><text x="265" y="200" fill="#1f5fff">감찰</text>
             <circle cx="160" cy="225" r="26" fill="#f0eefe" stroke="#6b4ee0" stroke-width="1.5"/><text x="160" y="222" fill="#5a3fd0">전화</text><text x="160" y="235" fill="#5a3fd0">무전</text>
           </g>
-          <!-- center -->
-          <circle cx="160" cy="125" r="38" fill="#1f5fff"/>
-          <text x="160" y="120" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">Cbot</text>
-          <text x="160" y="137" text-anchor="middle" fill="#bcd0ff" font-size="9.5">스타 에이전트</text>
+          <circle cx="160" cy="125" r="40" fill="#1f5fff"/>
+          <text x="160" y="121" text-anchor="middle" fill="#fff" font-size="13" font-weight="800">건설 특화</text>
+          <text x="160" y="137" text-anchor="middle" fill="#bcd0ff" font-size="10.5">AI 에이전트</text>
         </svg>
         <div class="desc">
-          <h3>Cbot — 온톨로지를 물고 있는 스타 에이전트</h3>
-          <p>사용자의 요청(글·사진·음성·전화·무전)을 분석해 <b>알맞은 작업에 분배(오케스트레이션)</b>하고, 매 단계 건설 온톨로지를 검색해 근거를 제시합니다.</p>
-          <div class="li"><span class="dot"></span><span><b>온톨로지 = AI의 외부 기억</b> — 표준품셈·시방서(KCS)·법령·과거 공정표를 구조화해 저장. LLM이 외우는 게 아니라 여기서 꺼내 씀 → <b>환각 억제</b></span></div>
-          <div class="li"><span class="dot"></span><span><b>에이전틱 서치</b> — LLM이 단계마다 스스로 이 기억을 2회+ 검색해 근거 축적</span></div>
-          <div class="li"><span class="dot"></span><span><b>멀티모달</b> — 텍스트·이미지·음성·전화·무전 입력을 모두 이해</span></div>
-          <div class="li"><span class="dot"></span><span><b>휴먼 인 더 루프</b> — AI가 판단근거를 적고, 사람이 검토·수정 후 확정</span></div>
+          <h3>하나의 AI가 현장 전체를 돕습니다</h3>
+          <div class="li"><span class="dot"></span><span><b>멀티모달</b> — 글·사진·음성·전화·무전, 무엇으로 시켜도 알아듣습니다.</span></div>
+          <div class="li"><span class="dot"></span><span><b>건설 지식 훈련(온톨로지)</b> — 표준품셈·시방서·법령·과거 공정표를 훈련해 근거 있게 답합니다.</span></div>
+          <div class="li"><span class="dot"></span><span><b>한 번에 처리</b> — 공정표·4D·보고서·현장 감찰까지 한 AI가 처리합니다.</span></div>
+          <div class="li"><span class="dot"></span><span><b>사람이 검토</b> — AI가 초안을 만들면, 사람이 확인·수정해 확정합니다.</span></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FEATURES -->
+<!-- USE CASES -->
 <section style="padding-top:4px">
   <div class="wrap">
     <div class="kicker">Use Cases · 실제 화면</div>
-    <h2>CLM 활용 사례 — 실제 화면으로</h2>
+    <h2>활용 사례 — 실제 화면으로</h2>
     <p class="lead" style="margin-bottom:28px">제품의 실제 동작 화면입니다.</p>
 
-    <!-- 1 Cbot -->
+    <!-- 1 멀티모달 -->
     <div class="feat">
       <div class="top"><div class="num">1</div><div>
-        <h3>멀티모달 스타 에이전트 — Cbot</h3>
-        <p>무엇이든 묻고, 사진·음성·전화·무전까지 입력. Cbot이 요청을 분석해 맞는 작업으로 보내고 KCS/KDS 근거로 답합니다.</p>
+        <h3>사진·음성·말로 시키는 멀티모달 AI</h3>
+        <p>무엇이든 묻고, <b>사진·음성·전화·무전</b>으로 시키세요. AI가 알아듣고 맞는 작업으로 알아서 처리합니다.</p>
       </div></div>
-      <div class="tags"><span class="tag b">멀티모달</span><span class="tag">오케스트레이션</span><span class="tag">KCS/KDS 근거</span></div>
-      <div class="shot"><img src="/clm-assets/31.png" alt="Cbot 능력 안내 답변 화면"></div>
-      <div class="cap">▲ "너는 뭘 할 수 있니?" — Cbot이 실제 능력(자동 공정표·4D·문서작성·법령검색·멀티모달·토공)으로 답변. 이미지·음성·전화·무전 입력 가능</div>
+      <div class="tags"><span class="tag b">멀티모달</span><span class="tag">사진·음성·전화·무전</span><span class="tag">건설 기준 근거</span></div>
+      <div class="shot"><img src="/clm-assets/31.png" alt="AI 대화 화면"></div>
+      <div class="cap">▲ "너는 뭘 할 수 있니?" — AI가 할 수 있는 일을 안내 (공정표·4D·보고서·법령검색·토공). 사진·음성·전화·무전 입력 가능</div>
     </div>
 
-    <!-- 2 AI 보고서 -->
+    <!-- 2 보고서 -->
     <div class="feat">
       <div class="top"><div class="num">2</div><div>
-        <h3>멀티모달 AI 보고서 작성</h3>
-        <p>현장 사진 + 한마디(예: "안전점검보고서 작성해줘")만으로 Cbot이 <b>알맞은 보고서를 자동 작성</b>합니다. 온톨로지 에이전틱 서치로 관련 법령·시방서(KCS)를 근거로 달고, 사진·음성·전화·무전 입력도 그대로 문서가 됩니다. 당연히 수정 가능합니다.</p>
+        <h3>사진 한 장으로 보고서 자동 작성</h3>
+        <p>현장 사진 + 한마디(예: "안전점검보고서 작성해줘")면 <b>보고서가 자동으로</b> 만들어집니다. 관련 법령·시방서를 근거로 쓰고, 당연히 수정도 됩니다.</p>
       </div></div>
       <div class="tags"><span class="tag b">사진+한마디 → 문서</span><span class="tag">법령·시방서 근거</span><span class="tag">전화·무전 → 문서</span><span class="tag">수정 가능</span></div>
       <div class="shot two">
-        <div class="s"><img src="/clm-assets/39.png" alt="NCR 보고서 작성 대화 흐름"></div>
-        <div class="s"><img src="/clm-assets/40.png" alt="생성된 NCR 보고서 문서"></div>
+        <div class="s"><img src="/clm-assets/39.png" alt="보고서 작성 대화"></div>
+        <div class="s"><img src="/clm-assets/40.png" alt="완성된 보고서 문서"></div>
       </div>
-      <div class="cap">▲ (좌) 사진 첨부 + "NCR보고서 작성해줘" → 자동 작성 / (우) 완성된 NCR 문서 — 요구기준·부적합내용·조치사항을 KCS 근거로 작성</div>
+      <div class="cap">▲ (좌) 사진 첨부 + "NCR보고서 작성해줘" → 자동 작성 / (우) 완성된 보고서 — 기준·내용·조치를 건설 기준 근거로 작성</div>
     </div>
 
-    <!-- 3 공정표 생성 -->
+    <!-- 3 공정표 -->
     <div class="feat">
       <div class="top"><div class="num">3</div><div>
-        <h3>BIM → 자동 공정표 생성</h3>
-        <p>IFC(BIM)를 공종별로 올리면 공종을 자동 판정하고, <b>온톨로지 에이전틱 서치(표준품셈·시방서·법령·과거 공정표)</b>로 액티비티를 정의해 WBS·공정표를 만듭니다.</p>
+        <h3>BIM 파일만 올리면 공정표가 자동</h3>
+        <p>BIM(설계 모델)을 올리면 공종을 자동으로 나누고, <b>훈련된 건설 지식(표준품셈·시방서·법령·과거 공정표)</b>으로 공정표를 만듭니다.</p>
       </div></div>
-      <div class="tags"><span class="tag b">온톨로지 에이전틱 서치 2회</span><span class="tag">공종 자동판정</span><span class="tag">WBS 405 · 구역 26</span></div>
+      <div class="tags"><span class="tag b">BIM → 공정표 자동</span><span class="tag">공종 자동 분류</span><span class="tag">건설 지식 훈련</span></div>
       <div class="shot two">
-        <div class="s"><img src="/clm-assets/17.png" alt="공정계획 위저드 공종 슬롯"></div>
-        <div class="s"><img src="/clm-assets/18.png" alt="WBS 스코프"></div>
+        <div class="s"><img src="/clm-assets/17.png" alt="공종별 업로드"></div>
+        <div class="s"><img src="/clm-assets/18.png" alt="공정 범위 자동 도출"></div>
       </div>
-      <div class="cap">▲ (좌) 공종별 멀티 임포트 + AI 판정 — 토목·구조·건축·MEP·조경·가설 / (우) WBS 워크패키지 405개·구역 26개 자동 도출</div>
+      <div class="cap">▲ (좌) 공종별로 BIM 올리면 AI가 토목·구조·건축·설비 자동 분류 / (우) 공정 범위(작업 405개·구역 26개) 자동 도출</div>
     </div>
 
-    <!-- 4 AI 판단근거 + HITL -->
+    <!-- 4 판단근거 + 사람 검토 -->
     <div class="feat">
       <div class="top"><div class="num">4</div><div>
-        <h3>AI 판단근거 작성 + 휴먼 인 더 루프</h3>
-        <p>AI가 "왜 이렇게 계획했는가"를 적습니다. 사람이 활동·기간·선후행을 직접 수정·삭제한 뒤 컨펌하면 공정표 베이스라인이 됩니다.</p>
+        <h3>왜 이렇게 짰는지 AI가 설명 + 사람이 검토</h3>
+        <p>AI가 "왜 이렇게 계획했는지" 근거를 적어줍니다. 사람이 작업·기간·순서를 <b>직접 수정·삭제</b>한 뒤 확정합니다.</p>
       </div></div>
-      <div class="tags"><span class="tag b">AI 판단근거</span><span class="tag">사람이 검토·수정</span><span class="tag">액티비티 2124개</span></div>
-      <div class="shot"><img src="/clm-assets/19.png" alt="액티비티 정의 + AI 판단근거"></div>
-      <div class="cap">▲ 액티비티 정의 — "AI 판단 근거: 왜 이렇게 계획했는가" + 활동별 직접 수정/삭제 (휴먼 인 더 루프)</div>
+      <div class="tags"><span class="tag b">AI가 근거 설명</span><span class="tag">사람이 검토·수정</span></div>
+      <div class="shot"><img src="/clm-assets/19.png" alt="AI 판단근거와 수정"></div>
+      <div class="cap">▲ "AI 판단 근거: 왜 이렇게 계획했는가" + 작업별 직접 수정/삭제 (사람이 최종 확인)</div>
     </div>
 
-    <!-- 5 리스크 + 베이스라인 -->
+    <!-- 5 리스크 -->
     <div class="feat">
       <div class="top"><div class="num">5</div><div>
-        <h3>스케줄링 리스크 분석 + 베이스라인 근거</h3>
-        <p>CPM + 자원 평준화로 날짜를 계산하고, <b>목표공기 초과·우기 토공 등 리스크를 자동 진단</b>합니다. 베이스라인이 왜 이렇게 나왔는지 근거를 제시하고 AI가 브리핑합니다.</p>
+        <h3>공사 위험을 AI가 미리 경고</h3>
+        <p><b>공기 초과·우기 토공</b> 같은 위험을 AI가 자동으로 찾아 알려주고, 왜 위험한지·어떻게 대응할지 브리핑합니다.</p>
       </div></div>
-      <div class="tags"><span class="tag b">리스크 자동 진단</span><span class="tag">AI 브리핑</span><span class="tag">베이스라인 근거</span></div>
-      <div class="shot"><img src="/clm-assets/21.png" alt="리스크 분석 + 베이스라인 + 간트"></div>
-      <div class="cap">▲ 리스크 분석(목표공기 초과·우기 토공) + AI 브리핑 + 베이스라인 근거 + 간트 차트</div>
+      <div class="tags"><span class="tag b">위험 자동 진단</span><span class="tag">AI 브리핑</span></div>
+      <div class="shot"><img src="/clm-assets/21.png" alt="리스크 분석"></div>
+      <div class="cap">▲ 위험 분석(공기 초과·우기 토공) + AI 브리핑 + 공정표(간트)</div>
     </div>
 
-    <!-- 6 프리마베라 + 내역서 -->
+    <!-- 6 P6 + 내역서 -->
     <div class="feat">
       <div class="top"><div class="num">6</div><div>
-        <h3>프리마베라(P6) 호환 + 내역서로 정밀화</h3>
-        <p>생성된 공정표는 <b>P6 XML로 내보내</b> Primavera에서 그대로 임포트·수정할 수 있습니다. 기존 도구를 버리지 않아도 됩니다.</p>
+        <h3>프리마베라(P6)에서 그대로 사용</h3>
+        <p>만든 공정표는 <b>P6 파일로 내보내</b> Primavera에서 바로 열고 수정할 수 있습니다. 쓰던 도구를 안 바꿔도 됩니다.</p>
       </div></div>
-      <div class="tags"><span class="tag b">P6 XML 호환</span><span class="tag">임포트·수정 가능</span></div>
+      <div class="tags"><span class="tag b">P6 호환</span><span class="tag">바로 수정</span></div>
       <div class="precision" style="margin:4px 26px 24px">
-        <h4>💡 내역서(BOQ)를 넣으면 얼마나 정밀해지나?</h4>
+        <h4>💡 내역서를 넣으면 더 정밀해집니다</h4>
         <table>
-          <tr><th>구분</th><th>현재 (BIM만)</th><th>내역서 추가 시</th></tr>
-          <tr><td>기간 산정</td><td>부재 수·연면적 기반 추정</td><td class="hi">실제 물량(콘크리트량·거푸집·철근) 기반 정밀 산정</td></tr>
-          <tr><td>원가</td><td>미산정</td><td class="hi">물량 × 표준품셈 단가 → 공정별 원가</td></tr>
-          <tr><td>활동 상세</td><td>공종·층 단위</td><td class="hi">부재별 자재·수량까지 (콘크리트 종류, 거푸집, 철근)</td></tr>
+          <tr><th>구분</th><th>BIM만</th><th>내역서까지 넣으면</th></tr>
+          <tr><td>기간</td><td>대략 추정</td><td class="hi">실제 물량(콘크리트·거푸집·철근) 기반 정밀</td></tr>
+          <tr><td>원가</td><td>없음</td><td class="hi">물량 × 단가 → 공정별 원가</td></tr>
         </table>
-        <p style="font-size:12.5px;color:#8a6d2a;margin-top:10px">→ BIM = "무엇이 어디에", 내역서 = "얼마나 · 얼마짜리". 둘을 합치면 <b>기간·원가가 동시에 정밀</b>해집니다. (연동 훅 준비됨, 샘플 입수 시 적용)</p>
+        <p style="font-size:12.5px;color:#8a6d2a;margin-top:10px">→ BIM은 "무엇이 어디에", 내역서는 "얼마나·얼마짜리". 둘을 합치면 <b>기간·원가가 같이 정밀</b>해집니다.</p>
       </div>
     </div>
 
     <!-- 7 4D -->
     <div class="feat">
       <div class="top"><div class="num">7</div><div>
-        <h3>4D 시뮬레이션 — 오늘 날짜 진행을 육안으로</h3>
-        <p>공정표와 BIM 부재를 연결해, <b>슬라이더 날짜에 어디까지 지어졌는지 색으로 표시</b>합니다. 골조가 층별로 올라가고 토공이 깊이별로 진행되는 게 눈에 보입니다.</p>
+        <h3>오늘 어디까지 지어졌는지 눈으로</h3>
+        <p>공정표와 BIM을 연결해, <b>날짜를 움직이면 그날까지 지어진 부분이 색으로</b> 보입니다. 골조가 층층이 올라가는 게 한눈에 보입니다.</p>
       </div></div>
-      <div class="tags"><span class="tag b">공정표↔부재 연결</span><span class="tag">날짜별 진행 시각화</span><span class="tag">24,136개 100% 매칭</span></div>
-      <div class="shot"><img src="/clm-assets/22.png" alt="4D 대시보드"></div>
-      <div class="cap">▲ 4D 대시보드 — 공정 2,124건 · 부재 24,136개 100% 매칭, 부재 클릭 시 공정·기간·상태 표시</div>
+      <div class="tags"><span class="tag b">날짜별 진행 시각화</span><span class="tag">공정표↔BIM 연결</span></div>
+      <div class="shot"><img src="/clm-assets/22.png" alt="4D 시뮬레이션"></div>
+      <div class="cap">▲ 4D 시뮬레이션 — 부재를 누르면 공정·기간·상태 표시 (전 부재 매칭)</div>
     </div>
 
     <!-- 8 관리자 워크 -->
     <div class="feat">
       <div class="top"><div class="num">8</div><div>
-        <h3>관리자 워크 + 향후 IoT 결합 — 현장 안 가도 감찰</h3>
-        <p>가상 현장을 1인칭으로 걸어다니며 내부를 점검합니다. 향후 <b>IoT·CCTV·센서와 결합</b>하면 관리자가 직접 가지 않아도 실시간 현장을 감찰할 수 있습니다.</p>
+        <h3>현장에 안 가도 가상으로 둘러보기</h3>
+        <p>가상 현장을 <b>1인칭으로 걸어다니며</b> 내부를 점검합니다. 앞으로 IoT·CCTV와 연결하면 실시간 원격 감찰까지 가능합니다.</p>
       </div></div>
-      <div class="tags"><span class="tag b">관리자 워크(1인칭)</span><span class="tag">실사 모드</span><span class="tag">향후 IoT 연동</span></div>
-      <div class="shot"><img src="/clm-assets/23.png" alt="4D 관리자 워크 내부"></div>
-      <div class="cap">▲ 관리자 워크 ON · 실사 모드 — 가상 현장 내부를 걸으며 골조·부재 점검</div>
+      <div class="tags"><span class="tag b">가상 현장 워크</span><span class="tag">향후 IoT 연동</span></div>
+      <div class="shot"><img src="/clm-assets/23.png" alt="가상 현장 워크"></div>
+      <div class="cap">▲ 가상 현장 내부를 걸으며 골조·부재 점검</div>
     </div>
 
     <!-- 9 토공/지반 -->
     <div class="feat">
       <div class="top"><div class="num">9</div><div>
-        <h3>토공·지반 모델링 — 도면을 데이터로</h3>
-        <p><b>add 기능으로 도면의 시추공·대지경계선·CIP·Pile을 CSV로 추출·임포트</b>하면, 3D 지층 모델과 층별 토공 물량·단면도가 자동으로 나옵니다.</p>
+        <h3>도면을 올리면 3D 지층·토공 물량</h3>
+        <p>도면의 시추공·경계선 등을 올리면 <b>3D 지층 모델과 토공 물량</b>이 자동으로 나옵니다.</p>
       </div></div>
-      <div class="tags"><span class="tag b">도면 → CSV 추출</span><span class="tag">3D 지층 모델</span><span class="tag">층별 토공 물량</span></div>
+      <div class="tags"><span class="tag b">도면 → 3D 지층</span><span class="tag">토공 물량 자동</span></div>
       <div class="shot two">
         <div class="s"><img src="/clm-assets/25.png" alt="3D 지층 모델"></div>
-        <div class="s"><img src="/clm-assets/28.png" alt="층별 토공 물량 + 단면도"></div>
+        <div class="s"><img src="/clm-assets/28.png" alt="토공 물량 + 단면도"></div>
       </div>
-      <div class="cap">▲ (좌) 시추 11공 IDW 보간 3D 지층 모델 / (우) 층별 토공 물량 표(토사·풍화·암반) + 지질 단면도</div>
+      <div class="cap">▲ (좌) 시추 자료로 만든 3D 지층 모델 / (우) 층별 토공 물량 + 지질 단면도</div>
     </div>
 
+  </div>
+</section>
+
+<!-- FUTURE -->
+<section style="padding-top:4px">
+  <div class="wrap">
+    <div class="kicker">Future</div>
+    <h2>앞으로의 활용도</h2>
+    <p class="lead">건설 특화 멀티모달 AI는 이렇게 더 확장됩니다.</p>
+    <div class="futgrid">
+      <div class="futcard"><span class="ic">🛰️</span><h4>IoT·CCTV 결합 원격 감찰</h4><p>현장 센서·카메라와 연결해, 관리자가 가지 않아도 실시간으로 현장을 보고 점검합니다.</p></div>
+      <div class="futcard"><span class="ic">🎙️</span><h4>말하면 자동 일일보고</h4><p>무전·전화·음성을 실시간으로 받아 그날의 공사일보·회의록을 자동으로 정리합니다.</p></div>
+      <div class="futcard"><span class="ic">💰</span><h4>원가까지 정밀 공정</h4><p>내역서를 연동하면 기간뿐 아니라 공정별 원가까지 계산해 예산 관리를 돕습니다.</p></div>
+      <div class="futcard"><span class="ic">📈</span><h4>쌓일수록 똑똑해지는 예측</h4><p>현장 데이터가 누적될수록 더 정확한 공기·위험 예측이 가능해집니다.</p></div>
+      <div class="futcard"><span class="ic">📱</span><h4>모바일 현장 비서</h4><p>현장에서 사진 찍고 말 한마디면 즉시 보고서·지시가 만들어집니다.</p></div>
+      <div class="futcard"><span class="ic">🤝</span><h4>기존 시스템과 연동</h4><p>PMIS·ERP 등 쓰던 시스템과 결합해 한 흐름으로 일하게 합니다.</p></div>
+    </div>
   </div>
 </section>
 
 <!-- 차별점 -->
 <section style="padding-top:4px">
   <div class="wrap">
-    <div class="kicker">Why CLM</div>
-    <h2>무엇이 다른가</h2>
+    <div class="kicker">Why</div>
+    <h2>일반 AI와 무엇이 다른가</h2>
     <p class="lead" style="margin-bottom:20px"></p>
     <table class="cmp">
-      <tr><th>항목</th><th>기존 방식</th><th>p6 CLM</th></tr>
-      <tr><td>공정표 작성</td><td>전문가가 수일~수주 수작업</td><td class="us">BIM 업로드 → 온톨로지 기반 자동 생성</td></tr>
-      <tr><td>판단 근거</td><td>담당자 경험(암묵지)</td><td class="us">표준품셈·시방서·법령 근거 자동 제시</td></tr>
-      <tr><td>진행 확인</td><td>엑셀·현장 방문</td><td class="us">4D로 날짜별 시공 육안 확인 + 관리자 워크</td></tr>
-      <tr><td>문서 작성</td><td>퇴근 후 수기 작성</td><td class="us">사진·음성·전화·무전 → AI 자동 작성</td></tr>
-      <tr><td>기존 도구</td><td>교체 필요</td><td class="us">Primavera(P6) 그대로 호환</td></tr>
+      <tr><th>항목</th><th>일반 AI</th><th>건설 특화 멀티모달 AI</th></tr>
+      <tr><td>입력</td><td>글 위주</td><td class="us">사진·음성·전화·무전까지 이해</td></tr>
+      <tr><td>건설 지식</td><td>일반 상식 수준</td><td class="us">표준품셈·시방서·법령 훈련</td></tr>
+      <tr><td>공정표</td><td>못 만듦</td><td class="us">BIM에서 자동 생성</td></tr>
+      <tr><td>진행 확인</td><td>—</td><td class="us">4D로 날짜별 시공 육안 확인</td></tr>
+      <tr><td>기존 도구</td><td>—</td><td class="us">Primavera(P6) 그대로 호환</td></tr>
     </table>
   </div>
 </section>
@@ -289,13 +307,13 @@
 <section style="padding-top:4px">
   <div class="wrap">
     <div class="quote">
-      <h2>"건설 지식을 아는 AI가, 현장의 전 과정을 끌고 갑니다"</h2>
-      <p>온톨로지를 물고 있는 멀티모달 에이전트 Cbot — 공정표 생성부터 4D 시뮬레이션, 보고서, 현장 감찰까지 하나로.</p>
+      <h2>"사진 한 장, 말 한마디면 됩니다"</h2>
+      <p>건설을 훈련한 멀티모달 AI — 공정표부터 4D, 보고서, 현장 감찰까지 하나로.</p>
     </div>
   </div>
 </section>
 
-<footer>p6 CLM — 건설 현장 AI 플랫폼 · 2026.06 · 제품 소개용</footer>
+<footer>건설 특화 멀티모달 AI · 2026.06 · 제품 소개용</footer>
 
 </body>
 </html>
