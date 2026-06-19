@@ -302,6 +302,31 @@ export async function parseSchedule(
   return (await res.json()) as ScheduleParseResult;
 }
 
+/** 내역서(BOQ) 파싱 결과 — 공종 카드 업로드용. */
+export interface BoqResult {
+  quantities?: Record<string, number>;   // concrete_m3, formwork_m2, rebar_ton, excavation_m3, backfill_m3, total_cost
+  total_cost?: number;
+  has_prices?: boolean;
+  rows?: number;
+  items_matched?: number;
+  sheet?: string;       // xlsx 채택 시트명
+  filename?: string;
+  error?: string;
+}
+
+/** 내역서(.csv/.xlsx/.xlsm) 업로드 → 물량/원가 추출 (공종 카드별). */
+export async function parseBoq(file: File): Promise<BoqResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/schedule/boq/parse`, { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const detail = (body && (body.detail ?? body.error)) || `${res.status} ${res.statusText}`;
+    throw new ScheduleApiError(res.status, String(detail));
+  }
+  return (await res.json()) as BoqResult;
+}
+
 /**
  * PMXML 파일 업로드 → 공정 보고서 생성 (동기).
  * targetDate: 공사일보 '금일' 기준일 (YYYY-MM-DD). 4D 슬라이더 날짜 전달용. 미지정 시 서버 today.
@@ -380,7 +405,7 @@ export interface GenerateScheduleRequest {
   discipline_crews?: Record<string, number>; // 공종별 작업조 {건축, MEP, 조경} — 슬롯 밑 입력, 해당 공종 기간 단축
   gross_floor_area?: number;   // 연면적(㎡) — 건축/MEP 물량 기반 기간(마감·설비는 연면적 비례). 없으면 부재수
   civil_quantities?: { depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number }; // 토목 물량(서버 도출)
-  discipline_settings?: Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string }>; // 공종별 분리(착공일 앵커·가동률·전략·WBS수)
+  discipline_settings?: Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string; boq?: Record<string, number> }>; // 공종별 분리(착공일·가동률·전략·WBS·기상임계·내역서물량)
   weather_station?: string;   // 기상 지역(서울 등) — 공종별 가동률 기상 기반 산정(미지정 시 프리셋)
   utilization_rate?: number;   // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   formwork_system?: string;    // 거푸집 시스템(재래식/유로폼/갱폼/알폼/시스템폼) — 골조 기준층 사이클 결정

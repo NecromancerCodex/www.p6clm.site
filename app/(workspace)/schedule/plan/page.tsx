@@ -14,8 +14,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
-  savePlanActivities, startPlan, ScheduleApiError,
-  type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk,
+  savePlanActivities, startPlan, ScheduleApiError, parseBoq,
+  type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
 import { savePlanIfcs } from "../../../../lib/fourd/fileCache";
@@ -152,6 +152,17 @@ export default function SchedulePlanWizard() {
   const [discCrews, setDiscCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 공종별 작업조(슬롯 밑)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
   const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
+  const [discBoq, setDiscBoq] = useState<Record<string, BoqResult & { loading?: boolean }>>({});  // 공종 카드별 내역서 파싱 결과
+  const handleBoqUpload = async (cardKey: string, file: File | undefined) => {
+    if (!file) return;
+    setDiscBoq((s) => ({ ...s, [cardKey]: { loading: true } }));
+    try {
+      const r = await parseBoq(file);
+      setDiscBoq((s) => ({ ...s, [cardKey]: { ...r, loading: false } }));
+    } catch (e) {
+      setDiscBoq((s) => ({ ...s, [cardKey]: { loading: false, error: e instanceof Error ? e.message : "파싱 실패" } }));
+    }
+  };
   const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; wdpw: string; strategy: string; notes: string; win: string; heat: string; rain: string; snow: string; wind: string }>) =>
     setDiscSet((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
@@ -375,7 +386,12 @@ export default function SchedulePlanWizard() {
         work_days_per_week: projWdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
-        discipline_settings: discSet,   // 공종별 분리(착공일 앵커·가동률·전략·WBS수) — 백엔드 Phase2 적용
+        discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) 병합
+          Object.keys({ ...discSet, ...discBoq }).map((k) => [k, {
+            ...(discSet[k] || {}),
+            ...(discBoq[k]?.quantities ? { boq: discBoq[k].quantities } : {}),
+          }]),
+        ),
         weather_station: weatherStation || undefined,   // 기상 지역 — 있으면 공종별 가동률 기상 기반 산정
         utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
         seasonal_weather: seasonal,
@@ -626,6 +642,34 @@ export default function SchedulePlanWizard() {
                     })()}
                     <input className="wz-in" style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "4px 8px" }} placeholder="참고사항 (이 공종 메모)"
                            value={discSet[d.key]?.notes ?? ""} onChange={(e) => setDS(d.key, { notes: e.target.value })} />
+                    {(() => {
+                      const b = discBoq[d.key];
+                      const QLBL: Record<string, string> = { concrete_m3: "콘크리트㎥", formwork_m2: "거푸집㎡", rebar_ton: "철근t", excavation_m3: "굴착㎥", backfill_m3: "되메우기㎥" };
+                      const qsum = b?.quantities ? Object.entries(b.quantities).filter(([k]) => k !== "total_cost").reduce((s, [, v]) => s + (v || 0), 0) : 0;
+                      return (
+                        <div style={{ marginTop: 6, padding: "6px 8px", background: "#fafafa", border: "1px dashed #d4d4d8", borderRadius: 6 }}>
+                          <label style={{ fontSize: 11, color: "#52525b", fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            📄 내역서 업로드 (.csv/.xlsx) — 물량 보완(IFC 누락 대비)
+                            <input type="file" accept=".csv,.xlsx,.xlsm" style={{ display: "none" }}
+                                   onChange={(e) => { void handleBoqUpload(d.key, e.target.files?.[0]); e.currentTarget.value = ""; }} />
+                          </label>
+                          {b?.loading && <span style={{ fontSize: 11, color: "#6b7280", marginLeft: 6 }}>분석 중…</span>}
+                          {b?.error && <div style={{ fontSize: 11, color: "#dc2626", marginTop: 3 }}>⚠️ {b.error}</div>}
+                          {b && !b.loading && !b.error && (
+                            <div style={{ marginTop: 4, fontSize: 11, color: "#3f3f46" }}>
+                              ✓ {b.filename}{b.sheet ? ` (${b.sheet})` : ""} — {b.items_matched ?? 0}개 항목
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
+                                {b.quantities && Object.entries(QLBL).filter(([k]) => (b.quantities?.[k] || 0) > 0).map(([k, lbl]) => (
+                                  <span key={k} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px" }}>{lbl} {Math.round(b.quantities![k]).toLocaleString()}</span>
+                                ))}
+                                {b.has_prices && b.total_cost ? <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
+                              </div>
+                              {qsum === 0 && <div style={{ fontSize: 10.5, color: "#a16207", marginTop: 2 }}>물량 미검출 — 평탄 공/산출내역서(CSV) 권장 (원가집계 문서엔 물량 표 없음)</div>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
