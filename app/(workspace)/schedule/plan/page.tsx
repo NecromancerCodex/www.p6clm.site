@@ -126,6 +126,11 @@ const PLAN_CKPT = "clm.schedule.plan.active";
 const OP_KO: Record<string, string> = { FT: "기초", CR: "코어/골조", MD: "슬래브/모듈", PR: "마감" };
 // 공종 자동 가동률(CPE 벤치마킹 — 기상 민감도 기반 추정. 기상 데이터 연동 시 정밀화). 비우면 이 값 자동 적용.
 const UTIL_PRESET: Record<string, number> = { 종합: 0.82, 토목: 0.78, 구조: 0.82, 건축: 0.90, MEP: 0.90, 조경: 0.75, 가설: 0.85 };
+// 공종별 기상 임계 프리셋(CPE 벤치마킹) — 플레이스홀더(비우면 이 값 자동). [동절기최저℃, 혹서최고℃, 강우mm, 강설cm, 풍속m/s]
+const THRESH_PRESET: Record<string, [string, string, string, string, string]> = {
+  종합: ["-5", "35", "10", "1", "15"], 토목: ["-10", "35", "10", "5", "15"], 구조: ["-5", "35", "10", "1", "15"],
+  건축: ["", "35", "50", "5", "20"], MEP: ["", "35", "50", "5", "20"], 조경: ["-5", "33", "10", "1", "15"], 가설: ["-10", "35", "20", "5", "15"],
+};
 const PH_KO: Record<string, string> = { RB: "철근", FM: "거푸집", CN: "콘크리트", IN: "설치" };
 
 export default function SchedulePlanWizard() {
@@ -147,8 +152,8 @@ export default function SchedulePlanWizard() {
   const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
   const [discCrews, setDiscCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 공종별 작업조(슬롯 밑)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
-  const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string }>>({});
-  const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; wdpw: string; strategy: string; notes: string }>) =>
+  const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
+  const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; wdpw: string; strategy: string; notes: string; win: string; heat: string; rain: string; snow: string; wind: string }>) =>
     setDiscSet((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [weatherStation, setWeatherStation] = useState(""); // 기상 지역(ASOS) — 선택 시 공종별 가동률 기상 기반 산정
@@ -595,6 +600,31 @@ export default function SchedulePlanWizard() {
                         <span style={{ fontSize: 10.5, color: "#64748b" }}>오버레이 — 공정표 설치·해체 2줄, 4D는 층 따라</span>
                       )}
                     </div>
+                    {weatherStation && (() => {
+                      const tp = THRESH_PRESET[d.key] ?? ["", "35", "10", "5", "15"];
+                      const tf = [
+                        { k: "win" as const, lbl: "동절기℃", ph: tp[0] || "비적용" },
+                        { k: "heat" as const, lbl: "혹서℃", ph: tp[1] },
+                        { k: "rain" as const, lbl: "강우mm", ph: tp[2] },
+                        { k: "snow" as const, lbl: "강설cm", ph: tp[3] },
+                        { k: "wind" as const, lbl: "풍속㎧", ph: tp[4] },
+                      ];
+                      return (
+                        <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center",
+                                      padding: "6px 8px", background: "#f0f9ff", border: "1px solid #e0f2fe", borderRadius: 6 }}
+                             title="기상 작업불능 임계 — 비우면 공종 자동(프리셋). 입력하면 그 값으로 가동률 재계산.">
+                          <span style={{ fontSize: 10.5, color: "#0369a1", fontWeight: 600 }}>기상 임계(비우면 자동)</span>
+                          {tf.map((t) => (
+                            <label key={t.k} style={{ fontSize: 10.5, color: "#475569", display: "inline-flex", flexDirection: "column", gap: 1 }}>
+                              {t.lbl}
+                              <input className="wz-in" type="number" step="0.1" style={{ width: 58, padding: "2px 4px", fontSize: 11 }}
+                                     placeholder={t.ph} value={discSet[d.key]?.[t.k] ?? ""}
+                                     onChange={(e) => setDS(d.key, { [t.k]: e.target.value })} />
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     <input className="wz-in" style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "4px 8px" }} placeholder="참고사항 (이 공종 메모)"
                            value={discSet[d.key]?.notes ?? ""} onChange={(e) => setDS(d.key, { notes: e.target.value })} />
                   </div>
