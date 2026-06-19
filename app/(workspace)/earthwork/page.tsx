@@ -105,13 +105,26 @@ export default function EarthworkPage() {
   const bhA = boreholes.find((b) => b.id === secA) ?? boreholes[0];
   const bhB = boreholes.find((b) => b.id === secB) ?? boreholes[1];
 
-  // 마운트 시 저장된 시추공 로드 (있으면 샘플 대신 사용).
+  // 마운트 시 저장 모델 복원 — 시추(DB) + extra(경계·Pile·흙막이·지형, localStorage).
+  // 새로고침 시 초기화 방지: extra 는 백엔드 모델에 없어 localStorage 캐시로 함께 복원.
   useEffect(() => {
+    let cachedModel: { boreholes?: Borehole[]; extra?: typeof extra } | null = null;
+    try {
+      const raw = localStorage.getItem("earthwork-model");
+      if (raw) cachedModel = JSON.parse(raw);
+    } catch { /* 무시 */ }
+    if (cachedModel?.extra) setExtra(cachedModel.extra);
+
     void loadBoreholes().then((saved) => {
-      if (saved.length >= 2) {
-        setBoreholes(saved);
-        setSource(`저장됨 (시추 ${saved.length}공)`);
-        setSec(farthestPair(saved));
+      const bh = saved.length >= 2 ? saved : (cachedModel?.boreholes ?? []);
+      if (bh.length >= 2) {
+        setBoreholes(bh);
+        setSec(farthestPair(bh));
+        const ex: string[] = [];
+        if (cachedModel?.extra?.boundary?.length) ex.push(`경계 ${cachedModel.extra.boundary.length}점`);
+        if (cachedModel?.extra?.piles?.length) ex.push(`Pile ${cachedModel.extra.piles.length}`);
+        if (cachedModel?.extra?.walls?.length) ex.push(`흙막이 ${cachedModel.extra.walls.length}`);
+        setSource(`저장됨 (시추 ${bh.length}공${ex.length ? ` + ${ex.join(", ")}` : ""})`);
       }
     });
   }, []);
@@ -129,7 +142,10 @@ export default function EarthworkPage() {
     }
     setBoreholes(parsed);
     setSec(farthestPair(parsed));
-    setExtra({ terrain: data.terrain, boundary: data.boundary, piles: data.piles, walls: data.walls });
+    const newExtra = { terrain: data.terrain, boundary: data.boundary, piles: data.piles, walls: data.walls };
+    setExtra(newExtra);
+    // 전체 모델 캐시 — 새로고침 복원용(extra 는 백엔드 미저장이라 localStorage 로 보존).
+    try { localStorage.setItem("earthwork-model", JSON.stringify({ boreholes: parsed, extra: newExtra })); } catch { /* 용량초과 무시 */ }
     // 통합 CSV(##섹션)에서 추가로 들어온 데이터 요약
     const ex: string[] = [];
     if (data.terrain.length) ex.push(`지형 ${data.terrain.length}점`);
