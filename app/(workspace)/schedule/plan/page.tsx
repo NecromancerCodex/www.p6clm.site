@@ -151,6 +151,7 @@ export default function SchedulePlanWizard() {
   const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; wdpw: string; strategy: string; notes: string }>) =>
     setDiscSet((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
+  const [weatherStation, setWeatherStation] = useState(""); // 기상 지역(ASOS) — 선택 시 공종별 가동률 기상 기반 산정
   const [formwork, setFormwork] = useState(""); // 거푸집 시스템(골조 기준층 사이클) — 비우면 LLM 기준(재래식급)
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
   const [seasonal, setSeasonal] = useState(false); // 계절 비작업일(동절기·우기) — 가동률과 별개 축
@@ -371,6 +372,7 @@ export default function SchedulePlanWizard() {
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
         discipline_settings: discSet,   // 공종별 분리(착공일 앵커·가동률·전략·WBS수) — 백엔드 Phase2 적용
+        weather_station: weatherStation || undefined,   // 기상 지역 — 있으면 공종별 가동률 기상 기반 산정
         utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
         seasonal_weather: seasonal,
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
@@ -552,7 +554,7 @@ export default function SchedulePlanWizard() {
                       <label style={pr} title="이 공종 가동률 — 비우면 공종 자동값(CPE 벤치마킹, 기상 연동 시 정밀화)">가동률
                         <select className="wz-in" style={{ width: 96, padding: "2px 4px" }}
                                 value={discSet[d.key]?.util ?? ""} onChange={(e) => setDS(d.key, { util: e.target.value })}>
-                          <option value="">자동 {Math.round((UTIL_PRESET[d.key] ?? 0.85) * 100)}%</option><option value="1">100%</option><option value="0.9">90%</option><option value="0.85">85%</option><option value="0.8">80%</option><option value="0.7">70%</option>
+                          <option value="">{weatherStation ? `자동 (기상·${weatherStation})` : `자동 ${Math.round((UTIL_PRESET[d.key] ?? 0.85) * 100)}%`}</option><option value="1">100%</option><option value="0.9">90%</option><option value="0.85">85%</option><option value="0.8">80%</option><option value="0.7">70%</option>
                         </select></label>
                       <label style={pr} title="이 공종 주당 근무일 — 비우면 주6일">근무
                         <select className="wz-in" style={{ width: 78, padding: "2px 4px" }}
@@ -625,6 +627,15 @@ export default function SchedulePlanWizard() {
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
               <input className="wz-in" type="number" style={{ marginTop: 6 }} value={gfa} onChange={(e) => setGfa(e.target.value)}
                      placeholder="연면적(㎡, 선택) — 건축·MEP 기간 정밀화" title="연면적 — 마감·설비는 연면적에 비례. 입력하면 부재수 대신 물량 기반 기간" />
+              <label className="wz-sub" style={{ display: "block", marginTop: 6 }}
+                     title="기상 지역 선택 시 → 공종별 가동률을 그 지역 최근 5년 실제 기상(기온·강수·적설·풍속)으로 자동 산정. 미선택 시 공종 프리셋.">기상 지역 (가동률 자동)
+                <select className="wz-in" value={weatherStation} onChange={(e) => setWeatherStation(e.target.value)}>
+                  <option value="">선택 안 함 (공종 프리셋 가동률)</option>
+                  {["서울","부산","대구","인천","광주","대전","울산","수원","청주","전주","강릉","춘천","포항","창원","제주","목포","여수","안동","대관령"].map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </label>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#475569", marginTop: 8 }}
                      title="동절기(12·1·2월)·우기(7·8월) 기상 중단일 자동 제외 — 현장(부지) 공통. 가동률과 별개 축">
                 <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
