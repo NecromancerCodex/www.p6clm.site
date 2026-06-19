@@ -153,7 +153,6 @@ export default function SchedulePlanWizard() {
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
   const [seasonal, setSeasonal] = useState(false); // 계절 비작업일(동절기·우기) — 가동률과 별개 축
   const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
-  const [constraints, setConstraints] = useState("");
   const [milestones, setMilestones] = useState<GenMilestone[]>([]); // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 게이트
   const [diff, setDiff] = useState<IfcDiffResult | null>(null); // 설계변경 영향분석 결과
   const [diffBusy, setDiffBusy] = useState(false);
@@ -348,6 +347,10 @@ export default function SchedulePlanWizard() {
     const projUtil = prim.util ? Number(prim.util) : util;
     const projStrategy = prim.strategy || strategy;
     const projWdpw = prim.wdpw ? Number(prim.wdpw) : wdpw;
+    // 각 공종 카드 참고사항 → constraints (공종 라벨 붙여 AI 공정 반영)
+    const noteStr = Object.entries(discSet)
+      .map(([k, s]) => (s.notes?.trim() ? `[${k}] ${s.notes.trim()}` : ""))
+      .filter(Boolean).join(" / ");
     const finishes = Object.values(discSet).map((s) => s.finish).filter(Boolean).sort();
     const lastFinish = finishes[finishes.length - 1];
     let projMonths = durationMonths ? Number(durationMonths) : undefined;
@@ -368,7 +371,7 @@ export default function SchedulePlanWizard() {
         utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
         seasonal_weather: seasonal,
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
-        constraints: constraints.trim() || undefined, strategy: projStrategy,
+        constraints: noteStr || undefined, strategy: projStrategy,
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
@@ -640,18 +643,7 @@ export default function SchedulePlanWizard() {
                 </p>
               </Field>
             )}
-            <Field label="⑤ 현장 조건·제약 — BIM에 없는 정보를 알려주세요 (AI가 공정에 반영)">
-              <input className="wz-in" value={constraints} onChange={(e) => setConstraints(e.target.value)} placeholder="예: 야간작업 불가, 동절기 타설 제한, 암반 굴착, 도심 반입 제한" />
-              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
-                {["야간작업 불가", "동절기 타설 제한", "암반 굴착(발파)", "연약지반", "도심 자재반입 제한", "인접 민원 주의", "우기 집중 지역"].map((c) => (
-                  <button key={c} type="button" className="wz-chip"
-                          onClick={() => setConstraints((p) => (p.includes(c) ? p : (p ? p + ", " : "") + c))}>
-                    + {c}
-                  </button>
-                ))}
-              </div>
-            </Field>
-            <Field label="⑥ 외부 마일스톤 — BIM에 없는 인허가 게이트·장납기 자재·계약일 (선택)">
+            <Field label="⑤ 외부 마일스톤 — 인허가 게이트·장납기 자재 (프로젝트 공통, 선택)">
               <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
                 {([
                   { name: "착공신고", gates: "전체", kind: "permit" },
