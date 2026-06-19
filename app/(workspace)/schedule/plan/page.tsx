@@ -152,7 +152,7 @@ export default function SchedulePlanWizard() {
   const [discCrews, setDiscCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 공종별 작업조(슬롯 밑)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
   const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
-  const [discBoq, setDiscBoq] = useState<Record<string, BoqResult & { loading?: boolean }>>({});  // 공종 카드별 내역서 파싱 결과
+  const [discBoq, setDiscBoq] = useState<Record<string, BoqResult & { loading?: boolean; confirm?: boolean }>>({});  // 공종 카드별 내역서 파싱 결과(+기간보정 컨펌)
   const handleBoqUpload = async (cardKey: string, file: File | undefined) => {
     if (!file) return;
     setDiscBoq((s) => ({ ...s, [cardKey]: { loading: true } }));
@@ -386,10 +386,10 @@ export default function SchedulePlanWizard() {
         work_days_per_week: projWdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
-        discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) 병합
+        discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) + 컨펌 병합
           Object.keys({ ...discSet, ...discBoq }).map((k) => [k, {
             ...(discSet[k] || {}),
-            ...(discBoq[k]?.quantities ? { boq: discBoq[k].quantities } : {}),
+            ...(discBoq[k]?.quantities ? { boq: discBoq[k].quantities, boq_confirm: !!discBoq[k]?.confirm } : {}),
           }]),
         ),
         weather_station: weatherStation || undefined,   // 기상 지역 — 있으면 공종별 가동률 기상 기반 산정
@@ -665,6 +665,14 @@ export default function SchedulePlanWizard() {
                                 {b.has_prices && b.total_cost ? <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
                               </div>
                               {qsum === 0 && <div style={{ fontSize: 10.5, color: "#a16207", marginTop: 2 }}>물량 미검출 — 평탄 공/산출내역서(CSV) 권장 (원가집계 문서엔 물량 표 없음)</div>}
+                              {qsum > 0 && (
+                                <label style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4, fontSize: 11, color: "#166534", cursor: "pointer", fontWeight: 600 }}
+                                       title="체크 시 이 내역서 물량으로 해당 공정(타설·거푸집·철근·굴착) 기간을 보정 — BIM 누락 보완. 생성 후 BIM 대비 비교 표시.">
+                                  <input type="checkbox" checked={!!b?.confirm}
+                                         onChange={(e) => setDiscBoq((s) => ({ ...s, [d.key]: { ...s[d.key], confirm: e.target.checked } }))} />
+                                  ✅ 이 물량으로 기간 보정 (BIM 누락 보완)
+                                </label>
+                              )}
                             </div>
                           )}
                         </div>
