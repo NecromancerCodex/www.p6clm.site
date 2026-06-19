@@ -124,6 +124,8 @@ const bigStep = (st: PlanStage | null, hasPlan: boolean): number =>
 const PLAN_CKPT = "clm.schedule.plan.active";
 
 const OP_KO: Record<string, string> = { FT: "기초", CR: "코어/골조", MD: "슬래브/모듈", PR: "마감" };
+// 공종 자동 가동률(CPE 벤치마킹 — 기상 민감도 기반 추정. 기상 데이터 연동 시 정밀화). 비우면 이 값 자동 적용.
+const UTIL_PRESET: Record<string, number> = { 종합: 0.82, 토목: 0.78, 구조: 0.82, 건축: 0.90, MEP: 0.90, 조경: 0.75, 가설: 0.85 };
 const PH_KO: Record<string, string> = { RB: "철근", FM: "거푸집", CN: "콘크리트", IN: "설치" };
 
 export default function SchedulePlanWizard() {
@@ -547,10 +549,10 @@ export default function SchedulePlanWizard() {
                       <label style={pr} title="이 공종 마감일(목표)">마감일
                         <input type="date" className="wz-in" style={{ width: 142, padding: "2px 4px" }}
                                value={discSet[d.key]?.finish ?? ""} onChange={(e) => setDS(d.key, { finish: e.target.value })} /></label>
-                      <label style={pr} title="이 공종 가동률 — 비우면 85%">가동률
-                        <select className="wz-in" style={{ width: 78, padding: "2px 4px" }}
+                      <label style={pr} title="이 공종 가동률 — 비우면 공종 자동값(CPE 벤치마킹, 기상 연동 시 정밀화)">가동률
+                        <select className="wz-in" style={{ width: 96, padding: "2px 4px" }}
                                 value={discSet[d.key]?.util ?? ""} onChange={(e) => setDS(d.key, { util: e.target.value })}>
-                          <option value="">기본</option><option value="1">100%</option><option value="0.9">90%</option><option value="0.85">85%</option><option value="0.8">80%</option><option value="0.7">70%</option>
+                          <option value="">자동 {Math.round((UTIL_PRESET[d.key] ?? 0.85) * 100)}%</option><option value="1">100%</option><option value="0.9">90%</option><option value="0.85">85%</option><option value="0.8">80%</option><option value="0.7">70%</option>
                         </select></label>
                       <label style={pr} title="이 공종 주당 근무일 — 비우면 주6일">근무
                         <select className="wz-in" style={{ width: 78, padding: "2px 4px" }}
