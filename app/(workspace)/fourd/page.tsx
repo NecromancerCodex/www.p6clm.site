@@ -259,10 +259,13 @@ export default function FourDPage() {
         }));
       }
       const codeCount = tasks.filter((t) => decodeActId(t.code)).length;
-      if (codeCount === 0) {
+      // 토목 공정표는 4D 코드가 없음(부재 단위 X) — 활동명(굴착·흙막이)으로 earthworkWindow 매칭.
+      // 따라서 codeIndex 를 먼저 만들어 토목 가능성 확인 후, 4D코드도 토목활동도 없을 때만 에러.
+      const codeIndex0 = buildCodeIndex(tasks);
+      if (codeCount === 0 && !codeIndex0.earthworkWindow) {
         throw new Error(
-          `공정표 ${tasks.length}건 중 4D 코드(502HG…)를 0건 찾았습니다. ` +
-            `task_code 또는 UDF "Act ID_4D" 에 4D 코드가 있는 XER 인지 확인하세요.`,
+          `공정표 ${tasks.length}건에서 4D 코드(502HG…)도 토목 활동(굴착·흙막이)도 못 찾았습니다. ` +
+            `구조는 4D 코드가 있는 XER, 토목은 활동명에 굴착/흙막이가 있어야 4D 매칭됩니다.`,
         );
       }
 
@@ -296,7 +299,8 @@ export default function FourDPage() {
       const sidx = buildScheduleIndex(tasks);
       // 공정PSet 있으면 hybrid(zone정확). 없어도 공정표에 4D 코드(codeCount>0, 생성 공정표 등)가
       // 있으면 codeIndex 를 만들어 둔다 — AI 매칭·보고서·워크패키지 버튼/기능 활성화용.
-      let codeIndex: CodeIndex | null = useCode || codeCount > 0 ? buildCodeIndex(tasks) : null;
+      // codeIndex0(위에서 이름 기반 생성) 재사용 — 토목 earthworkWindow + 버튼/AI 활성화용(4D코드 0건이어도).
+      let codeIndex: CodeIndex | null = codeIndex0;
       // PC·모듈러 호 단위 4D 순차 전개 (Stage 2) — 셀 윈도우 안에서 모듈을 호별로 분배.
       // 타워는 el.unit(호 PSet) 없어 무동작. 매칭 전에 codeIndex.byUnit 을 채운다.
       if (codeIndex) expandModularUnits(parsed.elements, codeIndex);
