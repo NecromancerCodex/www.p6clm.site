@@ -16,7 +16,7 @@ import {
   parseEarthworkCsv, polygonArea, prepare,
   type Borehole, type TerrainPt, type PileItem, type WallLine,
 } from "../../../lib/earthwork/model";
-import { loadBoreholes, saveBoreholes } from "../../../lib/api/earthwork";
+import { loadEarthwork, saveEarthwork } from "../../../lib/api/earthwork";
 
 /** 가장 멀리 떨어진 두 시추공 = 대표 단면 기본값. */
 function Chip({ label, c }: { label: string; c: string }) {
@@ -105,26 +105,28 @@ export default function EarthworkPage() {
   const bhA = boreholes.find((b) => b.id === secA) ?? boreholes[0];
   const bhB = boreholes.find((b) => b.id === secB) ?? boreholes[1];
 
-  // 마운트 시 저장 모델 복원 — 시추(DB) + extra(경계·Pile·흙막이·지형, localStorage).
-  // 새로고침 시 초기화 방지: extra 는 백엔드 모델에 없어 localStorage 캐시로 함께 복원.
+  // 마운트 시 저장 모델 복원 — 시추 + extra(경계·Pile·흙막이·지형) 모두 DB(네온). localStorage 는 오프라인 폴백.
   useEffect(() => {
-    let cachedModel: { boreholes?: Borehole[]; extra?: typeof extra } | null = null;
+    let cached: { boreholes?: Borehole[]; extra?: typeof extra } | null = null;
     try {
       const raw = localStorage.getItem("earthwork-model");
-      if (raw) cachedModel = JSON.parse(raw);
+      if (raw) cached = JSON.parse(raw);
     } catch { /* 무시 */ }
-    if (cachedModel?.extra) setExtra(cachedModel.extra);
 
-    void loadBoreholes().then((saved) => {
-      const bh = saved.length >= 2 ? saved : (cachedModel?.boreholes ?? []);
+    void loadEarthwork().then(({ boreholes: saved, extra: dbExtra }) => {
+      const dbHas = !!(dbExtra && ((dbExtra.boundary as unknown[])?.length || (dbExtra.piles as unknown[])?.length
+        || (dbExtra.walls as unknown[])?.length || (dbExtra.terrain as unknown[])?.length));
+      const ex = (dbHas ? dbExtra : cached?.extra) as typeof extra | undefined;
+      if (ex) setExtra(ex);
+      const bh = saved.length >= 2 ? saved : (cached?.boreholes ?? []);
       if (bh.length >= 2) {
         setBoreholes(bh);
         setSec(farthestPair(bh));
-        const ex: string[] = [];
-        if (cachedModel?.extra?.boundary?.length) ex.push(`경계 ${cachedModel.extra.boundary.length}점`);
-        if (cachedModel?.extra?.piles?.length) ex.push(`Pile ${cachedModel.extra.piles.length}`);
-        if (cachedModel?.extra?.walls?.length) ex.push(`흙막이 ${cachedModel.extra.walls.length}`);
-        setSource(`저장됨 (시추 ${bh.length}공${ex.length ? ` + ${ex.join(", ")}` : ""})`);
+        const tags: string[] = [];
+        if (ex?.boundary?.length) tags.push(`경계 ${ex.boundary.length}점`);
+        if (ex?.piles?.length) tags.push(`Pile ${ex.piles.length}`);
+        if (ex?.walls?.length) tags.push(`흙막이 ${ex.walls.length}`);
+        setSource(`저장됨 (시추 ${bh.length}공${tags.length ? ` + ${tags.join(", ")}` : ""})`);
       }
     });
   }, []);
@@ -153,9 +155,9 @@ export default function EarthworkPage() {
     if (data.piles.length) ex.push(`Pile ${data.piles.length}`);
     if (data.walls.length) ex.push(`흙막이 ${data.walls.length}`);
     const suffix = ex.length ? ` + ${ex.join(", ")}` : "";
-    // DB 저장 (기존 데이터 교체 = 최신만 유지). 백엔드 미가동이면 화면만 갱신.
+    // DB(네온) 저장 — 시추+extra 기존 교체(최신만, owner 개인화). 백엔드 미가동이면 화면만.
     try {
-      const n = await saveBoreholes(parsed);
+      const n = await saveEarthwork(parsed, newExtra);
       setSource(`${f.name} (저장됨 ${n}공${suffix})`);
     } catch {
       setSource(`${f.name} (시추 ${parsed.length}공${suffix} · 저장 실패-화면만)`);
@@ -418,7 +420,7 @@ export default function EarthworkPage() {
           onSave={async (bh) => {
             setBoreholes(bh);
             setSec(farthestPair(bh));
-            try { const n = await saveBoreholes(bh); setSource(`저장됨 (${n}공)`); }
+            try { const n = await saveEarthwork(bh, extra); setSource(`저장됨 (${n}공)`); }
             catch { setSource(`${bh.length}공 · 저장 실패-화면만`); }
           }}
         />
