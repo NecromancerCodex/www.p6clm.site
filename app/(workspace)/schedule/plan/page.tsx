@@ -368,6 +368,7 @@ export default function SchedulePlanWizard() {
         work_days_per_week: projWdpw, tower_cranes: towerCranes, work_crews: workCrews,
         civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
         discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
+        discipline_settings: discSet,   // 공종별 분리(착공일 앵커·가동률·전략·WBS수) — 백엔드 Phase2 적용
         utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
         seasonal_weather: seasonal,
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
