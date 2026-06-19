@@ -4044,6 +4044,48 @@ select {
   flex-shrink: 0;
 }
 
+/* ── 데스크탑 사이드바 접기/펼치기 ── */
+.ws-sidebar {
+  transition: width 0.2s var(--ease-out);
+}
+.ws-sidebar-collapse {        /* 데스크탑 전용 접기(<<) — 모바일은 X(close) 사용 */
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.ws-sidebar.is-collapsed {
+  width: 0;
+  border-right: none;
+  pointer-events: none;
+}
+.ws-sidebar.is-collapsed > * {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.ws-expand-fab {              /* 접힘 시 펼치기 플로팅 버튼 */
+  position: fixed;
+  top: 14px;
+  left: 12px;
+  z-index: 40;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text-soft, #475569);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+  cursor: pointer;
+}
+.ws-expand-fab:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
 /* ══════════════════════════════════════════════════
    RESPONSIVE · 모바일 (≤ 768px)
    ══════════════════════════════════════════════════ */
@@ -4069,6 +4111,20 @@ select {
 
   .ws-sidebar-close {
     display: inline-flex;
+  }
+
+  /* 모바일은 드로어 방식 — 데스크탑 접기 UI 무효화 */
+  .ws-sidebar-collapse,
+  .ws-expand-fab {
+    display: none;
+  }
+  .ws-sidebar.is-collapsed {
+    width: min(280px, 80vw);
+    border-right: 1px solid var(--line);
+    pointer-events: auto;
+  }
+  .ws-sidebar.is-collapsed > * {
+    opacity: 1;
   }
 
   .ui-backdrop {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut, Phone, Mountain, Gamepad2 } from "lucide-react";
+import { Bot, BarChart2, CalendarRange, Info, ChevronRight, ChevronDown, HardHat, X, Plus, MessageSquare, Trash2, LogOut, Phone, Mountain, Gamepad2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -42,6 +42,9 @@ export function WorkspaceSidebar() {
   const router = useRouter();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const closeSidebar = useUiStore((s) => s.closeSidebar);
+  const collapsed = useUiStore((s) => s.sidebarCollapsed);
+  const setCollapsed = useUiStore((s) => s.setSidebarCollapsed);
+  const toggleCollapsed = useUiStore((s) => s.toggleSidebarCollapsed);
 
   // 채팅 세션 (3C)
   const sessions = useChatStore((s) => s.sessions);
@@ -56,6 +59,13 @@ export function WorkspaceSidebar() {
 
   // admin 여부 (전화 내역 메뉴 노출 제어) — fetchMe 는 AuthGuard 가 이미 호출, 캐시 재사용
   const [isAdmin, setIsAdmin] = useState(false);
+
+  /** 데스크탑 접힘 상태 복원 (mount 1회, localStorage) */
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("ws-collapsed") === "1") setCollapsed(true);
+    } catch { /* 무시 */ }
+  }, [setCollapsed]);
 
   /** 최근 대화 목록 로드 (mount 1회) */
   useEffect(() => {
@@ -128,8 +138,21 @@ export function WorkspaceSidebar() {
     <>
       <Backdrop open={sidebarOpen} onClick={closeSidebar} label="사이드바 닫기" />
 
+      {/* 데스크탑 접힘 시 — 펼치기 플로팅 버튼 */}
+      {collapsed && (
+        <button
+          type="button"
+          className="ws-expand-fab"
+          aria-label="사이드바 펼치기"
+          title="사이드바 펼치기"
+          onClick={toggleCollapsed}
+        >
+          <PanelLeftOpen size={18} strokeWidth={2} />
+        </button>
+      )}
+
       <aside
-        className={`ws-sidebar${sidebarOpen ? " is-open" : ""}`}
+        className={`ws-sidebar${sidebarOpen ? " is-open" : ""}${collapsed ? " is-collapsed" : ""}`}
         aria-hidden={!sidebarOpen ? undefined : "false"}
       >
         <div className="ws-logo">
@@ -140,6 +163,9 @@ export function WorkspaceSidebar() {
             <strong>p6 CLM</strong>
             <span>건설 현장 AI</span>
           </div>
+          <IconButton label="사이드바 접기" className="ws-sidebar-collapse" onClick={toggleCollapsed}>
+            <PanelLeftClose size={18} strokeWidth={2} />
+          </IconButton>
           <IconButton label="사이드바 닫기" className="ws-sidebar-close" onClick={closeSidebar}>
             <X size={18} strokeWidth={2} />
           </IconButton>

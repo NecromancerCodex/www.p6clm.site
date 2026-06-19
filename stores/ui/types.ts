@@ -7,10 +7,13 @@
  */
 
 export interface LayoutSlice {
-  sidebarOpen: boolean;
+  sidebarOpen: boolean;          // 모바일 드로어 열림
   openSidebar: () => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
+  sidebarCollapsed: boolean;     // 데스크탑 사이드바 접힘
+  setSidebarCollapsed: (v: boolean) => void;
+  toggleSidebarCollapsed: () => void;
 }
 
 export type UiStore = LayoutSlice;
