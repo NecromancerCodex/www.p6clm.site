@@ -389,7 +389,10 @@ export default function SchedulePlanWizard() {
         discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) + 컨펌 병합
           Object.keys({ ...discSet, ...discBoq }).map((k) => [k, {
             ...(discSet[k] || {}),
-            ...(discBoq[k]?.quantities ? { boq: discBoq[k].quantities, boq_confirm: !!discBoq[k]?.confirm } : {}),
+            ...(discBoq[k]?.quantities ? {
+              boq: discBoq[k].quantities, boq_confirm: !!discBoq[k]?.confirm,
+              boq_items: (discBoq[k]?.items ?? []).map((it) => ({ name: it.name, unit: it.unit, qty: it.qty, op: it.op })),
+            } : {}),
           }]),
         ),
         weather_station: weatherStation || undefined,   // 기상 지역 — 있으면 공종별 가동률 기상 기반 산정

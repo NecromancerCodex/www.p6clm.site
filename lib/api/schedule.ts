@@ -312,6 +312,7 @@ export interface BoqResult {
   sheet?: string;       // xlsx 채택 시트명
   filename?: string;
   error?: string;
+  items?: { name: string; unit: string; qty: number; cost: number; op: string | null }[]; // 내역서 line item(WBS 생성·비교용)
 }
 
 /** 내역서(.csv/.xlsx/.xlsm) 업로드 → 물량/원가 추출 (공종 카드별). */
@@ -405,7 +406,7 @@ export interface GenerateScheduleRequest {
   discipline_crews?: Record<string, number>; // 공종별 작업조 {건축, MEP, 조경} — 슬롯 밑 입력, 해당 공종 기간 단축
   gross_floor_area?: number;   // 연면적(㎡) — 건축/MEP 물량 기반 기간(마감·설비는 연면적 비례). 없으면 부재수
   civil_quantities?: { depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number }; // 토목 물량(서버 도출)
-  discipline_settings?: Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string; boq?: Record<string, number>; boq_confirm?: boolean }>; // 공종별 분리(착공일·가동률·전략·WBS·기상임계·내역서물량·보정컨펌)
+  discipline_settings?: Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string; boq?: Record<string, number>; boq_confirm?: boolean; boq_items?: { name: string; unit: string; qty: number; op: string | null }[] }>; // 공종별 분리(착공일·가동률·전략·WBS·기상임계·내역서물량·항목·보정컨펌)
   weather_station?: string;   // 기상 지역(서울 등) — 공종별 가동률 기상 기반 산정(미지정 시 프리셋)
   utilization_rate?: number;   // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   formwork_system?: string;    // 거푸집 시스템(재래식/유로폼/갱폼/알폼/시스템폼) — 골조 기준층 사이클 결정
