@@ -618,6 +618,11 @@ export async function riskBrief(planId: string): Promise<{ brief: string }> {
   return planFetch(`/${planId}/risk-brief`, { method: "POST", body: "{}" });
 }
 
+/** AI 내역서 대조 브리핑 — 공정표 누락 항목 해석·조치 제안 */
+export async function boqBrief(planId: string): Promise<{ brief: string }> {
+  return planFetch(`/${planId}/boq-brief`, { method: "POST", body: "{}" });
+}
+
 /** P6 XML 다운로드 URL */
 export function planP6XmlUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/p6xml`;

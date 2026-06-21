@@ -14,7 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
-  savePlanActivities, startPlan, ScheduleApiError, parseBoq,
+  savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
   type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
@@ -176,6 +176,8 @@ export default function SchedulePlanWizard() {
   const [diffBusy, setDiffBusy] = useState(false);
   const [brief, setBrief] = useState<string | null>(null); // AI 리스크 브리핑
   const [briefBusy, setBriefBusy] = useState(false);
+  const [boqBriefTxt, setBoqBriefTxt] = useState<string | null>(null); // AI 내역서 대조 브리핑
+  const [boqBriefBusy, setBoqBriefBusy] = useState(false);
   const [strategy] = useState("bottom_up");  // 폴백(공종 카드 시공전략이 우선)
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
@@ -1004,6 +1006,37 @@ export default function SchedulePlanWizard() {
                 {brief && (
                   <div style={{ marginTop: 8, padding: "8px 10px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 12, color: "#1e3a8a", whiteSpace: "pre-wrap" }}>
                     🤖 {brief}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {(() => {
+            const cov = (plan?.payload.schedule as Record<string, unknown> | undefined)?.boq_coverage as
+              Record<string, { total: number; covered: number; uncovered: string[] }> | undefined;
+            const entries = cov ? Object.entries(cov).filter(([, c]) => c.total > 0) : [];
+            if (!entries.length) return null;
+            const totUnc = entries.reduce((s, [, c]) => s + (c.uncovered?.length || 0), 0);
+            return (
+              <div style={{ border: "1px solid #ddd6fe", background: "#f5f3ff", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <b style={{ fontSize: 13, color: "#5b21b6" }}>📋 내역서 대조 — {totUnc ? `${totUnc}개 항목 공정표 누락` : "전 항목 반영 ✓"}</b>
+                  {totUnc > 0 && (
+                    <button className="wz-btn" disabled={boqBriefBusy} style={{ fontSize: 12 }}
+                            onClick={() => { setBoqBriefBusy(true); void boqBrief(planId!).then((r) => setBoqBriefTxt(r.brief)).finally(() => setBoqBriefBusy(false)); }}>
+                      {boqBriefBusy ? "분석 중…" : "🤖 AI 브리핑"}
+                    </button>
+                  )}
+                </div>
+                {entries.map(([disc, c]) => (
+                  <div key={disc} style={{ fontSize: 12, padding: "3px 0", color: "#4c1d95" }}>
+                    <b>{disc}</b> — 내역서 {c.total}항목 중 <b>{c.covered}</b> 반영
+                    {c.uncovered?.length ? <span style={{ color: "#b45309" }}> · 누락: {c.uncovered.join(", ")}</span> : <span style={{ color: "#15803d" }}> · 누락 없음</span>}
+                  </div>
+                ))}
+                {boqBriefTxt && (
+                  <div style={{ marginTop: 8, padding: "8px 10px", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, fontSize: 12, color: "#3730a3", whiteSpace: "pre-wrap" }}>
+                    🤖 {boqBriefTxt}
                   </div>
                 )}
               </div>
