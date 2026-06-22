@@ -486,6 +486,14 @@ export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
       ? { range: idx.earthworkWindow, via: "tw_earthwork" }
       : { range: null, via: `no_storey:${k}` };
   }
+  // zone 없는 표준 IFC(Revit/Tekla 등 공정 PSet 미보유) — 구조계열을 층 단위(byStorey) 골조 window 로 매칭.
+  //   토목·가설·MO 는 위에서 처리됨. zone 없지만 층(storey4d=IfcBuildingStorey 폴백) 있으면 그 층의 골조 기간.
+  if (!el.zone && el.storey4d) {
+    const k = canonStorey(el.storey4d) || el.storey4d;
+    const r = idx.byStorey.get(k);
+    if (r) return { range: r, via: `st_storey:${k}` };
+    return { range: null, via: `no_storey:${k}` };
+  }
   if (!el.trade || !el.zone || !el.storey4d) return { range: null, via: "no_meta" };
   if (el.trade === "MO") {
     if (el.unit) {

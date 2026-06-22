@@ -17,6 +17,7 @@ import * as THREE from "three";
 import { IfcAPI, IFCRELCONTAINEDINSPATIALSTRUCTURE, IFCRELDEFINESBYPROPERTIES } from "web-ifc";
 
 import type { IfcElementMeta } from "./match";
+import { normStorey } from "./match";
 
 export interface ParsedElement extends IfcElementMeta {
   inst: { g: number; i: number }[]; // 이 요소의 인스턴스 참조 — g=그룹 index, i=그룹 내 슬롯 index
@@ -527,7 +528,8 @@ export async function parseIfc(
         areaM2: q?.area,
         trade: pm?.trade,
         zone: pm?.zone,
-        storey4d: pm?.storey4d,
+        // 공정 PSet(Lv.4) 없으면 IfcBuildingStorey 명("Level 2")에서 폴백 — 무PSet Revit/Tekla 4D 매칭(서버 _norm_storey 미러)
+        storey4d: pm?.storey4d ?? normStorey(storeyMap.get(expressID)) ?? undefined,
         wt: pm?.wt,
         mtype: pm?.mtype,
         unit: pm?.unit,
