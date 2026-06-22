@@ -409,7 +409,7 @@ export default function SchedulePlanWizard() {
           Object.keys({ ...discSet, ...discBoq, ...discEquip }).map((k) => [k, {
             ...(discSet[k] || {}),
             ...(discBoq[k]?.quantities ? {
-              boq: discBoq[k].quantities, boq_confirm: !!discBoq[k]?.confirm,
+              boq: discBoq[k].quantities, boq_confirm: true,  // 내역서 올리면 물량 보정 기본 적용(factor=물량비, 일치 시 1.0=무해)
               boq_items: (discBoq[k]?.items ?? []).map((it) => ({ name: it.name, unit: it.unit, qty: it.qty, op: it.op })),
             } : {}),
             ...(discEquip[k] ? { equipment: discEquip[k] } : {}),
@@ -706,12 +706,10 @@ export default function SchedulePlanWizard() {
                               )}
                               {qsum === 0 && <div style={{ fontSize: 10.5, color: "#a16207", marginTop: 2 }}>물량 미검출 — 평탄 공/산출내역서(CSV) 권장 (원가집계 문서엔 물량 표 없음)</div>}
                               {qsum > 0 && (
-                                <label style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4, fontSize: 11, color: "#166534", cursor: "pointer", fontWeight: 600 }}
-                                       title="체크 시 이 내역서 물량으로 해당 공정(타설·거푸집·철근·굴착) 기간을 보정 — BIM 누락 보완. 생성 후 BIM 대비 비교 표시.">
-                                  <input type="checkbox" checked={!!b?.confirm}
-                                         onChange={(e) => setDiscBoq((s) => ({ ...s, [d.key]: { ...s[d.key], confirm: e.target.checked } }))} />
-                                  ✅ 이 물량으로 기간 보정 (BIM 누락 보완)
-                                </label>
+                                <div style={{ marginTop: 4, fontSize: 10.5, color: "#166534" }}
+                                     title="내역서 물량으로 해당 공정 기간 자동 보정(factor=내역서물량÷BIM물량). IFC와 같으면 1.0=무변화, 누락 시 보완. 생성 후 BIM 대비 비교 표시.">
+                                  ✅ 내역서 물량으로 기간 자동 보정 (IFC 누락 보완 · 생성 후 비교 표시)
+                                </div>
                               )}
                             </div>
                           )}
