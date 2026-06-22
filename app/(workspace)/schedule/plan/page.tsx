@@ -146,10 +146,10 @@ export default function SchedulePlanWizard() {
   const [startDate] = useState(() => new Date().toISOString().slice(0, 10)); // 폴백(공종 카드 착공일이 우선)
   const [durationMonths] = useState("");  // 폴백(공종 카드 마감일로 산출)
   const [wdpw] = useState(6);  // 폴백(공종 카드 근무가 우선)
-  const [towerCranes, setTowerCranes] = useState(2);
-  const [workCrews, setWorkCrews] = useState(3);
+  const [towerCranes] = useState(2);   // 자원계획 미입력 시 폴백(inline 입력 제거됨)
+  const [workCrews] = useState(3);     // 자원계획 미입력 시 폴백
   const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
-  const [discCrews, setDiscCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 공종별 작업조(슬롯 밑)
+  const [discCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 폴백(자원계획 작업조 우선)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
   const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
   const [discBoq, setDiscBoq] = useState<Record<string, BoqResult & { loading?: boolean; confirm?: boolean }>>({});  // 공종 카드별 내역서 파싱 결과(+기간보정 컨펌)
