@@ -313,6 +313,7 @@ export interface BoqResult {
   filename?: string;
   error?: string;
   items?: { name: string; unit: string; qty: number; cost: number; op: string | null }[]; // 내역서 line item(WBS 생성·비교용)
+  equipment?: { equip: string; items: string[]; qty: number; unit: string }[]; // 내역서 규격 → 예측 장비
 }
 
 /** 내역서(.csv/.xlsx/.xlsm) 업로드 → 물량/원가 추출 (공종 카드별). */

@@ -669,6 +669,15 @@ export default function SchedulePlanWizard() {
                                 ))}
                                 {b.has_prices && b.total_cost ? <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
                               </div>
+                              {b.equipment && b.equipment.length > 0 && (
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4, alignItems: "center" }}>
+                                  <span style={{ fontSize: 10.5, color: "#92400e", fontWeight: 600 }}>🚜 예측 장비</span>
+                                  {b.equipment.map((e) => (
+                                    <span key={e.equip} title={e.items.join(", ")}
+                                          style={{ background: "#fef3c7", color: "#92400e", borderRadius: 4, padding: "1px 6px" }}>{e.equip}</span>
+                                  ))}
+                                </div>
+                              )}
                               {qsum === 0 && <div style={{ fontSize: 10.5, color: "#a16207", marginTop: 2 }}>물량 미검출 — 평탄 공/산출내역서(CSV) 권장 (원가집계 문서엔 물량 표 없음)</div>}
                               {qsum > 0 && (
                                 <label style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4, fontSize: 11, color: "#166534", cursor: "pointer", fontWeight: 600 }}
