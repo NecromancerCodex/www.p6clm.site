@@ -170,10 +170,12 @@ export default function SchedulePlanWizard() {
     try {
       const r = await parseBoq(file);
       setDiscBoq((s) => ({ ...s, [cardKey]: { ...r, loading: false } }));
-      // 예측 장비 → 자원 계획 자동 채움(추천 대수). 사용자가 수동 수정 가능.
+      // 예측 장비 + 작업조(+구조 크레인) → 자원 계획 자동 채움(추천). 수동 수정 가능. 자원 통일.
       const auto: Record<string, number> = {};
       for (const e of r.equipment ?? []) auto[e.equip] = suggestEquipCount(e.equip, e.qty);
-      if (Object.keys(auto).length) setDiscEquip((s) => ({ ...s, [cardKey]: auto }));
+      if (cardKey !== "토목") auto["작업조"] = 3;        // 토목은 굴삭기(백호)=투입조
+      if (cardKey === "구조" || cardKey === "종합") auto["크레인"] = auto["크레인"] ?? 2;
+      setDiscEquip((s) => ({ ...s, [cardKey]: { ...auto, ...s[cardKey] } }));   // 기존 수동값 보존
     } catch (e) {
       setDiscBoq((s) => ({ ...s, [cardKey]: { loading: false, error: e instanceof Error ? e.message : "파싱 실패" } }));
     }
@@ -400,11 +402,14 @@ export default function SchedulePlanWizard() {
         structure_type: structureType.trim() || undefined, discipline: discipline.trim() || undefined,
         zones, storeys, work_units: workUnits, methods: [],
         start_date: projStart, duration_months: projMonths,
-        work_days_per_week: projWdpw, tower_cranes: towerCranes, work_crews: workCrews,
-        // 토목 자원계획의 굴삭기(백호) 대수 = 굴착 공기 driver(civil_equipment). 수동 수정값 우선.
-        civil_equipment: discEquip["토목"]?.["굴삭기(백호)"] || civilEquip,
+        // 자원 = 자원 계획(discEquip, 내역서 자동+수동)에서 도출. 없으면 기존 기본값 폴백.
+        work_days_per_week: projWdpw,
+        tower_cranes: discEquip["구조"]?.["크레인"] ?? discEquip["종합"]?.["크레인"] ?? towerCranes,
+        work_crews: discEquip["구조"]?.["작업조"] ?? discEquip["종합"]?.["작업조"] ?? workCrews,
+        civil_equipment: discEquip["토목"]?.["굴삭기(백호)"] || civilEquip,   // 토목 굴착 driver
         civil_quantities: civilQty ?? undefined,
-        discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
+        discipline_crews: { ...discCrews, ...Object.fromEntries(["건축", "MEP", "조경"].map((k) => [k, discEquip[k]?.["작업조"] ?? discCrews[k] ?? 3])) },
+        gross_floor_area: gfa ? Number(gfa) : undefined,
         discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) + 자원계획 병합
           Object.keys({ ...discSet, ...discBoq, ...discEquip }).map((k) => [k, {
             ...(discSet[k] || {}),
@@ -609,15 +614,7 @@ export default function SchedulePlanWizard() {
                                 value={discSet[d.key]?.strategy ?? ""} onChange={(e) => setDS(d.key, { strategy: e.target.value })}>
                           <option value="">기본</option><option value="bottom_up">순타·일괄</option><option value="bottom_up_phased">순타·단계</option><option value="top_down">역타</option>
                         </select></label>
-                      {d.key === "토목" && (
-                        <label style={pr} title="굴착기·CIP장비 등 토목 투입조">투입조
-                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} /></label>
-                      )}
                       {isStruct && (<>
-                        <label style={pr} title="구조 동시 작업조">작업조
-                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={workCrews} onChange={(e) => setWorkCrews(Number(e.target.value))} /></label>
-                        <label style={pr} title="양중 동시 한계">크레인
-                          <input type="number" min={0} className="wz-in" style={{ width: 60, padding: "2px 4px" }} value={towerCranes} onChange={(e) => setTowerCranes(Number(e.target.value))} /></label>
                         <label style={pr} title="거푸집 시스템(기준층 사이클)">거푸집
                           <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
                             <option value="">자동</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option><option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
@@ -629,11 +626,6 @@ export default function SchedulePlanWizard() {
                             <option value="">자동</option><option value="RC">RC</option><option value="철골">철골</option><option value="SRC">SRC</option><option value="PC·모듈러">PC·모듈러</option><option value="혼합">혼합</option>
                           </select></label>
                       </>)}
-                      {(d.key === "건축" || d.key === "MEP" || d.key === "조경") && (
-                        <label style={pr} title={`${d.label} 작업조`}>작업조
-                          <input type="number" min={1} className="wz-in" style={{ width: 60, padding: "2px 4px" }}
-                                 value={discCrews[d.key] ?? 3} onChange={(e) => setDiscCrews((c) => ({ ...c, [d.key]: Number(e.target.value) }))} /></label>
-                      )}
                       {d.key === "가설" && (
                         <span style={{ fontSize: 10.5, color: "#64748b" }}>오버레이 — 공정표 설치·해체 2줄, 4D는 층 따라</span>
                       )}
@@ -663,7 +655,9 @@ export default function SchedulePlanWizard() {
                         </div>
                       );
                     })()}
-                    <input className="wz-in" style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "4px 8px" }} placeholder="참고사항 (이 공종 메모)"
+                    <input className="wz-in" style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "4px 8px" }}
+                           title="현장 조건·제약 — 공정표 생성 시 AI가 반영(시퀀스·마일스톤)"
+                           placeholder="현장조건·제약 (예: 야간작업 불가 · 도심 장비반입 제한 · 지하수 높음 · 인접 민원 · 작업공간 협소 — 생성 시 반영)"
                            value={discSet[d.key]?.notes ?? ""} onChange={(e) => setDS(d.key, { notes: e.target.value })} />
                     {(() => {
                       const b = discBoq[d.key];
@@ -687,18 +681,17 @@ export default function SchedulePlanWizard() {
                                 ))}
                                 {b.has_prices && b.total_cost ? <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
                               </div>
-                              {b.equipment && b.equipment.length > 0 && (
+                              {discEquip[d.key] && Object.keys(discEquip[d.key]).length > 0 && (
                                 <div style={{ marginTop: 5, padding: "6px 8px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6 }}>
-                                  <span style={{ fontSize: 10.5, color: "#92400e", fontWeight: 600 }}>🚜 자원 계획 — 내역서 예측 장비(자동, 수정 가능)</span>
+                                  <span style={{ fontSize: 10.5, color: "#92400e", fontWeight: 600 }}>🚜 자원 계획 — 작업조·장비 (내역서 자동, 수정 가능)</span>
                                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                                    {b.equipment.map((e) => (
-                                      <label key={e.equip} title={e.items.join(", ")}
-                                             style={{ fontSize: 11, color: "#78716c", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                                        {e.equip}
+                                    {Object.entries(discEquip[d.key]!).map(([name, cnt]) => (
+                                      <label key={name} style={{ fontSize: 11, color: "#78716c", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                                        {name}
                                         <input type="number" min={0} className="wz-in" style={{ width: 46, padding: "2px 4px", fontSize: 11 }}
-                                               value={discEquip[d.key]?.[e.equip] ?? suggestEquipCount(e.equip, e.qty)}
-                                               onChange={(ev) => setDiscEquip((s) => ({ ...s, [d.key]: { ...s[d.key], [e.equip]: Number(ev.target.value) } }))} />
-                                        대
+                                               value={cnt}
+                                               onChange={(ev) => setDiscEquip((s) => ({ ...s, [d.key]: { ...s[d.key], [name]: Number(ev.target.value) } }))} />
+                                        {name === "작업조" ? "조" : "대"}
                                       </label>
                                     ))}
                                   </div>
