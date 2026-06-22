@@ -170,13 +170,20 @@ export default function SchedulePlanWizard() {
     try {
       const r = await parseBoq(file);
       setDiscBoq((s) => ({ ...s, [cardKey]: { ...r, loading: false } }));
-      // 예측 장비 + 작업조(+구조 크레인) → 자원 계획 자동 채움(추천). 수동 수정 가능. 자원 통일.
+      // 예측 장비 + 작업조(+구조 크레인) → 자원 계획 자동 채움(추천 기본값, 수동 수정 가능).
       const auto: Record<string, number> = {};
       for (const e of r.equipment ?? []) auto[e.equip] = suggestEquipCount(e.equip, e.qty);
-      // 작업조·크레인은 물량(콘크리트)으로 스케일 — 고정값(3/2)은 초대형 현장에 비현실적.
-      const conc = r.quantities?.concrete_m3 || (r.quantities?.formwork_m2 ?? 0) / 8.5;
-      if (cardKey !== "토목") auto["작업조"] = Math.min(30, Math.max(3, Math.round(conc / 10000)));  // 토목=굴삭기
-      if (cardKey === "구조" || cardKey === "종합") auto["크레인"] = Math.min(16, Math.max(2, Math.round(conc / 18000)));
+      const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+      const conc = r.quantities?.concrete_m3 || (r.quantities?.formwork_m2 ?? 0) / 8.5;  // 구조 driver
+      const itemSum = (r.items ?? []).reduce((s, it) => s + (it.qty || 0), 0);            // 건축/MEP driver(마감·설비 물량)
+      if (cardKey === "구조" || cardKey === "종합") {
+        // 크레인: 실측 앵커 ~4대/15만㎥(포스코) → 1대당 ~4만㎥. 작업조 ≈ 크레인×2.
+        auto["크레인"] = clamp(Math.round(conc / 40000), 2, 12);
+        auto["작업조"] = clamp(Math.round(conc / 20000), 3, 16);
+      } else if (cardKey !== "토목") {
+        // 건축·MEP·조경: 자기 물량(마감㎡·설비m 합)으로 작업조 스케일. 토목은 굴삭기=투입조.
+        auto["작업조"] = clamp(Math.round(itemSum / 25000), 3, 12);
+      }
       setDiscEquip((s) => ({ ...s, [cardKey]: { ...auto, ...s[cardKey] } }));   // 기존 수동값 보존
     } catch (e) {
       setDiscBoq((s) => ({ ...s, [cardKey]: { loading: false, error: e instanceof Error ? e.message : "파싱 실패" } }));
