@@ -153,12 +153,27 @@ export default function SchedulePlanWizard() {
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
   const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
   const [discBoq, setDiscBoq] = useState<Record<string, BoqResult & { loading?: boolean; confirm?: boolean }>>({});  // 공종 카드별 내역서 파싱 결과(+기간보정 컨펌)
+  // 장비별 1일 표준 생산성(단위/일) — 추천 대수 산정용(qty ÷ (rate × 목표작업일 200)). 크레인은 고정.
+  const EQUIP_RATE: Record<string, number> = {
+    "굴삭기(백호)": 600, "덤프트럭": 200, "콘크리트펌프카": 150, "천공기(오거/RCD)": 40,
+    "항타기": 30, "다짐롤러": 800, "록브레이커/천공": 350, "그라우팅장비": 120,
+  };
+  const suggestEquipCount = (equip: string, qty: number): number => {
+    if (equip === "크레인") return 2;
+    const rate = EQUIP_RATE[equip] ?? 300;
+    return Math.max(1, Math.min(40, Math.ceil(qty / (rate * 200))));
+  };
+  const [discEquip, setDiscEquip] = useState<Record<string, Record<string, number>>>({}); // 공종별 자원계획 {장비: 대수}
   const handleBoqUpload = async (cardKey: string, file: File | undefined) => {
     if (!file) return;
     setDiscBoq((s) => ({ ...s, [cardKey]: { loading: true } }));
     try {
       const r = await parseBoq(file);
       setDiscBoq((s) => ({ ...s, [cardKey]: { ...r, loading: false } }));
+      // 예측 장비 → 자원 계획 자동 채움(추천 대수). 사용자가 수동 수정 가능.
+      const auto: Record<string, number> = {};
+      for (const e of r.equipment ?? []) auto[e.equip] = suggestEquipCount(e.equip, e.qty);
+      if (Object.keys(auto).length) setDiscEquip((s) => ({ ...s, [cardKey]: auto }));
     } catch (e) {
       setDiscBoq((s) => ({ ...s, [cardKey]: { loading: false, error: e instanceof Error ? e.message : "파싱 실패" } }));
     }
@@ -386,15 +401,18 @@ export default function SchedulePlanWizard() {
         zones, storeys, work_units: workUnits, methods: [],
         start_date: projStart, duration_months: projMonths,
         work_days_per_week: projWdpw, tower_cranes: towerCranes, work_crews: workCrews,
-        civil_equipment: civilEquip, civil_quantities: civilQty ?? undefined,
+        // 토목 자원계획의 굴삭기(백호) 대수 = 굴착 공기 driver(civil_equipment). 수동 수정값 우선.
+        civil_equipment: discEquip["토목"]?.["굴삭기(백호)"] || civilEquip,
+        civil_quantities: civilQty ?? undefined,
         discipline_crews: discCrews, gross_floor_area: gfa ? Number(gfa) : undefined,
-        discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) + 컨펌 병합
-          Object.keys({ ...discSet, ...discBoq }).map((k) => [k, {
+        discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) + 자원계획 병합
+          Object.keys({ ...discSet, ...discBoq, ...discEquip }).map((k) => [k, {
             ...(discSet[k] || {}),
             ...(discBoq[k]?.quantities ? {
               boq: discBoq[k].quantities, boq_confirm: !!discBoq[k]?.confirm,
               boq_items: (discBoq[k]?.items ?? []).map((it) => ({ name: it.name, unit: it.unit, qty: it.qty, op: it.op })),
             } : {}),
+            ...(discEquip[k] ? { equipment: discEquip[k] } : {}),
           }]),
         ),
         weather_station: weatherStation || undefined,   // 기상 지역 — 있으면 공종별 가동률 기상 기반 산정
@@ -670,12 +688,20 @@ export default function SchedulePlanWizard() {
                                 {b.has_prices && b.total_cost ? <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
                               </div>
                               {b.equipment && b.equipment.length > 0 && (
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4, alignItems: "center" }}>
-                                  <span style={{ fontSize: 10.5, color: "#92400e", fontWeight: 600 }}>🚜 예측 장비</span>
-                                  {b.equipment.map((e) => (
-                                    <span key={e.equip} title={e.items.join(", ")}
-                                          style={{ background: "#fef3c7", color: "#92400e", borderRadius: 4, padding: "1px 6px" }}>{e.equip}</span>
-                                  ))}
+                                <div style={{ marginTop: 5, padding: "6px 8px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6 }}>
+                                  <span style={{ fontSize: 10.5, color: "#92400e", fontWeight: 600 }}>🚜 자원 계획 — 내역서 예측 장비(자동, 수정 가능)</span>
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                                    {b.equipment.map((e) => (
+                                      <label key={e.equip} title={e.items.join(", ")}
+                                             style={{ fontSize: 11, color: "#78716c", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                                        {e.equip}
+                                        <input type="number" min={0} className="wz-in" style={{ width: 46, padding: "2px 4px", fontSize: 11 }}
+                                               value={discEquip[d.key]?.[e.equip] ?? suggestEquipCount(e.equip, e.qty)}
+                                               onChange={(ev) => setDiscEquip((s) => ({ ...s, [d.key]: { ...s[d.key], [e.equip]: Number(ev.target.value) } }))} />
+                                        대
+                                      </label>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                               {qsum === 0 && <div style={{ fontSize: 10.5, color: "#a16207", marginTop: 2 }}>물량 미검출 — 평탄 공/산출내역서(CSV) 권장 (원가집계 문서엔 물량 표 없음)</div>}
