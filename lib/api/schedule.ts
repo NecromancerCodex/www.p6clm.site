@@ -624,6 +624,24 @@ export async function boqBrief(planId: string): Promise<{ brief: string }> {
   return planFetch(`/${planId}/boq-brief`, { method: "POST", body: "{}" });
 }
 
+/** 공정계획 목록 — 자원 계획 화면 플랜 선택 */
+export interface PlanListItem { id: string; project_name: string; stage: string; created: string | null }
+export async function listPlans(): Promise<PlanListItem[]> {
+  const j = await planFetch<{ plans: PlanListItem[] }>(`/list`, { method: "GET" });
+  return j.plans ?? [];
+}
+
+/** 활동 ↔ 물량 ↔ 장비 매핑 — 자원 계획 화면 */
+export interface ResourceRow {
+  code: string; name: string; discipline: string; op: string;
+  start: string | null; end: string | null; duration: number | null;
+  qty: number | null; unit: string; zone: string | null; storey: string | null;
+  equip: { name: string; count: number }[];
+}
+export async function getResourceMap(planId: string): Promise<{ project_name: string; stage: string; activities: ResourceRow[] }> {
+  return planFetch(`/${planId}/resource-map`, { method: "GET" });
+}
+
 /** P6 XML 다운로드 URL */
 export function planP6XmlUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/p6xml`;
