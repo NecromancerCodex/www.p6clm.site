@@ -143,13 +143,16 @@ const UTIL_PRESET: { cat: string; val: number; note: string }[] = [
   { cat: "양생", val: 1.0, note: "날씨 무관(대기·감리)" },
 ];
 
+// 기상관측소(ASOS) 지역 — 가동률 실측 정밀화용. 검토 카드 + 폼 공용.
+const WEATHER_REGIONS = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "수원", "청주", "전주", "강릉", "춘천", "포항", "창원", "제주", "목포", "여수", "안동", "대관령"];
+
 // 구조유형 → 거푸집·시공전략 권장(검토용 — 사람이 아래 드롭다운으로 수정).
 function recommendForm(structType: string, hasBasement: boolean): { formwork: string; strategy: string } {
   const st = structType || "";
   let formwork = "유로폼 (재래식급)";
   if (st.includes("모듈러") || st.includes("PC")) formwork = "공장제작 (현장 거푸집 최소)";
+  else if (st.includes("SRC") || st.includes("철골")) formwork = "데크플레이트 (합성 슬래브) + 코어 갱폼";  // SRC가 'RC' 포함 → RC보다 먼저
   else if (st.includes("RC")) formwork = "알폼 (아파트 골조 사이클 단축)";
-  else if (st.includes("철골") || st.includes("SRC")) formwork = "데크플레이트 (합성 슬래브)";
   return { formwork, strategy: hasBasement ? "순타·일괄 (지하 깊으면 역타 검토)" : "순타·일괄" };
 }
 
@@ -775,9 +778,16 @@ export default function SchedulePlanWizard() {
                         </span>
                       ))}
                     </div>
-                    {weatherStation
-                      ? <div style={{ marginTop: 4, color: "#0369a1" }}>· 기상지역 <b>{weatherStation}</b> → 위 값을 ASOS 실측(최근 5년)으로 정밀 재산정</div>
-                      : <div style={{ marginTop: 4, color: "#94a3b8" }}>· 기상지역 미선택 → 위 프리셋 적용 (지역 선택 시 실측 기상으로 정밀화)</div>}
+                    <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      · <b>기상지역</b>
+                      <select className="wz-in" style={{ width: 132, padding: "2px 5px", fontSize: 11.5 }} value={weatherStation} onChange={(e) => setWeatherStation(e.target.value)}>
+                        <option value="">미선택 (프리셋)</option>
+                        {WEATHER_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                      <span style={{ color: weatherStation ? "#0369a1" : "#94a3b8", fontSize: 11 }}>
+                        {weatherStation ? `→ ${weatherStation} 최근 5년 실측 기상으로 가동률 정밀 재산정(생성 시)` : "→ 선택 시 위 프리셋을 실측 기상으로 정밀화"}
+                      </span>
+                    </div>
                     <div style={{ marginTop: 5, color: "#94a3b8", fontSize: 11 }}>
                       ↓ 아래 공종 카드에서 가동률·거푸집·시공전략 수정 가능. <b>착공일·마감일</b>만 직접 입력하세요(사업 결정).
                     </div>
@@ -797,7 +807,7 @@ export default function SchedulePlanWizard() {
                      title="기상 지역 선택 시 → 공종별 가동률을 그 지역 최근 5년 실제 기상(기온·강수·적설·풍속)으로 자동 산정. 미선택 시 공종 프리셋.">기상 지역 (가동률 자동)
                 <select className="wz-in" value={weatherStation} onChange={(e) => setWeatherStation(e.target.value)}>
                   <option value="">선택 안 함 (공종 프리셋 가동률)</option>
-                  {["서울","부산","대구","인천","광주","대전","울산","수원","청주","전주","강릉","춘천","포항","창원","제주","목포","여수","안동","대관령"].map((r) => (
+                  {WEATHER_REGIONS.map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
