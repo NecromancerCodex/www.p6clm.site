@@ -221,6 +221,7 @@ export default function SchedulePlanWizard() {
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
   const [seasonal, setSeasonal] = useState(false); // 계절 비작업일(동절기·우기) — 가동률과 별개 축
   const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);   // 드래그앤드롭 — 호버 중인 공종 슬롯
   const [milestones, setMilestones] = useState<GenMilestone[]>([]); // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 게이트
   const [brief, setBrief] = useState<string | null>(null); // AI 리스크 브리핑
   const [briefBusy, setBriefBusy] = useState(false);
@@ -571,6 +572,7 @@ export default function SchedulePlanWizard() {
             </div>
             <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px" }}>
               넣은 공종만 공정표에 반영됩니다 (예: 구조만 → 구조 공정표 / 토목+구조 → 합쳐서 1개). 시공 순서대로 자동 연결.
+              <span style={{ color: "#2563eb", fontWeight: 600 }}> · 카드에 IFC·내역서를 드래그앤드롭하거나 클릭 업로드.</span>
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {DISCIPLINES.map((d, i) => {
@@ -588,7 +590,25 @@ export default function SchedulePlanWizard() {
                 const pr: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#475569", gap: 6 };
                 const isStruct = d.key === "구조" || d.key === "종합";  // 종합=구조 자원 공유(골조 지배)
                 return (
-                  <div key={d.key} style={{ border: `1px solid ${filled ? "#bbf7d0" : "#dbeafe"}`, borderLeft: `4px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 10, padding: "14px 16px", background: "#fff", boxShadow: "0 1px 4px rgba(15,23,42,0.06)" }}>
+                  <div key={d.key}
+                       onDragOver={(e) => { e.preventDefault(); if (!bimBusy) setDragOver(d.key); }}
+                       onDragLeave={() => setDragOver((k) => (k === d.key ? null : k))}
+                       onDrop={(e) => {
+                         e.preventDefault(); setDragOver(null);
+                         if (bimBusy) return;
+                         const f = e.dataTransfer.files?.[0];
+                         if (!f) return;
+                         const n = f.name.toLowerCase();
+                         if (n.endsWith(".ifc")) void onBim(f, d.key);
+                         else if (n.endsWith(".csv") || n.endsWith(".xlsx") || n.endsWith(".xlsm")) void handleBoqUpload(d.key, f);
+                         else setErr("IFC(.ifc) 또는 내역서(.csv/.xlsx) 파일만 가능합니다");
+                       }}
+                       style={{ border: `1px ${dragOver === d.key ? "dashed" : "solid"} ${dragOver === d.key ? "#2563eb" : filled ? "#bbf7d0" : "#dbeafe"}`,
+                                borderLeft: `4px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 10, padding: "14px 16px",
+                                background: dragOver === d.key ? "#eff6ff" : "#fff", boxShadow: "0 1px 4px rgba(15,23,42,0.06)", transition: "background .1s" }}>
+                    {dragOver === d.key && (
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#2563eb", marginBottom: 4 }}>📥 여기에 놓기 — IFC(.ifc) 또는 내역서(.csv/.xlsx)</div>
+                    )}
                     <label title={`${d.label} IFC 업로드 — ${d.hint}`} style={{ display: "block", cursor: bimBusy ? "wait" : "pointer" }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: filled ? "#15803d" : "#1d4ed8" }}>
                         {filled ? "✓" : `${i + 1}.`} {d.icon} {d.label}
