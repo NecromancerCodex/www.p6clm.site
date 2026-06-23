@@ -8,10 +8,10 @@
  *  · 토공 3D 물량은 EarthworkVolumePanel(보조).
  *  Backend: /schedule/plan/list, /schedule/plan/{id}/resource-map.
  */
-import { Boxes, RefreshCw } from "lucide-react";
+import { Boxes, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { listPlans, getResourceMap, type PlanListItem, type ResourceRow } from "../../../../lib/api/schedule";
+import { listPlans, getResourceMap, deletePlan, type PlanListItem, type ResourceRow } from "../../../../lib/api/schedule";
 import { EarthworkVolumePanel } from "../../../../components/earthwork/EarthworkVolumePanel";
 
 const fmt = (n: number) => n.toLocaleString();
@@ -53,6 +53,24 @@ export default function ResourcePlanPage() {
       .finally(() => setLoading(false));
   }, [planId, reloadKey]);
 
+  // 저장 공정계획 삭제 (누적 정리) — 확인 후 하드 삭제, 목록 갱신 + 다음 플랜 자동 선택.
+  const onDelete = async () => {
+    const cur = plans.find((p) => p.id === planId);
+    if (!cur || !window.confirm(`공정계획 삭제\n\n"${cur.project_name} · ${dt(cur.created)}"\n되돌릴 수 없습니다. 삭제할까요?`)) return;
+    setLoading(true); setErr("");
+    try {
+      await deletePlan(planId);
+      const rest = plans.filter((p) => p.id !== planId);
+      setPlans(rest);
+      setPlanId(rest.length ? rest[0].id : "");
+      setRows([]);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "삭제 실패");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const byDisc = useMemo(() => {
     const g: Record<string, ResourceRow[]> = {};
     for (const r of rows) (g[r.discipline] ??= []).push(r);
@@ -84,6 +102,11 @@ export default function ResourcePlanPage() {
         </select>
         <button className="wz-btn" disabled={!planId || loading} onClick={() => setReloadKey((k) => k + 1)} title="새로고침">
           <RefreshCw size={14} /> {loading ? "로딩…" : "새로고침"}
+        </button>
+        <button className="wz-btn" disabled={!planId || loading}
+                style={{ color: "#dc2626", borderColor: "#fecaca" }}
+                onClick={() => void onDelete()} title="이 공정계획 삭제">
+          <Trash2 size={14} /> 삭제
         </button>
         {err && <span style={{ color: "#dc2626", fontSize: 12 }}>⚠️ {err}</span>}
       </div>

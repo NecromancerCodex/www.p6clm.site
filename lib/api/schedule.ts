@@ -614,6 +614,11 @@ export async function listPlans(): Promise<PlanListItem[]> {
   return j.plans ?? [];
 }
 
+/** 저장된 공정계획 삭제 (owner 격리, 하드 삭제) */
+export async function deletePlan(planId: string): Promise<{ deleted: string }> {
+  return planFetch(`/${planId}`, { method: "DELETE" });
+}
+
 /** 활동 ↔ 물량 ↔ 장비 매핑 — 자원 계획 화면 */
 export interface ResourceRow {
   code: string; name: string; discipline: string; op: string;
