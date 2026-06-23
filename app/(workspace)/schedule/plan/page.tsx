@@ -754,8 +754,17 @@ export default function SchedulePlanWizard() {
                     🔎 분석 결과 — 플래닝 전 검토 (자동 판정값, 아래에서 수정 가능)
                   </div>
                   <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.75 }}>
-                    {structureType && <div>· <b>구조유형</b> {structureType} <span style={{ color: "#94a3b8" }}>(BIM 자동 판정)</span></div>}
-                    <div>· <b>거푸집 권장</b> {rec.formwork} · <b>시공전략</b> {rec.strategy}</div>
+                    {(slots["구조"] || slots["종합"]) && structureType && (
+                      <div>· 🏢 <b>구조</b> {structureType} · 거푸집 {rec.formwork} · 시공전략 {rec.strategy} <span style={{ color: "#94a3b8" }}>(BIM 판정)</span></div>
+                    )}
+                    {(slots["토목"] || (civilQty && (civilQty.footprint_m2 || civilQty.depth_m))) && (
+                      <div>· 🏗️ <b>토목</b> {civilQty?.footprint_m2 && civilQty?.depth_m
+                        ? <>굴착 약 <b>{Math.round(civilQty.footprint_m2 * civilQty.depth_m).toLocaleString()}㎥</b> (흙막이 {civilQty.depth_m}m) · 권장 투입조 {civilEquip}</>
+                        : "흙막이·굴착"} <span style={{ color: "#94a3b8" }}>(지반 시추 저장 시 굴착 물량 지질모델로 자동 정밀화)</span></div>
+                    )}
+                    {(slots["건축"] || slots["MEP"] || slots["조경"]) && (
+                      <div>· 🏛️ <b>{[slots["건축"] && "건축", slots["MEP"] && "MEP", slots["조경"] && "조경"].filter(Boolean).join("·")}</b> <span style={{ color: "#94a3b8" }}>(내역서 있으면 마감·설비 시퀀스 생성)</span></div>
+                    )}
                     <div style={{ marginTop: 4 }}>· <b>가동률(공정별 자동 적용)</b> — 공기 = 공수 ÷ 가동률:</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
                       {UTIL_PRESET.map((u) => (
