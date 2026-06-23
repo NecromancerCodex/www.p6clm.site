@@ -13,9 +13,9 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, ifcDiff, inferScheduleContext, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
-  type GanttTask, type GenMilestone, type GenWorkUnit, type IfcDiffResult, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
+  type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
 import { classifyIfcType, normStorey } from "../../../../lib/fourd/match";
 import { savePlanIfcs } from "../../../../lib/fourd/fileCache";
@@ -198,8 +198,6 @@ export default function SchedulePlanWizard() {
   const [seasonal, setSeasonal] = useState(false); // 계절 비작업일(동절기·우기) — 가동률과 별개 축
   const [civilQty, setCivilQty] = useState<{ depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number } | null>(null);
   const [milestones, setMilestones] = useState<GenMilestone[]>([]); // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 게이트
-  const [diff, setDiff] = useState<IfcDiffResult | null>(null); // 설계변경 영향분석 결과
-  const [diffBusy, setDiffBusy] = useState(false);
   const [brief, setBrief] = useState<string | null>(null); // AI 리스크 브리핑
   const [briefBusy, setBriefBusy] = useState(false);
   const [boqBriefTxt, setBoqBriefTxt] = useState<string | null>(null); // AI 내역서 대조 브리핑
@@ -323,20 +321,6 @@ export default function SchedulePlanWizard() {
     }
   };
 
-  // ── 설계변경 영향분석 — 새 IFC 버전 업로드 → work_unit 추출(분석 재사용) → 옛 버전과 diff. ──
-  const onDiffFile = async (file: File) => {
-    if (!planId) return;
-    setDiffBusy(true); setErr(null);
-    try {
-      const r = await analyzeSlotFile(file);
-      const res = await ifcDiff(planId, r.work_units as unknown[]);
-      setDiff(res);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "설계변경 분석 실패");
-    } finally {
-      setDiffBusy(false);
-    }
-  };
 
   // ── [버튼 1] 분석 & 추천 — 업로드한 슬롯 일괄 분석 → 공종·구조 판정·건물유형 추천(필드 채움). 생성은 별개. ──
   const onAnalyze = async () => {
@@ -1117,84 +1101,6 @@ export default function SchedulePlanWizard() {
                 setBusy(true);
                 void confirmPlan(planId!, { civil_equipment: civilEquip }).then(() => refresh(planId!)).finally(() => setBusy(false));
               }}>토목 기간 재계산</button>
-            </div>
-          )}
-          {stage === "scheduled" && (
-            <div style={{ border: "1px solid #e2e8f0", background: "#f8fafc", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#475569", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ flex: 1 }}>
-                📅 공기가 비현실적이면 <b>가동률·거푸집 시스템</b>을 조정하세요 — 공기=공수÷가동률(우천·장비손실), 골조는 거푸집 사이클이 좌우. 공휴일 항상 자동 제외.
-              </span>
-              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>가동률
-                <select className="wz-in" style={{ width: 88 }} value={util} onChange={(e) => setUtil(Number(e.target.value))}>
-                  <option value={1.0}>100%</option><option value={0.9}>90%</option>
-                  <option value={0.85}>85%</option><option value={0.8}>80%</option><option value={0.7}>70%</option>
-                </select>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>거푸집
-                <select className="wz-in" style={{ width: 104 }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
-                  <option value="">자동</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option>
-                  <option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
-                </select>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} />조강
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 4 }} title="동절기·우기 기상 중단일 자동 반영">
-                <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />계절
-              </label>
-              <button className="wz-btn" disabled={busy} onClick={() => {
-                setBusy(true);
-                void confirmPlan(planId!, { utilization_rate: util, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
-                                            seasonal_weather: seasonal, milestones: milestones.filter((m) => m.name.trim() && m.target_date) })
-                  .then(() => refresh(planId!)).finally(() => setBusy(false));
-              }}>공기 재계산</button>
-            </div>
-          )}
-          {stage === "scheduled" && (
-            <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#92400e", marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ flex: 1 }}>
-                  🔄 <b>설계변경 영향분석</b> — 수정된 IFC(새 버전)를 올리면 옛 버전과 비교해 추가·삭제·물량변경 부재와 <b>영향받는 Activity</b>를 찾아냅니다.
-                </span>
-                <label className="wz-btn" style={{ cursor: diffBusy ? "wait" : "pointer", opacity: diffBusy ? 0.6 : 1 }}>
-                  {diffBusy ? "분석 중…" : "📂 새 IFC 비교"}
-                  <input type="file" accept=".ifc" style={{ display: "none" }} disabled={diffBusy}
-                         onChange={(e) => { const f = e.target.files?.[0]; if (f) void onDiffFile(f); e.target.value = ""; }} />
-                </label>
-              </div>
-              {diff && (
-                <div style={{ marginTop: 8, fontSize: 12 }}>
-                  {!diff.summary.has_change ? (
-                    <p style={{ color: "#15803d", margin: 0 }}>✅ 설계변경 없음 — 옛 버전과 동일(공정표 재산정 불필요).</p>
-                  ) : (
-                    <>
-                      <p style={{ margin: "0 0 6px", fontWeight: 600 }}>
-                        변경 {diff.summary.changed_buckets} · 추가 {diff.summary.added_buckets} · 삭제 {diff.summary.deleted_buckets} → 영향 Activity <b>{diff.summary.affected_activities}개</b> (재산정 권장)
-                      </p>
-                      {diff.changed.map((c, i) => (
-                        <div key={`c${i}`} style={{ padding: "3px 0", borderTop: "1px solid #fde68a" }}>
-                          <span style={{ color: (c.delta ?? 0) > 0 ? "#b91c1c" : "#1d4ed8", fontWeight: 600 }}>
-                            ✏️ {c.discipline} {c.zone !== "-" ? `${c.zone} ` : ""}{c.storey !== "-" ? `${c.storey}F ` : ""}{c.element_type} {c.old_count}→{c.new_count} ({(c.pct ?? 0) > 0 ? "+" : ""}{c.pct}%)
-                          </span>
-                          {c.affected_activities.length > 0 && <span style={{ color: "#78716c" }}> → {c.affected_activities.map((a) => a.name).slice(0, 4).join(", ")}{c.affected_activities.length > 4 ? ` 외 ${c.affected_activities.length - 4}` : ""}</span>}
-                        </div>
-                      ))}
-                      {diff.added.map((a, i) => (
-                        <div key={`a${i}`} style={{ padding: "3px 0", borderTop: "1px solid #fde68a", color: "#047857" }}>
-                          ➕ 신규: {a.discipline} {a.zone !== "-" ? `${a.zone} ` : ""}{a.storey !== "-" ? `${a.storey}F ` : ""}{a.element_type} {a.count}개 (신규 공정 검토)
-                        </div>
-                      ))}
-                      {diff.deleted.map((d, i) => (
-                        <div key={`d${i}`} style={{ padding: "3px 0", borderTop: "1px solid #fde68a", color: "#9f1239" }}>
-                          ➖ 삭제: {d.discipline} {d.zone !== "-" ? `${d.zone} ` : ""}{d.storey !== "-" ? `${d.storey}F ` : ""}{d.element_type} {d.count}개
-                          {d.affected_activities.length > 0 && <span style={{ color: "#78716c" }}> → {d.affected_activities.map((a) => a.name).slice(0, 4).join(", ")} 삭제 검토</span>}
-                        </div>
-                      ))}
-                      <p style={{ margin: "6px 0 0", color: "#78716c" }}>ⓘ 물량변경은 기간 ∝ 물량 → 영향 Activity 기간 재산정 권장. 자동 변경 아님(PM 검토).</p>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           )}
           {ganttReady && ganttTasks.length > 0 ? (
