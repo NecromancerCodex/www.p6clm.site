@@ -132,6 +132,27 @@ const THRESH_PRESET: Record<string, [string, string, string, string, string]> = 
 };
 const PH_KO: Record<string, string> = { RB: "철근", FM: "거푸집", CN: "콘크리트", IN: "설치" };
 
+// 공종 자동 가동률(공정분류별, CPE 벤치마킹) — 백엔드 scheduling.py disc_util 과 동일. 검토 표시용.
+const UTIL_PRESET: { cat: string; val: number; note: string }[] = [
+  { cat: "타설", val: 0.68, note: "추위·비에 가장 취약" },
+  { cat: "골조", val: 0.78, note: "외부 골조작업" },
+  { cat: "토공", val: 0.80, note: "굴착·되메우기" },
+  { cat: "외부마감", val: 0.78, note: "외장·옥외 노출" },
+  { cat: "내부습식", val: 0.80, note: "미장·타일·방수" },
+  { cat: "내부건식", val: 0.92, note: "실내 건식·설비" },
+  { cat: "양생", val: 1.0, note: "날씨 무관(대기·감리)" },
+];
+
+// 구조유형 → 거푸집·시공전략 권장(검토용 — 사람이 아래 드롭다운으로 수정).
+function recommendForm(structType: string, hasBasement: boolean): { formwork: string; strategy: string } {
+  const st = structType || "";
+  let formwork = "유로폼 (재래식급)";
+  if (st.includes("모듈러") || st.includes("PC")) formwork = "공장제작 (현장 거푸집 최소)";
+  else if (st.includes("RC")) formwork = "알폼 (아파트 골조 사이클 단축)";
+  else if (st.includes("철골") || st.includes("SRC")) formwork = "데크플레이트 (합성 슬래브)";
+  return { formwork, strategy: hasBasement ? "순타·일괄 (지하 깊으면 역타 검토)" : "순타·일괄" };
+}
+
 export default function SchedulePlanWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -724,6 +745,37 @@ export default function SchedulePlanWizard() {
               </p>
             )}
             {inferReason && <p style={{ fontSize: 12, color: "#7c3aed", margin: "8px 0 0" }}>🤖 AI 판정: {inferReason}</p>}
+            {workUnits.length > 0 && (() => {
+              const hasB = storeys.some((s) => /^B|지하|^PT|PIT/i.test(s));
+              const rec = recommendForm(structureType, hasB);
+              return (
+                <div style={{ marginTop: 10, background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "#7c3aed", marginBottom: 6 }}>
+                    🔎 분석 결과 — 플래닝 전 검토 (자동 판정값, 아래에서 수정 가능)
+                  </div>
+                  <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.75 }}>
+                    {structureType && <div>· <b>구조유형</b> {structureType} <span style={{ color: "#94a3b8" }}>(BIM 자동 판정)</span></div>}
+                    <div>· <b>거푸집 권장</b> {rec.formwork} · <b>시공전략</b> {rec.strategy}</div>
+                    <div style={{ marginTop: 4 }}>· <b>가동률(공정별 자동 적용)</b> — 공기 = 공수 ÷ 가동률:</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
+                      {UTIL_PRESET.map((u) => (
+                        <span key={u.cat} title={u.note}
+                              style={{ background: "#fff", border: "1px solid #e9d5ff", borderRadius: 6, padding: "2px 8px", fontSize: 11.5,
+                                       color: u.val <= 0.7 ? "#b91c1c" : u.val >= 0.92 ? "#15803d" : "#475569" }}>
+                          {u.cat} <b>{Math.round(u.val * 100)}%</b>
+                        </span>
+                      ))}
+                    </div>
+                    {weatherStation
+                      ? <div style={{ marginTop: 4, color: "#0369a1" }}>· 기상지역 <b>{weatherStation}</b> → 위 값을 ASOS 실측(최근 5년)으로 정밀 재산정</div>
+                      : <div style={{ marginTop: 4, color: "#94a3b8" }}>· 기상지역 미선택 → 위 프리셋 적용 (지역 선택 시 실측 기상으로 정밀화)</div>}
+                    <div style={{ marginTop: 5, color: "#94a3b8", fontSize: 11 }}>
+                      ↓ 아래 공종 카드에서 가동률·거푸집·시공전략 수정 가능. <b>착공일·마감일</b>만 직접 입력하세요(사업 결정).
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="wz-card" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
