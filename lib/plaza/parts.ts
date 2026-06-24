@@ -104,8 +104,10 @@ export interface ComposedAvatar {
 /** config 를 z순서로 합성 → 내용 영역만 트림한 캔버스 반환. */
 export async function composeAvatar(m: PartsManifest, config: AvatarConfig): Promise<ComposedAvatar | null> {
   const W = 444, H = 700;
+  const hasDress = !!config.dress; // 원피스 착용 시 상하의 미표시(겹침 방지)
   const layers = await Promise.all(
     Z_ORDER.map(async (cat) => {
+      if (hasDress && (cat === "top" || cat === "bottom")) return null;
       const stem = config[cat];
       if (!stem) return null;
       const url = partUrl(m, cat, stem);

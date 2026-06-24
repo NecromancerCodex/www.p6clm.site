@@ -69,7 +69,13 @@ export function CharacterCreator({
   const hasColors = (cat?.colors.length ?? 0) > 1;
 
   const setPart = (shape: string, color: string) =>
-    setConfig((c) => ({ ...c, [activeCat]: `${shape}${color}` }));
+    setConfig((c) => {
+      const n = { ...c, [activeCat]: `${shape}${color}` };
+      // 원피스 ↔ 상하의 상호배제 (겹쳐 입기 방지)
+      if (activeCat === "dress") { delete n.top; delete n.bottom; }
+      else if (activeCat === "top" || activeCat === "bottom") { delete n.dress; }
+      return n;
+    });
   const clearPart = () =>
     setConfig((c) => { const n = { ...c }; delete n[activeCat]; return n; });
 
