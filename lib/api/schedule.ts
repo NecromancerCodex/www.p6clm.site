@@ -505,6 +505,15 @@ export async function recommendWbs(req: {
   return (await res.json()) as { wbs_structure: string; reason: string };
 }
 
+// 자연어 WBS 요청 → 그룹핑 키 순서(프리셋 또는 커스텀). 예: "공종 중심으로" → {structure:"trade,zone", label:"공종 중심"}.
+export async function wbsFromText(text: string): Promise<{ keys: string[]; structure: string; label: string; reason: string }> {
+  const res = await fetch(`${API_BASE}/schedule/wbs-from-text`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+  });
+  if (!res.ok) return { keys: ["zone", "trade"], structure: "zone", label: "구역 중심", reason: "" };
+  return (await res.json()) as { keys: string[]; structure: string; label: string; reason: string };
+}
+
 // ── IFC → S3 → 서버 work_unit 추출 (C-1) — 대용량 IFC 브라우저 부담 0 ───────────
 export interface IfcWorkUnitsResult {
   work_units: { zone: string; storey: string; element_type: string; count: number; discipline?: string }[];

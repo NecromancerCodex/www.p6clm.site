@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
   type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
@@ -229,8 +229,10 @@ export default function SchedulePlanWizard() {
   const [boqBriefBusy, setBoqBriefBusy] = useState(false);
   const [strategy] = useState("bottom_up");  // 폴백(공종 카드 시공전략이 우선)
   const [wbsStructure, setWbsStructure] = useState("zone");  // WBS 구조(PM 관리방식) — 스케줄과 직교(날짜 불변)
-  const [wbsReason, setWbsReason] = useState<string | null>(null);  // WBS 재추천 사유
+  const [wbsReason, setWbsReason] = useState<string | null>(null);  // WBS 재추천/자연어 사유
   const [wbsRecBusy, setWbsRecBusy] = useState(false);
+  const [wbsText, setWbsText] = useState("");          // 자연어 WBS 요청 입력
+  const [wbsCustomLabel, setWbsCustomLabel] = useState<string | null>(null);  // 커스텀(프리셋 아님) 표시
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
   const [storeys, setStoreys] = useState<string[]>([]);
@@ -421,6 +423,22 @@ export default function SchedulePlanWizard() {
       const discipline_summary = Object.entries(dc).map(([discipline, count]) => ({ discipline, count }));
       const r = await recommendWbs({ building_type: buildingType, structure_type: structureType, zones, storeys, discipline_summary });
       if (r.wbs_structure) setWbsStructure(r.wbs_structure);
+      setWbsCustomLabel(null);   // 추천은 프리셋
+      setWbsReason(r.reason || null);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setWbsRecBusy(false); }
+  };
+
+  // 자연어 WBS — "공종 중심으로", "층별 다음 공종별로" 등 → 키 순서로 변환·적용(프리셋 또는 커스텀).
+  const onWbsFromText = async () => {
+    const t = wbsText.trim();
+    if (!t) return;
+    setWbsRecBusy(true);
+    try {
+      const r = await wbsFromText(t);
+      setWbsStructure(r.structure || "zone");
+      const presets = ["zone", "trade", "sequence", "storey", "trade_detail"];
+      setWbsCustomLabel(presets.includes(r.structure) ? null : `${r.label || "커스텀"} (${(r.keys || []).join(" › ")})`);
       setWbsReason(r.reason || null);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setWbsRecBusy(false); }
@@ -845,12 +863,14 @@ export default function SchedulePlanWizard() {
                     </div>
                     <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       · <b>WBS 구조</b>
-                      <select className="wz-in" style={{ width: 200, padding: "2px 5px", fontSize: 11.5 }} value={wbsStructure} onChange={(e) => setWbsStructure(e.target.value)}>
+                      <select className="wz-in" style={{ width: 200, padding: "2px 5px", fontSize: 11.5 }} value={wbsStructure}
+                              onChange={(e) => { setWbsStructure(e.target.value); setWbsCustomLabel(null); setWbsReason(null); }}>
                         <option value="zone">구역 중심 (구역 &gt; 공종) — 위치별 진도</option>
                         <option value="trade">공종 중심 (공종 &gt; 구역) — 협력업체·기성</option>
                         <option value="sequence">시공순서 중심 (단계 &gt; 차수 &gt; 구역) — CPM</option>
                         <option value="storey">층 중심 (층 &gt; 구역 &gt; 공종) — 층별 진도</option>
                         <option value="trade_detail">공종-구역-층 — 하도급 상세 기성</option>
+                        {wbsCustomLabel && <option value={wbsStructure}>커스텀: {wbsCustomLabel}</option>}
                       </select>
                       <button onClick={onRecommendWbs} disabled={wbsRecBusy}
                         style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, border: "1px solid #c4b5fd", background: "#f5f3ff", color: "#7c3aed", cursor: wbsRecBusy ? "default" : "pointer" }}
@@ -858,6 +878,18 @@ export default function SchedulePlanWizard() {
                         {wbsRecBusy ? "추천 중…" : "🤖 WBS 재추천"}
                       </button>
                       <span style={{ color: "#94a3b8", fontSize: 11 }}>관리 방식만 다름 — 날짜·물량 불변(직교)</span>
+                      {/* 자연어 WBS — "공종 중심으로", "층별 다음 공종별로" 등 직접 서술 → 키 순서 변환 */}
+                      <div style={{ flexBasis: "100%", display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                        <input className="wz-in" value={wbsText} onChange={(e) => setWbsText(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") onWbsFromText(); }}
+                          placeholder='예: "공종 중심으로", "층별 다음 공종별로 묶어줘"'
+                          style={{ flex: 1, padding: "3px 8px", fontSize: 11.5 }} />
+                        <button onClick={onWbsFromText} disabled={wbsRecBusy || !wbsText.trim()}
+                          style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #a7f3d0", background: "#ecfdf5", color: "#059669", cursor: (wbsRecBusy || !wbsText.trim()) ? "default" : "pointer" }}>
+                          💬 WBS 생성
+                        </button>
+                      </div>
+                      {wbsCustomLabel && <div style={{ flexBasis: "100%", color: "#059669", fontSize: 11, marginTop: 2 }}>🗂 커스텀 WBS: {wbsCustomLabel}</div>}
                       {wbsReason && <div style={{ flexBasis: "100%", color: "#7c3aed", fontSize: 11, marginTop: 2 }}>🤖 {wbsReason}</div>}
                     </div>
                     <div style={{ marginTop: 5, color: "#94a3b8", fontSize: 11 }}>
