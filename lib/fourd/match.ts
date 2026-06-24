@@ -293,17 +293,20 @@ function opToCat(op: string): Category {
   if (o === "CR" || o.startsWith("COR") || o.startsWith("WAL") || o.startsWith("COL")) return "CORE";
   return "MOD"; // MD/PR/SLB/BEA 등 수평·모듈
 }
+// 세부구역(타설구획 A-1~A-6) → 메인 작업구역(A) 정규화. 백엔드가 스케줄을 메인구역으로 집계하므로
+// (타워크레인 1대=1전선), BIM 부재 zone("A-1")도 메인구역("A")으로 맞춰야 매칭됨. storey 의 canonStorey 와 동일 취지.
+const mainZone = (zone: string) => (zone || "").replace(/[-_ ]?\d+$/, "") || zone;
 const zoneCatKey = (zone: string, storey: string, cat: Category) =>
-  `${zone}|${canonStorey(storey) || storey}|${cat}`;
+  `${mainZone(zone)}|${canonStorey(storey) || storey}|${cat}`;
 
-// storey 는 canonStorey 로 정규화해 키 생성 — 스케줄("8F")/BIM("Level 8") 표기 차이 흡수.
+// storey 는 canonStorey, zone 은 mainZone 로 정규화해 키 생성 — 표기/세부조닝 차이 흡수.
 const codeKey = (trade: string, zone: string, storey: string, wt: string) =>
-  `${trade}|${zone}|${canonStorey(storey) || storey}|${wt}`;
+  `${trade}|${mainZone(zone)}|${canonStorey(storey) || storey}|${wt}`;
 // 유닛 키 — 모듈 번호(unit)로만. 4D 코드의 type 필드(36/46)는 스케줄 내부코드라
 // BIM 실제 타입과 어긋난다(ZC 코드=46 ↔ BIM=36, 활동명은 둘 다 "36Type"). 그래서 제외.
 // pmisx 도 활동명의 모듈 번호로 매칭한다.
 const unitKey = (zone: string, storey: string, unit: string) =>
-  `MO|${zone}|${canonStorey(storey) || storey}|${unit}`;
+  `MO|${mainZone(zone)}|${canonStorey(storey) || storey}|${unit}`;
 const phaseKey = (zone: string, storey: string, wt: string, phase: string) =>
   `ST|${zone}|${canonStorey(storey) || storey}|${wt}|${phase}`;
 

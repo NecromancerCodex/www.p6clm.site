@@ -379,7 +379,7 @@ export default function SchedulePlanWizard() {
       // ③ zone 기반 구조 자원 보정 — 넓은 건물(다구역)은 물량 기준만으론 작업조 부족 → SGS 직렬화·공기폭주.
       //   메인존(A/B/C/D)당 크레인 1대, 세부존 병렬 위해 작업조 = max(물량기준, 세부존×0.6). 직렬화 완화.
       const subZones = [...zoneSet].filter((z) => z && z !== "-");
-      const mainZones = new Set(subZones.map((z) => z.replace(/[-_ ]?\d+$/, ""))).size || 1;
+      const mainZones = new Set(subZones.map((z) => z.replace(/[-_ .]?\d+$/, "") || z)).size || 1;
       if (subZones.length > 4) {
         const cl = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
         const sk = slotFilesRef.current["구조"] ? "구조" : (slotFilesRef.current["종합"] ? "종합" : null);
