@@ -627,7 +627,7 @@ export default function SchedulePlanWizard() {
                     </label>
                     {/* 공종별 입력(규격 통일) — 공통 6필드 + 공종 전용 파라미터를 한 박스에 */}
                     <div style={{ marginTop: 10, padding: "10px 12px", background: "#f8fafc", border: "1px solid #eef2f7", borderRadius: 8, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center" }}>
-                      <label style={pr} title="WBS 개수 — 비우면 BIM 자동(구역×층)">WBS개수
+                      <label style={pr} title="WBS 개수 — 비우면 BIM 자동(구역×층 정밀). 토목=굴착 단계 수 / 구조=상세수준(구역 수보다 작게 넣으면 구역 통합→층 단위로 활동 수↓, 공기 유지)">WBS개수
                         <input type="number" min={1} className="wz-in" style={{ width: 64, padding: "2px 4px" }} placeholder="자동"
                                value={discSet[d.key]?.wbs ?? ""} onChange={(e) => setDS(d.key, { wbs: e.target.value })} /></label>
                       <label style={pr} title="이 공종 착공일">착공일
