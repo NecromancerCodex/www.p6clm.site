@@ -416,6 +416,7 @@ export interface GenerateScheduleRequest {
   milestones?: GenMilestone[]; // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 외부 게이트
   constraints?: string;
   strategy?: string;   // bottom_up(순타)|top_down(역타) — BIM에 없는 발주·부지 조건(사람 선택)
+  wbs_structure?: string;   // zone|trade|sequence|storey|trade_detail — WBS 그룹핑(PM 관리방식, 스케줄과 직교)
 }
 export interface GenTask {
   code: string; name: string; start: string; end: string;

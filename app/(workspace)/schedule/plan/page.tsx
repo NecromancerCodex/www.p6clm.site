@@ -228,6 +228,7 @@ export default function SchedulePlanWizard() {
   const [boqBriefTxt, setBoqBriefTxt] = useState<string | null>(null); // AI 내역서 대조 브리핑
   const [boqBriefBusy, setBoqBriefBusy] = useState(false);
   const [strategy] = useState("bottom_up");  // 폴백(공종 카드 시공전략이 우선)
+  const [wbsStructure, setWbsStructure] = useState("zone");  // WBS 구조(PM 관리방식) — 스케줄과 직교(날짜 불변)
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
   const [storeys, setStoreys] = useState<string[]>([]);
@@ -458,7 +459,7 @@ export default function SchedulePlanWizard() {
         utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
         seasonal_weather: seasonal,
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
-        constraints: noteStr || undefined, strategy: projStrategy,
+        constraints: noteStr || undefined, strategy: projStrategy, wbs_structure: wbsStructure,
       });
       setScopeWbs(r.scope);
       setPlanId(r.plan_id);
@@ -823,6 +824,17 @@ export default function SchedulePlanWizard() {
                       <span style={{ color: weatherStation ? "#0369a1" : "#94a3b8", fontSize: 11 }}>
                         {weatherStation ? `→ ${weatherStation} 최근 5년 실측 기상으로 가동률 정밀 재산정(생성 시)` : "→ 선택 시 위 프리셋을 실측 기상으로 정밀화"}
                       </span>
+                    </div>
+                    <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      · <b>WBS 구조</b>
+                      <select className="wz-in" style={{ width: 200, padding: "2px 5px", fontSize: 11.5 }} value={wbsStructure} onChange={(e) => setWbsStructure(e.target.value)}>
+                        <option value="zone">구역 중심 (구역 &gt; 공종) — 위치별 진도</option>
+                        <option value="trade">공종 중심 (공종 &gt; 구역) — 협력업체·기성</option>
+                        <option value="sequence">시공순서 중심 (단계 &gt; 차수 &gt; 구역) — CPM</option>
+                        <option value="storey">층 중심 (층 &gt; 구역 &gt; 공종) — 층별 진도</option>
+                        <option value="trade_detail">공종-구역-층 — 하도급 상세 기성</option>
+                      </select>
+                      <span style={{ color: "#94a3b8", fontSize: 11 }}>관리 방식만 다름 — 날짜·물량 불변(직교)</span>
                     </div>
                     <div style={{ marginTop: 5, color: "#94a3b8", fontSize: 11 }}>
                       ↓ 아래 공종 카드에서 가동률·거푸집·시공전략 수정 가능. <b>착공일·마감일</b>만 직접 입력하세요(사업 결정).
