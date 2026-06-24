@@ -114,6 +114,8 @@ interface ReportData {
   }[];
   seqViolations: string[]; // 타임라인 순서 위반 (아래층>위층, 공종순서 등)
   clashes4d: string[]; // 4D Clash — 같은 공간(zone·층)에서 작업 기간 중첩
+  // 구역별 층 커버리지 갭 — 타워 구역이 중간층을 건너뜀(전이층/보이드 또는 BIM 모델 누락). 결정론 경고.
+  zoneGaps: { zone: string; present: number[]; gaps: number[]; floorMin: number; floorMax: number }[];
 }
 
 // 파일명 → 공종(disc) 추측 — 4D 직접 업로드용(플랜 모드는 슬롯 공종이 우선). STRU→구조·ARCH→건축 등.
@@ -787,6 +789,36 @@ export default function FourDPage() {
       }
     }
 
+    // ⑤ 구역별 층 커버리지 갭 — 타워 구역이 중간 지상층을 건너뛰는지(전이층/보이드 vs 모델 누락). 결정론.
+    //   세부구역(A-1) → 메인구역(A) 집계 후 지상층만 보고 연속성 검사. 지하·옥탑(B/PT/RF/PH)은 제외.
+    const _mz = (z: string) => (z || "").replace(/[-_ .]?\d+$/, "") || z;
+    const _floorNum = (s: string): number | null => {
+      const u = (s || "").toUpperCase();
+      if (!u || u.startsWith("B") || u.includes("PIT") || u === "PT") return null; // 지하 제외
+      if (u === "RF" || u.startsWith("PH") || u.includes("지붕")) return null; // 옥탑 제외
+      const m = /(\d+)/.exec(u);
+      return m ? parseInt(m[1], 10) : null;
+    };
+    const zoneFloorSet = new Map<string, Set<number>>();
+    for (const el of parsed.elements) {
+      if (!el.zone) continue;
+      const f = _floorNum(el.storey4d ?? normStorey(el.storeyName) ?? "");
+      if (f == null) continue;
+      const mz = _mz(el.zone);
+      let s = zoneFloorSet.get(mz);
+      if (!s) zoneFloorSet.set(mz, (s = new Set()));
+      s.add(f);
+    }
+    const zoneGaps: ReportData["zoneGaps"] = [];
+    for (const [zone, fset] of zoneFloorSet) {
+      const fs = [...fset].sort((a, b) => a - b);
+      if (fs.length < 3) continue; // 포디움(1~2F만)은 타워 아님 — 갭 판정 제외
+      const gaps: number[] = [];
+      for (let f = fs[0]; f <= fs[fs.length - 1]; f++) if (!fset.has(f)) gaps.push(f);
+      if (gaps.length) zoneGaps.push({ zone, present: fs, gaps, floorMin: fs[0], floorMax: fs[fs.length - 1] });
+    }
+    zoneGaps.sort((a, b) => b.gaps.length - a.gaps.length);
+
     setReport({
       total: parsed.elements.length,
       matched: parsed.elements.length - unmatched,
@@ -797,6 +829,7 @@ export default function FourDPage() {
       noSchedule,
       seqViolations: seqViolations.slice(0, 30),
       clashes4d: [...new Set(clashes4d)].slice(0, 30),
+      zoneGaps,
     });
   }, [ready]);
 
@@ -1215,12 +1248,48 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
             닫기
           </button>
         </div>
-        <div style={{ fontSize: 13, color: "#475569", marginBottom: 16, padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
+        <div style={{ fontSize: 13, color: "#475569", marginBottom: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
           요소 {report.total.toLocaleString()}개 중 <strong style={{ color: "#10b981" }}>{report.matched.toLocaleString()}개 매칭 ({rate}%)</strong> · 공정활동 {report.activityTotal}종 · 미매칭 {report.unmatched.toLocaleString()}개
           {report.aiResolved.length > 0 && (
             <> · <strong style={{ color: "#7c3aed" }}>AI 해결 {report.aiResolved.reduce((s, r) => s + r.count, 0).toLocaleString()}개</strong></>
           )}
         </div>
+
+        {/* 종합 판정 — 한눈 건강도 칩 (매칭·층연속·순서·Clash) */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          {[
+            { ok: report.unmatched === 0, g: `매칭 ${rate}%`, b: `미매칭 ${report.unmatched.toLocaleString()}` },
+            { ok: report.zoneGaps.length === 0, g: "구역 층 연속", b: `층갭 ${report.zoneGaps.length}구역` },
+            { ok: report.noBim.reduce((s, x) => s + x.total, 0) === 0, g: "공정↔BIM 일치", b: `BIM없음 ${report.noBim.reduce((s, x) => s + x.total, 0)}` },
+            { ok: report.seqViolations.length === 0, g: "순서 정상", b: `순서위반 ${report.seqViolations.length}` },
+            { ok: report.clashes4d.length === 0, g: "Clash 없음", b: `Clash ${report.clashes4d.length}` },
+          ].map((c, i) => (
+            <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: c.ok ? "#ecfdf5" : "#fff7ed", color: c.ok ? "#059669" : "#c2410c", border: `1px solid ${c.ok ? "#a7f3d0" : "#fed7aa"}` }}>
+              {c.ok ? "✅ " : "⚠️ "}{c.ok ? c.g : c.b}
+            </span>
+          ))}
+        </div>
+
+        {/* 구역별 층 커버리지 갭 — BIM 특성 경고 (전이층/보이드 vs 모델 누락) */}
+        {report.zoneGaps.length > 0 && (
+          <div style={{ marginBottom: 16, padding: "10px 12px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8 }}>
+            <div style={{ fontWeight: 700, color: "#b45309", marginBottom: 6 }}>
+              ⚠️ 구역별 층 커버리지 — 중간층 누락 감지 ({report.zoneGaps.length}구역)
+            </div>
+            <div style={{ fontSize: 12, color: "#92400e", marginBottom: 8 }}>
+              타워 구역이 중간 지상층을 건너뜁니다. <strong>BIM 모델의 의도된 형상</strong>(타워-포디움 전이층·보이드 등)이거나 <strong>모델 누락</strong>(부재 미작성)입니다.
+              스케줄은 BIM 그대로 반영하므로 <strong>버그가 아닙니다</strong> — 의도된 형상인지 BIM에서 확인하세요.
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
+              {report.zoneGaps.map((g, i) => (
+                <li key={i}>
+                  <strong>{g.zone}구역</strong>: {g.floorMin}~{g.floorMax}F 중 <strong style={{ color: "#b45309" }}>{g.gaps.join("·")}F 없음</strong>{" "}
+                  <span style={{ color: "#a16207" }}>(전이층/보이드 또는 모델 누락 — 확인 요망)</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {report.aiResolved.length > 0 && (
           <div style={{ marginBottom: 16, padding: "10px 12px", background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8 }}>
