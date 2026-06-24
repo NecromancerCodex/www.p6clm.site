@@ -376,6 +376,22 @@ export default function SchedulePlanWizard() {
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
       setWorkUnits(allWu); setZones([...zoneSet]); setStoreys([...storeySet]); setCivilQty(cq);
+      // ③ zone 기반 구조 자원 보정 — 넓은 건물(다구역)은 물량 기준만으론 작업조 부족 → SGS 직렬화·공기폭주.
+      //   메인존(A/B/C/D)당 크레인 1대, 세부존 병렬 위해 작업조 = max(물량기준, 세부존×0.6). 직렬화 완화.
+      const subZones = [...zoneSet].filter((z) => z && z !== "-");
+      const mainZones = new Set(subZones.map((z) => z.replace(/[-_ ]?\d+$/, ""))).size || 1;
+      if (subZones.length > 4) {
+        const cl = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+        const sk = slotFilesRef.current["구조"] ? "구조" : (slotFilesRef.current["종합"] ? "종합" : null);
+        if (sk) {
+          setDiscEquip((s) => {
+            const cur = s[sk] || {};
+            return { ...s, [sk]: { ...cur,
+              크레인: cl(Math.max(cur["크레인"] ?? 0, mainZones), 2, 16),                       // 메인존당 1크레인
+              작업조: cl(Math.max(cur["작업조"] ?? 0, Math.round(subZones.length * 0.6)), 3, 30) } }; // 세부존 병렬
+          });
+        }
+      }
       // 공종·구조·건물유형 추천 → 빈 칸 채움(사람이 검토·수정 후 생성)
       if (inferSrc) {
         const ctx = await inferScheduleContext({
