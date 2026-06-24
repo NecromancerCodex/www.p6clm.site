@@ -493,6 +493,18 @@ export async function inferScheduleContext(req: {
   return (await res.json()) as InferContextResult;
 }
 
+// WBS 5안 추천 — 프로젝트 맥락 → 관리 방식 1개(AI 판단). 구조 자체는 결정론.
+export async function recommendWbs(req: {
+  building_type?: string; structure_type?: string; zones?: string[]; storeys?: string[];
+  discipline_summary?: { discipline: string; count: number }[]; focus?: string;
+}): Promise<{ wbs_structure: string; reason: string }> {
+  const res = await fetch(`${API_BASE}/schedule/wbs-recommend`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),
+  });
+  if (!res.ok) return { wbs_structure: "zone", reason: "" };
+  return (await res.json()) as { wbs_structure: string; reason: string };
+}
+
 // ── IFC → S3 → 서버 work_unit 추출 (C-1) — 대용량 IFC 브라우저 부담 0 ───────────
 export interface IfcWorkUnitsResult {
   work_units: { zone: string; storey: string; element_type: string; count: number; discipline?: string }[];

@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
   type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
@@ -229,6 +229,8 @@ export default function SchedulePlanWizard() {
   const [boqBriefBusy, setBoqBriefBusy] = useState(false);
   const [strategy] = useState("bottom_up");  // 폴백(공종 카드 시공전략이 우선)
   const [wbsStructure, setWbsStructure] = useState("zone");  // WBS 구조(PM 관리방식) — 스케줄과 직교(날짜 불변)
+  const [wbsReason, setWbsReason] = useState<string | null>(null);  // WBS 재추천 사유
+  const [wbsRecBusy, setWbsRecBusy] = useState(false);
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
   const [zones, setZones] = useState<string[]>([]);
   const [storeys, setStoreys] = useState<string[]>([]);
@@ -406,6 +408,22 @@ export default function SchedulePlanWizard() {
       } else { setInferReason(null); }
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
     finally { setBimBusy(false); }
+  };
+
+  // WBS 재추천 — 프로젝트 맥락(구역·층·공종)으로 5안 중 1개 AI 추천 → 드롭다운 갱신.
+  const onRecommendWbs = async () => {
+    setWbsRecBusy(true);
+    try {
+      const zones = [...new Set(workUnits.map((w) => w.zone).filter(Boolean) as string[])];
+      const storeys = [...new Set(workUnits.map((w) => w.storey).filter(Boolean) as string[])];
+      const dc: Record<string, number> = {};
+      for (const w of workUnits) { const d = (w.discipline || "").trim(); if (d) dc[d] = (dc[d] || 0) + 1; }
+      const discipline_summary = Object.entries(dc).map(([discipline, count]) => ({ discipline, count }));
+      const r = await recommendWbs({ building_type: buildingType, structure_type: structureType, zones, storeys, discipline_summary });
+      if (r.wbs_structure) setWbsStructure(r.wbs_structure);
+      setWbsReason(r.reason || null);
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setWbsRecBusy(false); }
   };
 
   // ── [버튼 2] 생성 — 분석된 work_unit + (검토한) 건물유형·공종·구조유형으로 공정표 생성. ──
@@ -834,7 +852,13 @@ export default function SchedulePlanWizard() {
                         <option value="storey">층 중심 (층 &gt; 구역 &gt; 공종) — 층별 진도</option>
                         <option value="trade_detail">공종-구역-층 — 하도급 상세 기성</option>
                       </select>
+                      <button onClick={onRecommendWbs} disabled={wbsRecBusy}
+                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, border: "1px solid #c4b5fd", background: "#f5f3ff", color: "#7c3aed", cursor: wbsRecBusy ? "default" : "pointer" }}
+                        title="프로젝트 맥락(구역·층·공종)으로 WBS 구조를 AI 추천">
+                        {wbsRecBusy ? "추천 중…" : "🤖 WBS 재추천"}
+                      </button>
                       <span style={{ color: "#94a3b8", fontSize: 11 }}>관리 방식만 다름 — 날짜·물량 불변(직교)</span>
+                      {wbsReason && <div style={{ flexBasis: "100%", color: "#7c3aed", fontSize: 11, marginTop: 2 }}>🤖 {wbsReason}</div>}
                     </div>
                     <div style={{ marginTop: 5, color: "#94a3b8", fontSize: 11 }}>
                       ↓ 아래 공종 카드에서 가동률·거푸집·시공전략 수정 가능. <b>착공일·마감일</b>만 직접 입력하세요(사업 결정).
