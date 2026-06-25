@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, type AuditFinding, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
   type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
@@ -304,6 +304,10 @@ export default function SchedulePlanWizard() {
   const [milestones, setMilestones] = useState<GenMilestone[]>([]); // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 게이트
   const [brief, setBrief] = useState<string | null>(null); // AI 리스크 브리핑
   const [briefBusy, setBriefBusy] = useState(false);
+  const [audit, setAudit] = useState<AuditFinding[] | null>(null); // AI 공정 검토 — 모순 목록
+  const [auditBusy, setAuditBusy] = useState(false);
+  const [auditFixBusy, setAuditFixBusy] = useState(false);
+  const [auditFixMsg, setAuditFixMsg] = useState<string | null>(null);
   const [boqBriefTxt, setBoqBriefTxt] = useState<string | null>(null); // AI 내역서 대조 브리핑
   const [boqBriefBusy, setBoqBriefBusy] = useState(false);
   const [strategy] = useState("bottom_up");  // 폴백(공종 카드 시공전략이 우선)
@@ -1259,6 +1263,46 @@ export default function SchedulePlanWizard() {
                   <span className="wz-rat-stat"> ⚠ 보정 {((plan.payload.schedule as Record<string, unknown>).warnings as string[]).length}건 (순환·기간상한 등)</span>
                 )}
               </p>
+            </div>
+          )}
+          {/* ── 고성능 AI 공정 검토 — 시공순서 모순 탐지(검토만) → 사람이 수정 버튼 ── */}
+          {plan?.payload.schedule && (
+            <div style={{ border: "1px solid #c7d2fe", background: "#eef2ff", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <b style={{ fontSize: 13, color: "#4338ca" }}>🧠 AI 공정 검토</b>
+                <span style={{ fontSize: 11.5, color: "#6366f1" }}>고성능 AI가 시공순서 모순(되메·단계역전·양생전타설 등)을 검토합니다 — 자동수정 X, 검토 후 사람이 결정</span>
+                <button className="wz-btn" disabled={auditBusy} style={{ fontSize: 12, marginLeft: "auto" }}
+                  onClick={() => { setAuditBusy(true); setAuditFixMsg(null); void planAudit(planId!).then((r) => setAudit(r.findings || [])).finally(() => setAuditBusy(false)); }}>
+                  {auditBusy ? "검토 중…" : "🔍 AI 검토 실행"}
+                </button>
+              </div>
+              {audit && audit.length === 0 && <div style={{ marginTop: 6, color: "#059669", fontSize: 12 }}>✅ 시공순서 모순이 발견되지 않았습니다.</div>}
+              {audit && audit.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ color: "#991b1b", fontWeight: 600, fontSize: 12.5, marginBottom: 4 }}>⚠️ 모순 {audit.length}건 발견 — 수정할까요? (근거 확인 후 결정)</div>
+                  {audit.map((f, i) => (
+                    <div key={i} style={{ background: "#fff", border: "1px solid #e0e7ff", borderRadius: 8, padding: "7px 10px", marginBottom: 5, fontSize: 12 }}>
+                      <div><b style={{ color: f.severity === "high" ? "#991b1b" : "#92400e" }}>{f.severity === "high" ? "🔴" : "🟡"} {f.title}</b></div>
+                      {f.names && f.names.length > 0 && <div style={{ color: "#64748b", fontSize: 11, marginTop: 1 }}>관련: {f.names.join(" · ")}</div>}
+                      <div style={{ marginTop: 2 }}><b>근거:</b> {f.reason}</div>
+                      <div style={{ color: "#475569", marginTop: 1 }}><b>수정 방향:</b> {f.fix}</div>
+                    </div>
+                  ))}
+                  <button className="wz-btn" disabled={auditFixBusy} style={{ fontSize: 12.5, background: "#4338ca", color: "#fff", marginTop: 2 }}
+                    onClick={() => {
+                      if (!confirm(`AI가 ${audit.length}건의 모순을 수정하고 재스케줄합니다. 진행할까요?`)) return;
+                      setAuditFixBusy(true);
+                      void planAuditFix(planId!).then((r) => {
+                        setAuditFixMsg(r.fixed ? `✅ ${r.fixed}건 수정·재스케줄 완료. ${r.summary || ""}` : (r.summary || "수정할 모순이 없습니다."));
+                        setAudit(null);
+                        void getPlan(planId!).then(setPlan);   // 갱신된 베이스라인 반영
+                      }).finally(() => setAuditFixBusy(false));
+                    }}>
+                    {auditFixBusy ? "AI 수정·재스케줄 중…" : `✏️ AI로 ${audit.length}건 수정 + 재스케줄`}
+                  </button>
+                </div>
+              )}
+              {auditFixMsg && <div style={{ marginTop: 6, color: "#4338ca", fontSize: 12 }}>{auditFixMsg}</div>}
             </div>
           )}
           {(() => {

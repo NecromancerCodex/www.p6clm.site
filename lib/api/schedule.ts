@@ -629,6 +629,16 @@ export async function boqBrief(planId: string): Promise<{ brief: string }> {
   return planFetch(`/${planId}/boq-brief`, { method: "POST", body: "{}" });
 }
 
+/** 고성능 AI 공정 검토 — 시공순서 논리 모순 탐지(검토만, 근거 안내) */
+export interface AuditFinding { codes: string[]; names?: string[]; title: string; severity: string; reason: string; fix: string }
+export async function planAudit(planId: string): Promise<{ findings: AuditFinding[]; error?: string }> {
+  return planFetch(`/${planId}/audit`, { method: "POST", body: "{}" });
+}
+/** 고성능 AI 모순 수정 — 선후행 재설정 + 재스케줄(베이스라인 갱신) */
+export async function planAuditFix(planId: string): Promise<{ fixed: number; summary?: string; error?: string }> {
+  return planFetch(`/${planId}/audit-fix`, { method: "POST", body: "{}" });
+}
+
 /** 공정계획 목록 — 자원 계획 화면 플랜 선택 */
 export interface PlanListItem { id: string; project_name: string; stage: string; created: string | null }
 export async function listPlans(): Promise<PlanListItem[]> {
