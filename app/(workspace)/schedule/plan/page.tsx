@@ -156,6 +156,48 @@ function recommendForm(structType: string, hasBasement: boolean): { formwork: st
   return { formwork, strategy: hasBasement ? "순타·일괄 (지하 깊으면 역타 검토)" : "순타·일괄" };
 }
 
+// WBS 미리보기 — work_units 메타로 트리 구성(날짜 불필요). 백엔드 wbs_structure.py 미러.
+const _DISC_KO_W: Record<string, string> = { EARTHWORK: "토목", FOUNDATION: "기초", STRUCTURE: "구조", TEMPORARY: "가설", ARCHITECTURE: "건축", MEP: "MEP", LANDSCAPE: "조경" };
+const _PHASE_KO_W: Record<string, string> = { EARTHWORK: "토공·기초", FOUNDATION: "토공·기초", STRUCTURE: "골조", TEMPORARY: "가설", ARCHITECTURE: "마감·설비", MEP: "마감·설비", LANDSCAPE: "마감·설비" };
+const _mainZoneW = (z: string) => (z || "").replace(/[-_ .]?\d+$/, "").trim() || "-";
+const WBS_PRESETS_W: Record<string, string[]> = { zone: ["zone", "trade"], trade: ["trade", "zone"], sequence: ["phase", "zone"], storey: ["storey", "zone", "trade"], trade_detail: ["trade", "zone", "storey"] };
+function resolveWbsKeysW(s: string): string[] {
+  if (WBS_PRESETS_W[s]) return WBS_PRESETS_W[s];
+  const ks = (s || "").split(/[>,\s]+/).filter((k) => ["zone", "storey", "trade", "phase", "stage"].includes(k));
+  return ks.length ? ks : WBS_PRESETS_W.zone;
+}
+function wbsKeyValW(w: { zone?: string; storey?: string; discipline?: string }, k: string): string {
+  if (k === "zone") return _mainZoneW(w.zone || "");
+  if (k === "storey") return w.storey || "-";
+  if (k === "trade") return _DISC_KO_W[(w.discipline || "").toUpperCase()] || w.discipline || "공종";
+  if (k === "phase") return _PHASE_KO_W[(w.discipline || "").toUpperCase()] || w.discipline || "공통";
+  return "-";
+}
+type WbsNode = { count: number; children: Record<string, WbsNode> };
+function buildWbsTree(units: { zone?: string; storey?: string; discipline?: string; count?: number }[], keys: string[]): WbsNode {
+  const root: WbsNode = { count: 0, children: {} };
+  for (const u of units) {
+    let node = root; root.count += u.count || 1;
+    for (const k of keys) {
+      const v = wbsKeyValW(u, k);
+      if (v === "-") continue;
+      node.children[v] = node.children[v] || { count: 0, children: {} };
+      node = node.children[v]; node.count += u.count || 1;
+    }
+  }
+  return root;
+}
+function flattenWbsTree(node: WbsNode, depth = 0, maxBranch = 6): { depth: number; label: string; count: number }[] {
+  const out: { depth: number; label: string; count: number }[] = [];
+  const entries = Object.entries(node.children).sort((a, b) => b[1].count - a[1].count);
+  entries.slice(0, maxBranch).forEach(([label, child]) => {
+    out.push({ depth, label, count: child.count });
+    out.push(...flattenWbsTree(child, depth + 1, maxBranch));
+  });
+  if (entries.length > maxBranch) out.push({ depth, label: `… 외 ${entries.length - maxBranch}개`, count: 0 });
+  return out;
+}
+
 export default function SchedulePlanWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -234,6 +276,10 @@ export default function SchedulePlanWizard() {
   const [wbsText, setWbsText] = useState("");          // 자연어 WBS 요청 입력
   const [wbsCustomLabel, setWbsCustomLabel] = useState<string | null>(null);  // 커스텀(프리셋 아님) 표시
   const [workUnits, setWorkUnits] = useState<GenWorkUnit[]>([]);
+  // WBS 미리보기 트리 — work_units 메타로 선택 구조 시각화(날짜 불필요, 생성 전 제시)
+  const wbsPreview = useMemo(() =>
+    workUnits.length ? flattenWbsTree(buildWbsTree(workUnits, resolveWbsKeysW(wbsStructure))) : [],
+    [workUnits, wbsStructure]);
   const [zones, setZones] = useState<string[]>([]);
   const [storeys, setStoreys] = useState<string[]>([]);
   const [bimName, setBimName] = useState<string | null>(null);
@@ -861,6 +907,17 @@ export default function SchedulePlanWizard() {
                         {weatherStation ? `→ ${weatherStation} 최근 5년 실측 기상으로 가동률 정밀 재산정(생성 시)` : "→ 선택 시 위 프리셋을 실측 기상으로 정밀화"}
                       </span>
                     </div>
+                    <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      · <b>연면적</b>
+                      <input className="wz-in" type="number" style={{ width: 130, padding: "2px 5px", fontSize: 11.5 }} value={gfa} onChange={(e) => setGfa(e.target.value)}
+                             placeholder="㎡ (선택)" title="연면적 — 건축·MEP 기간 정밀화(부재수 대신 물량 기반)" />
+                      <span style={{ color: "#94a3b8", fontSize: 11 }}>건축·MEP 기간 정밀화</span>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "#475569", marginLeft: 10 }}
+                             title="동절기(12·1·2월)·우기(7·8월) 기상 중단일 자동 제외 — 가동률과 별개 축">
+                        <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
+                        계절 비작업일(동절기·우기)
+                      </label>
+                    </div>
                     <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       · <b>WBS 구조</b>
                       <select className="wz-in" style={{ width: 200, padding: "2px 5px", fontSize: 11.5 }} value={wbsStructure}
@@ -891,6 +948,16 @@ export default function SchedulePlanWizard() {
                       </div>
                       {wbsCustomLabel && <div style={{ flexBasis: "100%", color: "#059669", fontSize: 11, marginTop: 2 }}>🗂 커스텀 WBS: {wbsCustomLabel}</div>}
                       {wbsReason && <div style={{ flexBasis: "100%", color: "#7c3aed", fontSize: 11, marginTop: 2 }}>🤖 {wbsReason}</div>}
+                      {wbsPreview.length > 0 && (
+                        <div style={{ flexBasis: "100%", marginTop: 4, padding: "6px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 11, maxHeight: 170, overflowY: "auto" }}>
+                          <div style={{ color: "#475569", fontWeight: 600, marginBottom: 3 }}>🗂 WBS 미리보기 (선택 구조 — work_units 기준, 날짜 무관)</div>
+                          {wbsPreview.map((n, i) => (
+                            <div key={i} style={{ paddingLeft: n.depth * 14, color: n.depth === 0 ? "#1e293b" : "#64748b", lineHeight: 1.6 }}>
+                              {n.depth > 0 ? "└ " : "📁 "}{n.label}{n.count > 0 ? ` (${n.count})` : ""}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div style={{ marginTop: 5, color: "#94a3b8", fontSize: 11 }}>
                       ↓ 아래 공종 카드에서 가동률·거푸집·시공전략 수정 가능. <b>착공일·마감일</b>만 직접 입력하세요(사업 결정).
@@ -905,24 +972,8 @@ export default function SchedulePlanWizard() {
             <Field label="① 무엇을 — 건물유형 (비우면 생성 시 AI 자동 추천)">
               <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="비워두면 AI 가 추천 (예: 모듈러 공동주택)" />
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
-              <input className="wz-in" type="number" style={{ marginTop: 6 }} value={gfa} onChange={(e) => setGfa(e.target.value)}
-                     placeholder="연면적(㎡, 선택) — 건축·MEP 기간 정밀화" title="연면적 — 마감·설비는 연면적에 비례. 입력하면 부재수 대신 물량 기반 기간" />
-              <label className="wz-sub" style={{ display: "block", marginTop: 6 }}
-                     title="기상 지역 선택 시 → 공종별 가동률을 그 지역 최근 5년 실제 기상(기온·강수·적설·풍속)으로 자동 산정. 미선택 시 공종 프리셋.">기상 지역 (가동률 자동)
-                <select className="wz-in" value={weatherStation} onChange={(e) => setWeatherStation(e.target.value)}>
-                  <option value="">선택 안 함 (공종 프리셋 가동률)</option>
-                  {WEATHER_REGIONS.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#475569", marginTop: 8 }}
-                     title="동절기(12·1·2월)·우기(7·8월) 기상 중단일 자동 제외 — 현장(부지) 공통. 가동률과 별개 축">
-                <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
-                계절 비작업일 자동 반영 (동절기·우기 — 현장 공통)
-              </label>
               <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0", lineHeight: 1.5 }}>
-                ⓘ 착공일·목표공기·가동률·근무·시공전략은 각 <b>공종 카드</b>에서 설정 · 공휴일 자동 제외
+                ⓘ 연면적·기상지역·계절은 <b>분석 결과 카드</b>에서, 착공일·목표공기·가동률·근무·시공전략은 각 <b>공종 카드</b>에서 설정 · 공휴일 자동 제외
               </p>
             </Field>
             {slots["토목"] && civilQty && (
