@@ -198,6 +198,30 @@ function flattenWbsTree(node: WbsNode, depth = 0, maxBranch = 6): { depth: numbe
   return out;
 }
 
+// 장비 1대당 직종 크루(표준품셈) — 자원계획 장비 대수 → 인력(운전수·신호수·조수·보통인부) 자동 도출.
+const _EQUIP_CREW: Record<string, Record<string, number>> = {
+  "굴삭기(백호)": { 운전수: 1, 신호수: 1, 보통인부: 1 },
+  "덤프트럭": { 운전수: 1 },
+  "록브레이커/천공": { 운전수: 1, 신호수: 1 },
+  "다짐롤러": { 운전수: 1 },
+  "크레인": { 운전수: 1, 신호수: 1 },
+  "이동식크레인": { 운전수: 1, 신호수: 1 },
+  "천공기(오거/RCD)": { 운전수: 1, 보통인부: 1 },
+  "항타기": { 운전수: 1, 신호수: 1, 보통인부: 1 },
+  "그라우팅장비": { 운전수: 1, 보통인부: 1 },
+  "콘크리트펌프카": { 운전수: 1, 보통인부: 1 },
+};
+// 자원계획 장비맵 → 직종별 인력 합계(장비 대수 × 1대당 크루). 작업조/비장비 키는 무시.
+function equipLabor(equip: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [name, cnt] of Object.entries(equip || {})) {
+    const crew = _EQUIP_CREW[name];
+    if (!crew || !cnt) continue;
+    for (const [job, per] of Object.entries(crew)) out[job] = (out[job] || 0) + per * cnt;
+  }
+  return out;
+}
+
 export default function SchedulePlanWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -831,6 +855,17 @@ export default function SchedulePlanWizard() {
                                       </label>
                                     ))}
                                   </div>
+                                  {(() => {
+                                    const labor = equipLabor(discEquip[d.key]!);
+                                    const jobs = Object.keys(labor);
+                                    if (!jobs.length) return null;
+                                    return (
+                                      <div style={{ marginTop: 5, fontSize: 10.5, color: "#78716c", borderTop: "1px dashed #fde68a", paddingTop: 4 }}>
+                                        👷 <b>인력(장비 기준 자동)</b>: {jobs.map((j) => `${j} ${labor[j]}명`).join(" · ")}
+                                        <span style={{ color: "#a16207" }}> — 장비 대수 수정 시 자동 반영</span>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
                               {qsum === 0 && <div style={{ fontSize: 10.5, color: "#a16207", marginTop: 2 }}>물량 미검출 — 평탄 공/산출내역서(CSV) 권장 (원가집계 문서엔 물량 표 없음)</div>}
