@@ -1358,6 +1358,29 @@ select {
   border: 1px solid var(--line);
 }
 
+/* ordered list 연속 번호 — LLM이 전부 1.로 출력하거나, 항목 사이 bullet으로
+   리스트가 CommonMark 분할 파싱돼도 버블 단위 카운터로 1,2,3… 연속 보장.
+   counter-reset 을 버블(부모)에 두는 게 핵심 — ol 마다 두면 분할 시 또 리셋됨. */
+.cbot-bubble.assistant {
+  counter-reset: olc;
+}
+.cbot-bubble.assistant ol {
+  list-style: none;
+  padding-left: 1.6em;
+}
+.cbot-bubble.assistant ol > li {
+  counter-increment: olc;
+  position: relative;
+}
+.cbot-bubble.assistant ol > li::before {
+  content: counter(olc) ". ";
+  position: absolute;
+  left: -1.5em;
+  color: var(--muted-strong);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .cbot-bubble.thinking {
   display: flex;
   gap: 5px;
