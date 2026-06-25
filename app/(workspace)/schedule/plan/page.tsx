@@ -1230,6 +1230,27 @@ export default function SchedulePlanWizard() {
             );
           })()}
           {(() => {
+            const conf = (plan?.payload.schedule as Record<string, unknown> | undefined)?.confidence as
+              | { grade?: string; note?: string; total_man_days?: number; peak_manpower?: number; labor_per_m2?: number;
+                  crew?: Record<string, { man_days: number; peak: number }>;
+                  equipment?: Record<string, { equip_days: number; peak: number }> } | undefined;
+            if (!conf || !conf.crew) return null;
+            const c = conf.grade === "적정" ? { bg: "#ecfdf5", bd: "#a7f3d0", fg: "#059669", icon: "✅" }
+              : conf.grade === "과소" ? { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" }
+              : { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📉" };
+            return (
+              <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "10px 14px", fontSize: 12.5, marginBottom: 10 }}>
+                <b style={{ color: c.fg }}>{c.icon} 공기 신뢰도 [{conf.grade}]</b> — {conf.note}
+                <div style={{ marginTop: 4, color: "#475569" }}>적산: 총 {conf.total_man_days?.toLocaleString()}인일 · 피크 {conf.peak_manpower}명 · 원단위 {conf.labor_per_m2}인일/㎡</div>
+                <div style={{ marginTop: 4 }}><b>직종별 피크 동원:</b> {Object.entries(conf.crew).map(([j, v]) => `${j} ${v.peak}명`).join(" · ")}</div>
+                {conf.equipment && Object.keys(conf.equipment).length > 0 && (
+                  <div style={{ marginTop: 2 }}><b>장비:</b> {Object.entries(conf.equipment).map(([e, v]) => `${e} ${v.peak}대`).join(" · ")}</div>
+                )}
+                <div style={{ marginTop: 3, color: "#94a3b8", fontSize: 11 }}>표준품셈 직종 크루 × BOQ 물량 ÷ 공기 — 직종별 분리(조 퉁침 X)</div>
+              </div>
+            );
+          })()}
+          {(() => {
             const risks = (plan?.payload.schedule as Record<string, unknown> | undefined)?.risks as ScheduleRisk[] | undefined;
             if (!risks || !risks.length) return null;
             const col = (s: string) => s === "high" ? { fg: "#991b1b", icon: "🔴" } : s === "medium" ? { fg: "#92400e", icon: "🟡" } : { fg: "#475569", icon: "⚪" };
