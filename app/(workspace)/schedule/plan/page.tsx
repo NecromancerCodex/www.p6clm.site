@@ -211,13 +211,26 @@ const _EQUIP_CREW: Record<string, Record<string, number>> = {
   "그라우팅장비": { 운전수: 1, 보통인부: 1 },
   "콘크리트펌프카": { 운전수: 1, 보통인부: 1 },
 };
-// 자원계획 장비맵 → 직종별 인력 합계(장비 대수 × 1대당 크루). 작업조/비장비 키는 무시.
-function equipLabor(equip: Record<string, number>): Record<string, number> {
+// 공종별 '작업조' 1조 직종 구성(표준품셈) — 장비 아닌 직영 인력(형틀목공·철근공…)을 작업조 수에서 도출.
+const _CREW_COMPOSITION: Record<string, Record<string, number>> = {
+  구조: { 형틀목공: 6, 철근공: 5, 콘크리트공: 2, 보통인부: 4 },   // 골조 사이클 1작업조
+  종합: { 형틀목공: 6, 철근공: 5, 콘크리트공: 2, 보통인부: 4 },
+  건축: { 마감공: 4, 보통인부: 2 },
+  MEP: { 설비공: 3, 보통인부: 1 },
+  조경: { 조경공: 3, 보통인부: 2 },
+};
+// 자원계획 → 직종별 인력 합계. 장비 키=장비크루(운전수…), '작업조' 키=공종 직영크루(형틀목공…).
+function laborOf(equip: Record<string, number>, disc: string): Record<string, number> {
   const out: Record<string, number> = {};
+  const add = (job: string, n: number) => { out[job] = (out[job] || 0) + n; };
   for (const [name, cnt] of Object.entries(equip || {})) {
-    const crew = _EQUIP_CREW[name];
-    if (!crew || !cnt) continue;
-    for (const [job, per] of Object.entries(crew)) out[job] = (out[job] || 0) + per * cnt;
+    if (!cnt) continue;
+    if (name === "작업조") {
+      const comp = _CREW_COMPOSITION[disc];
+      if (comp) for (const [job, per] of Object.entries(comp)) add(job, per * cnt);
+    } else if (_EQUIP_CREW[name]) {
+      for (const [job, per] of Object.entries(_EQUIP_CREW[name])) add(job, per * cnt);
+    }
   }
   return out;
 }
@@ -856,13 +869,13 @@ export default function SchedulePlanWizard() {
                                     ))}
                                   </div>
                                   {(() => {
-                                    const labor = equipLabor(discEquip[d.key]!);
+                                    const labor = laborOf(discEquip[d.key]!, d.key);
                                     const jobs = Object.keys(labor);
                                     if (!jobs.length) return null;
                                     return (
                                       <div style={{ marginTop: 5, fontSize: 10.5, color: "#78716c", borderTop: "1px dashed #fde68a", paddingTop: 4 }}>
-                                        👷 <b>인력(장비 기준 자동)</b>: {jobs.map((j) => `${j} ${labor[j]}명`).join(" · ")}
-                                        <span style={{ color: "#a16207" }}> — 장비 대수 수정 시 자동 반영</span>
+                                        👷 <b>인력(직종별 자동)</b>: {jobs.map((j) => `${j} ${labor[j]}명`).join(" · ")}
+                                        <span style={{ color: "#a16207" }}> — 작업조·장비 수 수정 시 자동 반영</span>
                                       </div>
                                     );
                                   })()}
