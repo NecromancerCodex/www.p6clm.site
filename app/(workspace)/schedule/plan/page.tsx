@@ -251,7 +251,7 @@ export default function SchedulePlanWizard() {
   const [wdpw] = useState(6);  // 폴백(공종 카드 근무가 우선)
   const [towerCranes] = useState(2);   // 자원계획 미입력 시 폴백(inline 입력 제거됨)
   const [workCrews] = useState(3);     // 자원계획 미입력 시 폴백
-  const [civilEquip, setCivilEquip] = useState(5); // 토목 투입조(굴착기·CIP장비) — 토목 기간 산정
+  const [civilEquip, setCivilEquip] = useState(5); // 토목 굴착 장비 세트(백호·CIP) — 토목 기간 산정
   const [discCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 폴백(자원계획 작업조 우선)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
   const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
@@ -284,7 +284,7 @@ export default function SchedulePlanWizard() {
         auto["크레인"] = clamp(Math.round(conc / 40000), 2, 12);
         auto["작업조"] = clamp(Math.round(conc / 20000), 3, 16);
       } else if (cardKey !== "토목") {
-        // 건축·MEP·조경: 자기 물량(마감㎡·설비m 합)으로 작업조 스케일. 토목은 굴삭기=투입조.
+        // 건축·MEP·조경: 자기 물량(마감㎡·설비m 합)으로 작업조 스케일. 토목은 굴삭기=장비 세트.
         auto["작업조"] = clamp(Math.round(itemSum / 25000), 3, 12);
       }
       setDiscEquip((s) => ({ ...s, [cardKey]: { ...auto, ...s[cardKey] } }));   // 기존 수동값 보존
@@ -459,7 +459,7 @@ export default function SchedulePlanWizard() {
               KEEP.has(String(w.discipline || "")) ? w : { ...w, discipline: disc })));
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
         if (r.civil_quantities) cq = r.civil_quantities;
-        if (r.suggested_equip) setCivilEquip(r.suggested_equip);  // 물량 기반 권장 투입조 자동 반영(대형현장 현실화)
+        if (r.suggested_equip) setCivilEquip(r.suggested_equip);  // 물량 기반 권장 장비 세트 자동 반영(대형현장 현실화)
         setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary), ai: r.ai_classified } }));
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
@@ -929,7 +929,7 @@ export default function SchedulePlanWizard() {
                     )}
                     {(slots["토목"] || (civilQty && (civilQty.footprint_m2 || civilQty.depth_m))) && (
                       <div>· 🏗️ <b>토목</b> {civilQty?.footprint_m2 && civilQty?.depth_m
-                        ? <>굴착 약 <b>{Math.round(civilQty.footprint_m2 * civilQty.depth_m).toLocaleString()}㎥</b> (흙막이 {civilQty.depth_m}m) · 권장 투입조 {civilEquip}</>
+                        ? <>굴착 약 <b>{Math.round(civilQty.footprint_m2 * civilQty.depth_m).toLocaleString()}㎥</b> (흙막이 {civilQty.depth_m}m) · 권장 장비 {civilEquip}세트</>
                         : "흙막이·굴착"} <span style={{ color: "#94a3b8" }}>(지반 시추 저장 시 굴착 물량 지질모델로 자동 정밀화)</span></div>
                     )}
                     {(slots["건축"] || slots["MEP"] || slots["조경"]) && (
@@ -1030,9 +1030,9 @@ export default function SchedulePlanWizard() {
                   🏗️ 굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
                   · 굴착체적 ≈ {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥
                   · 흙막이 {(civilQty.pile_count ?? 0).toLocaleString()}공/둘레 {civilQty.perimeter_m}m
-                  <br />→ 물량 기반 <b>권장 투입조 {civilEquip}조</b>(굴착기+덤프 세트) 기준 ·
+                  <br />→ 물량 기반 <b>권장 장비 {civilEquip}세트</b>(굴착기+덤프) 기준 ·
                   굴착 ≈ {Math.ceil((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0) / (600 * Math.max(1, civilEquip)) / 26)}개월 추정
-                  (토목 슬롯에서 투입조 조정 가능 — 늘릴수록 단축)
+                  (토목 슬롯에서 장비 세트 조정 가능 — 늘릴수록 단축)
                 </p>
               </Field>
             )}
@@ -1388,9 +1388,9 @@ export default function SchedulePlanWizard() {
           {stage === "scheduled" && civilQty && (
             <div style={{ border: "1px solid #bae6fd", background: "#f0f9ff", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#0369a1", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ flex: 1 }}>
-                🏗️ 토목이 길면 <b>투입조(굴착기·CIP 대수)</b>를 늘리세요 — 굴착 {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥ ÷ (표준품셈 생산성 × 투입조). 늘릴수록 토목 기간 단축.
+                🏗️ 토목이 길면 <b>굴착 장비 세트(백호·덤프·CIP 대수)</b>를 늘리세요 — 굴착 {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥ ÷ (표준품셈 생산성 × 장비 세트). 늘릴수록 토목 기간 단축.
               </span>
-              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>토목 투입조
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>굴착 장비(백호) 세트
                 <input type="number" min={1} className="wz-in" style={{ width: 72 }} value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} />
               </label>
               <button className="wz-btn" disabled={busy} onClick={() => {
