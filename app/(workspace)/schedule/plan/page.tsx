@@ -1285,10 +1285,11 @@ export default function SchedulePlanWizard() {
             if (!conf || !conf.crew) return null;
             const c = conf.grade === "적정" ? { bg: "#ecfdf5", bd: "#a7f3d0", fg: "#059669", icon: "✅" }
               : conf.grade === "과소" ? { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" }
-              : { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📉" };
+              : conf.grade === "과다" ? { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📉" }
+              : { bg: "#f8fafc", bd: "#e2e8f0", fg: "#475569", icon: "📊" };   // 등급 미산정(가설-only 등)
             return (
               <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "10px 14px", fontSize: 12.5, marginBottom: 10 }}>
-                <b style={{ color: c.fg }}>{c.icon} 공기 신뢰도 [{conf.grade}]</b> — {conf.note}
+                <b style={{ color: c.fg }}>{c.icon} 공기 신뢰도{conf.grade ? ` [${conf.grade}]` : " (적산)"}</b>{conf.note ? ` — ${conf.note}` : ""}
                 <div style={{ marginTop: 4, color: "#475569" }}>적산: 총 {conf.total_man_days?.toLocaleString()}인일 · 피크 {conf.peak_manpower}명 · 원단위 {conf.labor_per_m2}인일/㎡</div>
                 <div style={{ marginTop: 4 }}><b>직종별 피크 동원:</b> {Object.entries(conf.crew).map(([j, v]) => `${j} ${v.peak}명`).join(" · ")}</div>
                 {conf.equipment && Object.keys(conf.equipment).length > 0 && (
