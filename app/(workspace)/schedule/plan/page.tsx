@@ -740,14 +740,14 @@ export default function SchedulePlanWizard() {
                          if (!f) return;
                          const n = f.name.toLowerCase();
                          if (n.endsWith(".ifc")) void onBim(f, d.key);
-                         else if (n.endsWith(".csv") || n.endsWith(".xlsx") || n.endsWith(".xlsm")) void handleBoqUpload(d.key, f);
-                         else setErr("IFC(.ifc) 또는 내역서(.csv/.xlsx) 파일만 가능합니다");
+                         else if (n.endsWith(".csv") || n.endsWith(".xlsx") || n.endsWith(".xlsm") || n.endsWith(".xls")) void handleBoqUpload(d.key, f);
+                         else setErr("IFC(.ifc) 또는 내역서(.csv/.xlsx/.xls) 파일만 가능합니다");
                        }}
                        style={{ border: `1px ${dragOver === d.key ? "dashed" : "solid"} ${dragOver === d.key ? "#2563eb" : filled ? "#bbf7d0" : "#dbeafe"}`,
                                 borderLeft: `4px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 10, padding: "14px 16px",
                                 background: dragOver === d.key ? "#eff6ff" : "#fff", boxShadow: "0 1px 4px rgba(15,23,42,0.06)", transition: "background .1s" }}>
                     {dragOver === d.key && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#2563eb", marginBottom: 4 }}>📥 여기에 놓기 — IFC(.ifc) 또는 내역서(.csv/.xlsx)</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#2563eb", marginBottom: 4 }}>📥 여기에 놓기 — IFC(.ifc) 또는 내역서(.csv/.xlsx/.xls)</div>
                     )}
                     <label title={`${d.label} IFC 업로드 — ${d.hint}`} style={{ display: "block", cursor: bimBusy ? "wait" : "pointer" }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: filled ? "#15803d" : "#1d4ed8" }}>
@@ -843,8 +843,8 @@ export default function SchedulePlanWizard() {
                       return (
                         <div style={{ marginTop: 6, padding: "6px 8px", background: "#fafafa", border: "1px dashed #d4d4d8", borderRadius: 6 }}>
                           <label style={{ fontSize: 11, color: "#52525b", fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                            📄 내역서 업로드 (.csv/.xlsx) — 물량 보완(IFC 누락 대비)
-                            <input type="file" accept=".csv,.xlsx,.xlsm" style={{ display: "none" }}
+                            📄 내역서 업로드 (.csv/.xlsx/.xls) — 물량 보완(IFC 누락 대비)
+                            <input type="file" accept=".csv,.xlsx,.xlsm,.xls" style={{ display: "none" }}
                                    onChange={(e) => { void handleBoqUpload(d.key, e.target.files?.[0]); e.currentTarget.value = ""; }} />
                           </label>
                           {b?.loading && <span style={{ fontSize: 11, color: "#6b7280", marginLeft: 6 }}>분석 중…</span>}
