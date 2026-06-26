@@ -12,10 +12,9 @@ const CW = 460;
 const CH = 360;
 const TEETH_X0 = 70;
 const TEETH_X1 = CW - 70;
-const GUM_Y = 162;            // 윗잇몸 라인(윗니가 매달림)
-const TOOTH_TOP = GUM_Y;      // 윗니 시작 y
-const TOOTH_H = 58;           // 윗니 길이
-const TOOTH_W = 26;           // 윗니 폭
+const GUM_Y = 162;            // 윗잇몸 라인(윗니 장식이 매달림)
+const TOOTH_H = 58;           // 게임 이빨(아랫니) 길이
+const TOOTH_W = 26;           // 게임 이빨 폭
 const LGUM_Y = CH - 84;       // 아랫잇몸 라인
 const BITE_DROP = 64;         // 입 다물 때 상악이 내려오는 거리
 
@@ -137,11 +136,16 @@ export function GatorRoom({
     ctx.arcTo(18, CH - 6, 18, CH - 26, 22);
     ctx.closePath(); ctx.fill();
     ctx.restore();
-    for (let i = 0; i < n; i++) {                          // 아랫니(윗니와 엇갈리게)
+    for (let i = 0; i < n; i++) {                          // 아랫니 = 실제 게임 이빨(클릭)
       const g = toothGeom(i, n);
-      const lx = g.cx + (TEETH_X1 - TEETH_X0) / n / 2;
-      if (lx > TEETH_X1 - 4) continue;
-      tooth(ctx, lx, LGUM_Y - 4, TOOTH_W * 0.82, TOOTH_H * 0.62, true, "");
+      const kind: "" | "pressed" | "trap" =
+        (s?.status === "done" && s.trap === i) ? "trap" : (s?.teeth?.[i] ? "pressed" : "");
+      const h = TOOTH_H * (i % 2 === 0 ? 1 : 0.88);        // 길이 살짝 교차
+      tooth(ctx, g.cx, LGUM_Y - 2, TOOTH_W, h, true, kind);
+      if (kind === "trap") {
+        ctx.font = "16px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "#fff";
+        ctx.fillText("💥", g.cx, LGUM_Y - 26);
+      }
     }
 
     // ── 상악(입 다물면 drop 만큼 하강) ──
@@ -170,17 +174,10 @@ export function GatorRoom({
     eye(ctx, 60, 52, green);
     eye(ctx, CW - 60, 52, green);
 
-    // 윗니
+    // 윗니 = 고정 톱니 장식(작게) — 게임 이빨 아님
     for (let i = 0; i < n; i++) {
       const g = toothGeom(i, n);
-      const kind: "" | "pressed" | "trap" =
-        (s?.status === "done" && s.trap === i) ? "trap" : (s?.teeth?.[i] ? "pressed" : "");
-      const h = TOOTH_H * (i % 2 === 0 ? 1 : 0.86);        // 길이 살짝 교차
-      tooth(ctx, g.cx, GUM_Y, TOOTH_W, h, false, kind);
-      if (kind === "trap") {
-        ctx.font = "16px system-ui"; ctx.textAlign = "center";
-        ctx.fillText("💥", g.cx, GUM_Y + 26);
-      }
+      tooth(ctx, g.cx, GUM_Y, TOOTH_W * 0.7, TOOTH_H * 0.5, false, "");
     }
     ctx.restore();
   };
@@ -213,7 +210,7 @@ export function GatorRoom({
     const c = canvasRef.current!; const r = c.getBoundingClientRect();
     const px = (e.clientX - r.left) * (CW / r.width);
     const py = (e.clientY - r.top) * (CH / r.height);
-    if (py < TOOTH_TOP - 12 || py > TOOTH_TOP + TOOTH_H + 14) return;
+    if (py < LGUM_Y - TOOTH_H - 16 || py > LGUM_Y + 16) return;  // 아랫니 영역만
     for (let i = 0; i < s.count; i++) {
       if (s.teeth[i]) continue;
       const g = toothGeom(i, s.count);
