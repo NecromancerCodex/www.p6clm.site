@@ -1181,7 +1181,7 @@ export default function SchedulePlanWizard() {
                   <th style={{ width: 80 }}>기간(일)</th>
                   <th style={{ width: 56 }} title="필요 타워크레인 (양중작업) — SGS 자원 평준화 입력">🏗️</th>
                   <th style={{ width: 56 }} title="필요 작업조 — SGS 자원 평준화 입력">👷</th>
-                  <th style={{ textAlign: "left", width: "22%" }}>선행 (code, 쉼표)</th><th />
+                  <th style={{ textAlign: "left", width: "22%" }} title="선행 활동 code (쉼표 구분). 아래 배지 = 관계타입 FS/SS/FF/SF + lag(일). 온톨로지 에이전틱 릴레이션이 판정.">선행 · 관계(FS/SS/FF+lag)</th><th />
                 </tr>
               </thead>
               <tbody>
@@ -1205,7 +1205,21 @@ export default function SchedulePlanWizard() {
                     </td>
                     <td>
                       <input className="wz-cell" value={(a.predecessors ?? []).map((p) => p.code).join(", ")}
-                             onChange={(e) => editAct(i, { predecessors: e.target.value.split(/[\s,]+/).filter(Boolean).map((c) => ({ code: c, type: "FS", lag_days: 0 })) })} />
+                             onChange={(e) => {
+                               const codes = e.target.value.split(/[\s,]+/).filter(Boolean);
+                               const prev = a.predecessors ?? [];
+                               editAct(i, { predecessors: codes.map((c) => prev.find((p) => p.code === c) ?? { code: c, type: "FS", lag_days: 0 }) });
+                             }} />
+                      {(a.predecessors ?? []).some((p) => p.type !== "FS" || (p.lag_days ?? 0) !== 0) && (
+                        <div style={{ fontSize: 10, color: "#64748b", marginTop: 3, lineHeight: 1.4 }}>
+                          {(a.predecessors ?? []).map((p) => (
+                            <span key={p.code} style={{ marginRight: 6 }}>
+                              <b style={{ color: p.type === "FS" ? "#94a3b8" : p.type === "SS" ? "#2563eb" : p.type === "FF" ? "#7c3aed" : "#0891b2" }}>{p.type}</b>
+                              {(p.lag_days ?? 0) !== 0 ? `+${p.lag_days}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="c"><button className="wz-del" onClick={() => removeAct(i)}>삭제</button></td>
                   </tr>
