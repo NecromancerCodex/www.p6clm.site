@@ -5135,10 +5135,11 @@ select {
 .plaza-gator-aiav { font-size: 28px; line-height: 40px; }
 .plaza-gator-bite { position: absolute; top: -8px; right: -6px; font-size: 18px; }
 .plaza-gator-empty { color: #8d99a8; font-size: 0.84rem; padding: 8px 0; }
-.plaza-gator-canvaswrap { position: relative; width: 100%; max-width: 420px; }
+.plaza-gator-canvaswrap { position: relative; width: 100%; max-width: 440px; }
 .plaza-gator-canvas {
-  display: block; width: 100%; height: auto; aspect-ratio: 420 / 300;
-  border-radius: 12px; background: #1d2a1f; box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  display: block; width: 100%; height: auto; aspect-ratio: 460 / 360;
+  border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  background: radial-gradient(120% 90% at 50% 28%, #5aa7e6 0%, #2e6fb0 60%, #1c4a7d 100%);
   touch-action: none;
 }
 .plaza-gator-hint {

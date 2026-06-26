@@ -8,14 +8,16 @@ import type { Participant } from "./PlazaCanvas";
 import { AvatarThumb } from "./AvatarThumb";
 
 // 캔버스(악어 머리) 좌표계 — 표시 크기와 무관, 비율 고정
-const CW = 420;
-const CH = 300;
-const TEETH_X0 = 50;
-const TEETH_X1 = CW - 50;
-const TOOTH_TOP = 92;   // 윗니가 매달린 y
-const TOOTH_H = 54;     // 윗니 길이
-const TOOTH_W = 22;     // 윗니 폭
-const BITE_DROP = 80;   // 입 다물 때 상악이 내려오는 거리
+const CW = 460;
+const CH = 360;
+const TEETH_X0 = 70;
+const TEETH_X1 = CW - 70;
+const GUM_Y = 162;            // 윗잇몸 라인(윗니가 매달림)
+const TOOTH_TOP = GUM_Y;      // 윗니 시작 y
+const TOOTH_H = 58;           // 윗니 길이
+const TOOTH_W = 26;           // 윗니 폭
+const LGUM_Y = CH - 84;       // 아랫잇몸 라인
+const BITE_DROP = 64;         // 입 다물 때 상악이 내려오는 거리
 
 type GatorState = {
   teeth: number[]; turn: number | null; status: "waiting" | "playing" | "done";
@@ -29,14 +31,51 @@ function toothGeom(i: number, n: number) {
   return { cx, x: cx - TOOTH_W / 2, w: TOOTH_W };
 }
 
-function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+/** 윗면만 둥근 사각형(잇몸 바닥은 직선) 경로. */
+function topRound(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h);
   ctx.closePath();
+}
+
+/** 광택 이빨 — 위(상악)/아래(하악) 공용. up=true 면 위로 뾰족. */
+function tooth(ctx: CanvasRenderingContext2D, cx: number, base: number, w: number, h: number, up: boolean, kind: "" | "pressed" | "trap") {
+  const tip = up ? base - h : base + h;
+  const g = ctx.createLinearGradient(0, up ? tip : base, 0, up ? base : tip);
+  if (kind === "trap") { g.addColorStop(0, "#ff9d9d"); g.addColorStop(1, "#ff3b3b"); }
+  else if (kind === "pressed") { g.addColorStop(0, "#b9a89c"); g.addColorStop(1, "#8c7a6e"); }
+  else { g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#ddd6c0"); }
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(cx - w / 2, base);
+  ctx.lineTo(cx + w / 2, base);
+  const mid = base + (up ? -h * 0.45 : h * 0.45);
+  ctx.quadraticCurveTo(cx + w / 2, mid, cx, tip);
+  ctx.quadraticCurveTo(cx - w / 2, mid, cx - w / 2, base);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(60,40,20,0.18)"; ctx.lineWidth = 1; ctx.stroke();
+}
+
+function eye(ctx: CanvasRenderingContext2D, ex: number, ey: number, green: CanvasGradient | string) {
+  ctx.fillStyle = green;
+  ctx.beginPath(); ctx.arc(ex, ey, 26, 0, Math.PI * 2); ctx.fill();          // 눈두덩 혹
+  ctx.fillStyle = "#fdfdf6";
+  ctx.beginPath(); ctx.arc(ex, ey + 2, 15, 0, Math.PI * 2); ctx.fill();      // 흰자
+  ctx.fillStyle = "#1a2230";
+  ctx.beginPath(); ctx.arc(ex + 3, ey + 4, 7, 0, Math.PI * 2); ctx.fill();   // 눈동자
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(ex, ey, 3, 0, Math.PI * 2); ctx.fill();           // 하이라이트
+  // 윗눈꺼풀
+  ctx.fillStyle = green;
+  ctx.beginPath(); ctx.moveTo(ex - 18, ey - 4);
+  ctx.quadraticCurveTo(ex, ey - 26, ex + 18, ey - 4);
+  ctx.quadraticCurveTo(ex, ey - 10, ex - 18, ey - 4); ctx.closePath(); ctx.fill();
 }
 
 /** 악어이빨 룸 — 차례대로 이빨을 누르다 함정 이빨을 누른 사람이 패배. 독립 세션. */
@@ -63,7 +102,7 @@ export function GatorRoom({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 악어 그리기 (bite = 입 다문 정도)
+  // 악어 그리기 (bite = 입 다문 정도 0..1)
   const drawGator = (bite: number) => {
     const c = canvasRef.current; if (!c) return;
     const ctx = c.getContext("2d"); if (!ctx) return;
@@ -72,56 +111,75 @@ export function GatorRoom({
     const drop = bite * BITE_DROP;
     ctx.clearRect(0, 0, CW, CH);
 
-    // 입 안(어두운 빨강)
-    ctx.fillStyle = "#4a0f1a";
-    rr(ctx, 22, 70, CW - 44, CH - 130, 16); ctx.fill();
+    const green = ctx.createLinearGradient(0, 0, 0, CH);
+    green.addColorStop(0, "#67c46d"); green.addColorStop(0.55, "#3fa34d"); green.addColorStop(1, "#287a35");
+
+    // ── 입 안(붉은 그라데이션) + 혀 ──
+    const mouth = ctx.createLinearGradient(0, GUM_Y - 20, 0, LGUM_Y + 20);
+    mouth.addColorStop(0, "#8a1b2c"); mouth.addColorStop(1, "#3a0810");
+    ctx.fillStyle = mouth;
+    ctx.beginPath(); ctx.ellipse(CW / 2, (GUM_Y + LGUM_Y) / 2, CW / 2 - 44, (LGUM_Y - GUM_Y) / 2 + 26, 0, 0, Math.PI * 2); ctx.fill();
+    const tongue = ctx.createRadialGradient(CW / 2, LGUM_Y - 4, 8, CW / 2, LGUM_Y - 4, 150);
+    tongue.addColorStop(0, "#ff8694"); tongue.addColorStop(1, "#cf3a4a");
+    ctx.fillStyle = tongue;
+    ctx.beginPath(); ctx.ellipse(CW / 2, LGUM_Y + 8, 130, 42, 0, Math.PI, 0); ctx.fill();
 
     // ── 하악(고정) + 아랫니 ──
-    ctx.fillStyle = "#2f8f3f";
-    rr(ctx, 6, CH - 64, CW - 12, 84, 22); ctx.fill();
-    ctx.fillStyle = "#f3f1e6";
-    for (let i = 0; i < n; i++) {
-      const g = toothGeom(i + 0.5, n + 1);
-      if (g.cx < TEETH_X0 || g.cx > TEETH_X1) continue;
-      ctx.beginPath();
-      ctx.moveTo(g.x, CH - 64); ctx.lineTo(g.x + g.w, CH - 64);
-      ctx.lineTo(g.cx, CH - 64 - 22); ctx.closePath(); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 3;
+    ctx.fillStyle = green;
+    ctx.beginPath();
+    ctx.moveTo(18, LGUM_Y - 6);
+    ctx.lineTo(CW - 18, LGUM_Y - 6);
+    ctx.lineTo(CW - 18, CH - 26);
+    ctx.arcTo(CW - 18, CH - 6, CW - 44, CH - 6, 22);
+    ctx.lineTo(44, CH - 6);
+    ctx.arcTo(18, CH - 6, 18, CH - 26, 22);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    for (let i = 0; i < n; i++) {                          // 아랫니(윗니와 엇갈리게)
+      const g = toothGeom(i, n);
+      const lx = g.cx + (TEETH_X1 - TEETH_X0) / n / 2;
+      if (lx > TEETH_X1 - 4) continue;
+      tooth(ctx, lx, LGUM_Y - 4, TOOTH_W * 0.82, TOOTH_H * 0.62, true, "");
     }
 
-    // ── 상악(입 다물면 drop 만큼 하강) + 윗니(클릭 대상) ──
+    // ── 상악(입 다물면 drop 만큼 하강) ──
     ctx.save();
     ctx.translate(0, drop);
-    ctx.fillStyle = "#3aa04e";
-    rr(ctx, 6, -46, CW - 12, 138, 26); ctx.fill();
+
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
+    ctx.fillStyle = green;
+    topRound(ctx, 16, 60, CW - 32, GUM_Y - 60, 70);        // 스나우트(주둥이)
+    ctx.fill();
+    ctx.restore();
+
     // 콧등 하이라이트
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    rr(ctx, 30, -38, CW - 60, 22, 11); ctx.fill();
-    // 콧구멍
-    ctx.fillStyle = "#256b30";
-    ctx.beginPath(); ctx.ellipse(CW / 2 - 34, -26, 7, 10, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(CW / 2 + 34, -26, 7, 10, 0, 0, Math.PI * 2); ctx.fill();
-    // 눈 (두 혹)
-    for (const ex of [CW / 2 - 70, CW / 2 + 70]) {
-      ctx.fillStyle = "#3aa04e";
-      ctx.beginPath(); ctx.arc(ex, -54, 20, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.arc(ex, -54, 11, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#1a2332";
-      ctx.beginPath(); ctx.arc(ex + 2, -52, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    topRound(ctx, 70, 74, CW - 140, 34, 17); ctx.fill();
+    // 비늘 돌기(머리 위)
+    ctx.fillStyle = "#36963f";
+    for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(CW / 2 + i * 30, 64, 8, 0, Math.PI * 2); ctx.fill(); }
+    // 콧구멍(주둥이 끝)
+    for (const nx of [CW / 2 - 28, CW / 2 + 28]) {
+      ctx.fillStyle = "#2c7d3c"; ctx.beginPath(); ctx.arc(nx, 92, 13, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#14391a"; ctx.beginPath(); ctx.ellipse(nx, 92, 4, 7, 0, 0, Math.PI * 2); ctx.fill();
     }
+    // 눈(좌우 큰 혹)
+    eye(ctx, 60, 52, green);
+    eye(ctx, CW - 60, 52, green);
+
     // 윗니
     for (let i = 0; i < n; i++) {
       const g = toothGeom(i, n);
-      const pressed = !!s?.teeth?.[i];
-      const isTrap = s?.status === "done" && s.trap === i;
-      const h = pressed ? TOOTH_H * 0.34 : TOOTH_H;
-      ctx.fillStyle = isTrap ? "#ff5252" : pressed ? "#9a5b4e" : "#f7f5ea";
-      ctx.beginPath();
-      ctx.moveTo(g.x, TOOTH_TOP); ctx.lineTo(g.x + g.w, TOOTH_TOP);
-      ctx.lineTo(g.cx, TOOTH_TOP + h); ctx.closePath(); ctx.fill();
-      if (isTrap) {  // 함정 표식
-        ctx.fillStyle = "#fff"; ctx.font = "700 14px system-ui";
-        ctx.textAlign = "center"; ctx.fillText("💥", g.cx, TOOTH_TOP + 18);
+      const kind: "" | "pressed" | "trap" =
+        (s?.status === "done" && s.trap === i) ? "trap" : (s?.teeth?.[i] ? "pressed" : "");
+      const h = TOOTH_H * (i % 2 === 0 ? 1 : 0.86);        // 길이 살짝 교차
+      tooth(ctx, g.cx, GUM_Y, TOOTH_W, h, false, kind);
+      if (kind === "trap") {
+        ctx.font = "16px system-ui"; ctx.textAlign = "center";
+        ctx.fillText("💥", g.cx, GUM_Y + 26);
       }
     }
     ctx.restore();
@@ -155,11 +213,11 @@ export function GatorRoom({
     const c = canvasRef.current!; const r = c.getBoundingClientRect();
     const px = (e.clientX - r.left) * (CW / r.width);
     const py = (e.clientY - r.top) * (CH / r.height);
-    if (py < TOOTH_TOP - 10 || py > TOOTH_TOP + TOOTH_H + 12) return;
+    if (py < TOOTH_TOP - 12 || py > TOOTH_TOP + TOOTH_H + 14) return;
     for (let i = 0; i < s.count; i++) {
       if (s.teeth[i]) continue;
       const g = toothGeom(i, s.count);
-      if (px >= g.x - 4 && px <= g.x + g.w + 4) { send({ t: "gator_press", tooth: i }); return; }
+      if (px >= g.x - 5 && px <= g.x + g.w + 5) { send({ t: "gator_press", tooth: i }); return; }
     }
   };
 
