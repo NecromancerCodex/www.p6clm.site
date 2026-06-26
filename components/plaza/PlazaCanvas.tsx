@@ -616,6 +616,7 @@ export function PlazaCanvas() {
             register={(h) => { boardHandlerRef.current = h; }}
             onClose={() => setPanel(null)}
             participants={participants}
+            chatLog={chatLog}
           />
         )}
         {/* 최초(아바타 없음) = 강제 / 툴바 = 편집(닫기 가능) */}

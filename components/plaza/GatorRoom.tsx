@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { X, LogIn, LogOut, RotateCcw, Bot } from "lucide-react";
 
 import type { ClientMsg, ServerMsg } from "../../lib/plaza/protocol";
-import type { Participant } from "./PlazaCanvas";
+import type { Participant, ChatLine } from "./PlazaCanvas";
 import { AvatarThumb } from "./AvatarThumb";
 
 // 캔버스(악어 머리) 좌표계 — 표시 크기와 무관, 비율 고정
@@ -77,18 +77,50 @@ function eye(ctx: CanvasRenderingContext2D, ex: number, ey: number, green: Canva
   ctx.quadraticCurveTo(ex, ey - 10, ex - 18, ey - 4); ctx.closePath(); ctx.fill();
 }
 
-/** 악어이빨 룸 — 차례대로 이빨을 누르다 함정 이빨을 누른 사람이 패배. 독립 세션. */
+/** chatLog 에서 해당 id 의 최근(4.5s 이내) 메시지 — 카드 말풍선용 (돌림판/그림퀴즈와 동일). */
+function recentBubble(chatLog: ChatLine[], id: number, nowMs: number): string | undefined {
+  for (let i = chatLog.length - 1; i >= 0; i--) {
+    if (chatLog[i].id === id) return nowMs - chatLog[i].ts < 4500 ? chatLog[i].text : undefined;
+  }
+  return undefined;
+}
+
+/** 참가자 카드 — 좌석(🐊)·차례·물림 상태 표시. */
+function GatorCard({ p, st, bubble }: { p: Participant | null; st: GatorState | null; bubble?: string }) {
+  if (!p) return <div className="plaza-pcard plaza-pcard--empty">비어 있음</div>;
+  const seated = !!st?.players?.includes(p.id);
+  const isTurn = st?.status === "playing" && st.turn === p.id;
+  const isLoser = st?.status === "done" && st.loser === p.id;
+  return (
+    <div className={`plaza-pcard${p.me ? " me" : ""}${isTurn ? " turn" : ""}${isLoser ? " loser" : ""}`}>
+      {bubble && <div className="plaza-pcard-bubble">{bubble}</div>}
+      <AvatarThumb config={p.avatar} />
+      <div className="plaza-pcard-info">
+        <span className="plaza-pcard-name">{seated ? "🐊 " : ""}{p.me ? `${p.name}(나)` : p.name}</span>
+      </div>
+      {isLoser ? <span className="plaza-pcard-badge loser">물림 💥</span>
+        : isTurn ? <span className="plaza-pcard-badge">차례</span> : null}
+    </div>
+  );
+}
+
+/** 악어이빨 룸 — 차례대로 이빨을 누르다 함정 이빨을 누른 사람이 패배. 독립 세션.
+ *  돌림판/그림퀴즈와 동일한 룸 레이아웃(참가자 카드 8 + 채팅 로그 + 말풍선)으로 단체 참여. */
 export function GatorRoom({
-  send, register, onClose, participants,
+  send, register, onClose, participants, chatLog,
 }: {
   send: (m: ClientMsg) => void;
   register: (h: ((m: ServerMsg) => void) | null) => void;
   onClose: () => void;
   participants: Participant[];
+  chatLog: ChatLine[];
 }) {
   const myId = participants.find((p) => p.me)?.id ?? -1;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const chatLogRef = useRef<HTMLDivElement | null>(null);
   const [st, setSt] = useState<GatorState | null>(null);
+  const [nowMs, setNowMs] = useState(0);
+  const [showOver, setShowOver] = useState(false);
   const stRef = useRef<GatorState | null>(null);
   const biteRef = useRef(0);  // 0..1 입 다무는 정도(애니메이션)
   const rafRef = useRef(0);
@@ -100,6 +132,20 @@ export function GatorRoom({
     return () => { register(null); cancelAnimationFrame(rafRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 말풍선 만료 시계 + 채팅 자동 스크롤 (Date.now()는 콜백 안에서만)
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 400);
+    return () => window.clearInterval(id);
+  }, []);
+  useEffect(() => { const el = chatLogRef.current; if (el) el.scrollTop = el.scrollHeight; }, [chatLog]);
+
+  // 물기 애니메이션(360ms)을 보여준 뒤 결과 오버레이 표시. done 이탈 시 cleanup 으로 숨김.
+  useEffect(() => {
+    if (st?.status !== "done") return;
+    const id = window.setTimeout(() => setShowOver(true), 520);
+    return () => { window.clearTimeout(id); setShowOver(false); };
+  }, [st?.status]);
 
   // 악어 그리기 (bite = 입 다문 정도 0..1)
   const drawGator = (bite: number) => {
@@ -220,7 +266,6 @@ export function GatorRoom({
 
   const nameOf = (pid: number | null) =>
     pid == null ? "?" : pid === 0 ? "🤖 AI" : (participants.find((p) => p.id === pid)?.name ?? "?");
-  const avatarOf = (pid: number) => (pid !== 0 ? participants.find((p) => p.id === pid)?.avatar : undefined);
 
   const statusText = () => {
     if (!st) return "불러오는 중…";
@@ -232,71 +277,83 @@ export function GatorRoom({
     return `${nameOf(st.turn)} 차례${myTurn ? " — 당신!" : ""}`;
   };
 
+  const card = (i: number) => {
+    const p = participants[i] ?? null;
+    return <GatorCard key={i} p={p} st={st} bubble={p ? recentBubble(chatLog, p.id, nowMs) : undefined} />;
+  };
+
   return (
     <div className="plaza-board-backdrop" onClick={onClose}>
-      <div className="plaza-room plaza-gator" onClick={(e) => e.stopPropagation()}>
+      <div className="plaza-room" onClick={(e) => e.stopPropagation()}>
         <div className="plaza-panel-head">
           <span className="plaza-panel-title">🐊 악어이빨</span>
-          <span className="plaza-game-status">{statusText()}</span>
+          <span className="plaza-game-status">{statusText()}{st?.vsAI ? " · 🤖 AI 대결" : ""}</span>
           <button type="button" className="plaza-panel-x" onClick={onClose} aria-label="닫기"><X size={16} /></button>
         </div>
 
-        <div className="plaza-gator-body">
-          {/* 참가자 칩 */}
-          <div className="plaza-gator-players">
-            {(st?.players ?? []).map((pid) => {
-              const av = avatarOf(pid);
-              const isTurn = st?.status === "playing" && st.turn === pid;
-              const isLoser = st?.status === "done" && st.loser === pid;
-              return (
-                <div key={pid} className={`plaza-gator-chip${isTurn ? " turn" : ""}${isLoser ? " loser" : ""}`}>
-                  {av ? <AvatarThumb config={av} w={34} h={40} /> : <span className="plaza-gator-aiav">🤖</span>}
-                  <span className="plaza-pcard-name">{nameOf(pid)}{pid === myId ? "(나)" : ""}</span>
-                  {isLoser && <span className="plaza-gator-bite">💥</span>}
+        <div className="plaza-room-body">
+          <div className="plaza-room-side">{[0, 1, 2, 3].map(card)}</div>
+
+          <div className="plaza-room-center">
+            <div className="plaza-gator-canvaswrap">
+              <canvas ref={canvasRef} width={CW} height={CH} className="plaza-gator-canvas"
+                onPointerDown={press} style={{ cursor: myTurn ? "pointer" : "default" }} />
+              {myTurn && <div className="plaza-gator-hint">이빨 하나를 눌러요… 🤞</div>}
+              {showOver && st?.status === "done" && (
+                <div className="plaza-game-overlay">
+                  <div className="plaza-game-overlay-title">
+                    {st.loser === myId ? "💥 앗! 물렸다!" : <>💥 <b>{nameOf(st.loser)}</b> 물림!</>}
+                  </div>
+                  <div className="plaza-game-overlay-sub">
+                    {st.loser === myId ? "다음엔 운이 따르길…" : "나머지는 모두 생존 😎"}
+                  </div>
                 </div>
-              );
-            })}
-            {(st?.players?.length ?? 0) === 0 && <span className="plaza-gator-empty">아직 참가자가 없어요</span>}
-          </div>
+              )}
+            </div>
 
-          {/* 악어 */}
-          <div className="plaza-gator-canvaswrap">
-            <canvas ref={canvasRef} width={CW} height={CH} className="plaza-gator-canvas"
-              onPointerDown={press} style={{ cursor: myTurn ? "pointer" : "default" }} />
-            {myTurn && <div className="plaza-gator-hint">이빨 하나를 눌러요… 🤞</div>}
-          </div>
-
-          {/* 컨트롤 */}
-          <div className="plaza-omok-controls">
-            {!seated && st?.status !== "playing" && (
-              <button type="button" className="plaza-game-start"
-                disabled={(st?.players?.length ?? 0) >= 6} onClick={() => send({ t: "gator_join" })}>
-                <LogIn size={14} /> 참가
-              </button>
-            )}
-            {seated && st?.status === "waiting" && (
-              <>
+            <div className="plaza-gator-controls">
+              {!seated && st?.status !== "playing" && (
                 <button type="button" className="plaza-game-start"
-                  disabled={(st?.players?.length ?? 0) < 2} onClick={() => send({ t: "gator_start", vsAI: false })}>
-                  게임 시작
+                  disabled={(st?.players?.length ?? 0) >= 6} onClick={() => send({ t: "gator_join" })}>
+                  <LogIn size={14} /> 참가
                 </button>
-                <button type="button" className="plaza-diff-btn" onClick={() => send({ t: "gator_start", vsAI: true })}>
-                  <Bot size={13} /> AI와 시작
+              )}
+              {seated && st?.status === "waiting" && (
+                <>
+                  <button type="button" className="plaza-game-start"
+                    disabled={(st?.players?.length ?? 0) < 2} onClick={() => send({ t: "gator_start", vsAI: false })}>
+                    게임 시작
+                  </button>
+                  <button type="button" className="plaza-diff-btn" onClick={() => send({ t: "gator_start", vsAI: true })}>
+                    <Bot size={13} /> AI와 시작
+                  </button>
+                </>
+              )}
+              {seated && st?.status === "done" && (
+                <button type="button" className="plaza-game-start" onClick={() => send({ t: "gator_reset" })}>
+                  <RotateCcw size={14} /> 한 판 더
                 </button>
-              </>
-            )}
-            {seated && st?.status === "done" && (
-              <button type="button" className="plaza-game-start" onClick={() => send({ t: "gator_reset" })}>
-                <RotateCcw size={14} /> 한 판 더
-              </button>
-            )}
-            {seated && (
-              <button type="button" className="plaza-omok-leave" onClick={() => send({ t: "gator_leave" })}>
-                <LogOut size={14} /> 나가기
-              </button>
-            )}
-            {!seated && st?.status === "playing" && <span className="plaza-omok-spec">👀 관전 중</span>}
+              )}
+              {seated && (
+                <button type="button" className="plaza-omok-leave" onClick={() => send({ t: "gator_leave" })}>
+                  <LogOut size={14} /> 나가기
+                </button>
+              )}
+              {!seated && st?.status === "playing" && <span className="plaza-omok-spec">👀 관전 중 — 채팅으로 응원!</span>}
+            </div>
+
+            <div className="plaza-room-chat">
+              <div className="plaza-room-chatlog" ref={chatLogRef}>
+                {chatLog.length === 0
+                  ? <div className="plaza-room-chathint">아래 채팅창으로 함께 응원하세요</div>
+                  : chatLog.map((l, i) => (
+                    <div key={i} className="plaza-room-chatline"><b>{l.name}</b> {l.text}</div>
+                  ))}
+              </div>
+            </div>
           </div>
+
+          <div className="plaza-room-side">{[4, 5, 6, 7].map(card)}</div>
         </div>
       </div>
     </div>
