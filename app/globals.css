@@ -5121,6 +5121,32 @@ select {
 }
 .plaza-omok-leave:hover { background: rgba(224,49,49,0.28); }
 
+/* 광장 악어이빨 */
+.plaza-gator { width: min(520px, 96%); }
+.plaza-gator-body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 14px; }
+.plaza-gator-players { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.plaza-gator-chip {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 8px; border-radius: 10px; min-width: 58px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+}
+.plaza-gator-chip.turn { border-color: #ffd75e; background: rgba(255,200,40,0.14); }
+.plaza-gator-chip.loser { border-color: #ff6b6b; background: rgba(224,49,49,0.16); }
+.plaza-gator-aiav { font-size: 28px; line-height: 40px; }
+.plaza-gator-bite { position: absolute; top: -8px; right: -6px; font-size: 18px; }
+.plaza-gator-empty { color: #8d99a8; font-size: 0.84rem; padding: 8px 0; }
+.plaza-gator-canvaswrap { position: relative; width: 100%; max-width: 420px; }
+.plaza-gator-canvas {
+  display: block; width: 100%; height: auto; aspect-ratio: 420 / 300;
+  border-radius: 12px; background: #1d2a1f; box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  touch-action: none;
+}
+.plaza-gator-hint {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  background: rgba(20,30,20,0.78); color: #ffe066; font-weight: 700; font-size: 0.82rem;
+  padding: 4px 12px; border-radius: 10px; white-space: nowrap;
+}
+
 /* 광장 상점 — 미리보기 레이아웃 */
 .plaza-shop-body { display: flex; gap: 12px; padding: 12px 14px; min-height: 0; }
 .plaza-shop-preview {

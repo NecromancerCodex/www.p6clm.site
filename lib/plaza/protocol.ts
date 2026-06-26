@@ -28,6 +28,7 @@ export type ServerMsg =
   | { t: "wheel_spin"; order: number[]; targetId: number; turns: number; dur: number }
   | { t: "omok_state"; board: number[][]; turn: number; status: "waiting" | "playing" | "done"; black: number | null; white: number | null; winner: number | null; vsAI: boolean; forbidden: number[][] }
   | { t: "omok_forbidden"; reason: string }
+  | { t: "gator_state"; teeth: number[]; turn: number | null; status: "waiting" | "playing" | "done"; players: number[]; loser: number | null; vsAI: boolean; count: number; trap: number }
   | { t: "gold"; currency: number; reason: string }
   | { t: "leave"; id: number }
   | { t: "pong" };
@@ -51,6 +52,12 @@ export type ClientMsg =
   | { t: "omok_reset" }
   | { t: "omok_leave" }
   | { t: "omok_sync" }
+  | { t: "gator_join" }
+  | { t: "gator_start"; vsAI: boolean }
+  | { t: "gator_press"; tooth: number }
+  | { t: "gator_reset" }
+  | { t: "gator_leave" }
+  | { t: "gator_sync" }
   | { t: "ping" };
 
 /** 그림판 폴리라인 스트로크 */

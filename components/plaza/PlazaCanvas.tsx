@@ -31,6 +31,7 @@ import { CharacterCreator } from "./CharacterCreator";
 import { PaintBoard } from "./PaintBoard";
 import { WheelRoom } from "./WheelRoom";
 import { OmokRoom } from "./OmokRoom";
+import { GatorRoom } from "./GatorRoom";
 
 // ── 월드 / 물리 상수 ──────────────────────────────────────────────────────────
 // 월드 = 배경 이미지(town.png) 원본 크기 1384×768 와 1:1.
@@ -143,7 +144,7 @@ export function PlazaCanvas() {
   const [status, setStatus] = useState<"connecting" | "open" | "closed">("connecting");
   const [count, setCount] = useState(1);
   const [chatValue, setChatValue] = useState("");
-  const [panel, setPanel] = useState<null | "shop" | "creator" | "paint" | "wheel" | "omok">(null);
+  const [panel, setPanel] = useState<null | "shop" | "creator" | "paint" | "wheel" | "omok" | "gator">(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [chatLog, setChatLog] = useState<ChatLine[]>([]);
   const [game, setGame] = useState<GameView | null>(null);
@@ -265,8 +266,9 @@ export function PlazaCanvas() {
         case "board_clear":
         case "wheel_spin":
         case "omok_state":
-        case "omok_forbidden": {
-          boardHandlerRef.current?.(msg); // 열려있는 룸(그림퀴즈/돌림판/오목)으로 전달
+        case "omok_forbidden":
+        case "gator_state": {
+          boardHandlerRef.current?.(msg); // 열려있는 룸(그림퀴즈/돌림판/오목/악어이빨)으로 전달
           break;
         }
         case "game_state": {
@@ -567,6 +569,7 @@ export function PlazaCanvas() {
           <button type="button" className={`plaza-tool${panel === "paint" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "paint" ? null : "paint"))}>🎯 그림퀴즈</button>
           <button type="button" className={`plaza-tool${panel === "wheel" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "wheel" ? null : "wheel"))}>🎡 돌림판</button>
           <button type="button" className={`plaza-tool${panel === "omok" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "omok" ? null : "omok"))}>⚫ 오목</button>
+          <button type="button" className={`plaza-tool${panel === "gator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "gator" ? null : "gator"))}>🐊 악어이빨</button>
         </div>
       </div>
 
@@ -601,6 +604,14 @@ export function PlazaCanvas() {
         )}
         {panel === "omok" && (
           <OmokRoom
+            send={wsSend}
+            register={(h) => { boardHandlerRef.current = h; }}
+            onClose={() => setPanel(null)}
+            participants={participants}
+          />
+        )}
+        {panel === "gator" && (
+          <GatorRoom
             send={wsSend}
             register={(h) => { boardHandlerRef.current = h; }}
             onClose={() => setPanel(null)}
