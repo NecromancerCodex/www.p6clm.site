@@ -235,6 +235,8 @@ export interface CodeIndex {
   byPhase: Map<string, DateRange>; // 단계 키: ST|zone|storey|wt|phase (단계별 — 콘크리트 등)
   byZoneCat: Map<string, DateRange>; // 구역+카테고리: zone|storey|CORE|MOD|FOOT (trade/wt 코드 불일치 흡수)
   byStorey: Map<string, DateRange>; // 층(canonStorey)별 골조 window — 가설(TW) 층 추종용(zone 무관)
+  moByZoneStorey: Map<string, DateRange>; // 모듈러: zone|canonStorey → 모듈 양중~토핑 window (storey 포맷 '02'='2F' 흡수)
+  moByStorey: Map<string, DateRange>; // 모듈러: canonStorey → 모듈 window (zone 무관 폴백)
   earthworkWindow: DateRange | null; // 토공(흙막이/굴착/차수) 공통활동 기간 — 토목(CV) 매칭용
   finishWindow: DateRange | null; // 마감(창호·문·마감재) 활동 기간 — 마감 부재(골조 후) 매칭용
   mepWindow: DateRange | null; // 설비(배관·덕트·전기·소방·통신) 활동 기간 — MEP 부재 매칭용
@@ -329,6 +331,8 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   const byPhase = new Map<string, DateRange>();
   const byZoneCat = new Map<string, DateRange>();
   const byStorey = new Map<string, DateRange>();
+  const moByZoneStorey = new Map<string, DateRange>();
+  const moByStorey = new Map<string, DateRange>();
   let ewStart = Infinity;
   let ewEnd = -Infinity;
   let fwStart = Infinity;
@@ -382,6 +386,13 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
       mergeRange(byKey, codeKey("MO", d.zone, d.storey, "MD"), s, e);
       if (d.unit) mergeRange(byUnit, unitKey(d.zone, d.storey, d.unit), s, e);
       mergeRange(byZoneCat, zoneCatKey(d.zone, d.storey, "MOD"), s, e);
+      // 모듈러 정밀 타이밍 — canonStorey 정규화('02'='2F'='2')로 storey 포맷 혼재 흡수.
+      //   부재(BIM zone/storey)가 자기 층 모듈 양중~토핑 윈도에 매칭되도록 zone별/zone무관 2단 인덱스.
+      const cs = canonStorey(d.storey);
+      if (cs) {
+        mergeRange(moByZoneStorey, `${d.zone}|${cs}`, s, e);
+        mergeRange(moByStorey, cs, s, e);
+      }
     } else {
       const wt = d.worktype ?? "";
       mergeRange(byKey, codeKey("ST", d.zone, d.storey, wt), s, e);
@@ -395,6 +406,8 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     byPhase,
     byZoneCat,
     byStorey,
+    moByZoneStorey,
+    moByStorey,
     earthworkWindow: ewStart === Infinity ? null : { start: ewStart, end: ewEnd },
     finishWindow: fwStart === Infinity ? null : { start: fwStart, end: fwEnd },
     mepWindow: mwStart === Infinity ? null : { start: mwStart, end: mwEnd },
@@ -555,6 +568,30 @@ export function matchAllHybrid(
   const byVia: Record<string, number> = {};
   let matched = 0;
   for (const el of elements) {
+    // ★ 모듈러(MO) 부재 — disc(건축/MEP) 단축경로보다 먼저. PC모듈러는 마감·설비가 공장 완제품이라
+    //   현장에선 '그 층 모듈이 설치되는 시점'(양중~토핑)에 함께 등장한다. disc 단축경로의 글로벌
+    //   finishWindow 를 쓰면 천장이 마감기간(전체) 내내 진행중으로 잘못 표시됨.
+    //   canonStorey 로 storey 포맷('02'/'2F') 흡수, zone 일치 우선 → zone 무관 폴백.
+    if (el.trade === "MO" && el.storey4d) {
+      const cs = canonStorey(el.storey4d);
+      let rmo: DateRange | undefined;
+      let mvia = "";
+      if (cs && el.zone) {
+        rmo = codeIdx.moByZoneStorey.get(`${el.zone}|${cs}`);
+        if (rmo) mvia = `mo:${el.zone}|${cs}`;
+      }
+      if (!rmo && cs) {
+        rmo = codeIdx.moByStorey.get(cs);
+        if (rmo) mvia = `mo_storey:${cs}`;
+      }
+      if (rmo) {
+        ranges.set(el.globalId, { range: rmo, via: mvia });
+        matched++;
+        byVia["모듈러"] = (byVia["모듈러"] ?? 0) + 1;
+        continue;
+      }
+      // 모듈 윈도 못 잡으면 아래 disc/코드 폴백으로 진행(미매칭 방지)
+    }
     // ★ 슬롯이 정한 공종(disc)이 진실 — 타입보다 우선. 건축 슬롯 마감 벽/바닥(IfcSlab/Wall)·조명까지
     //   전부 그 공종 window 로. (타입 기반은 disc 없는 종합 파일용으로 아래에서 처리)
     if (el.disc === "건축" || el.disc === "MEP" || el.disc === "조경") {
