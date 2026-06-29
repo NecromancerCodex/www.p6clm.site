@@ -252,6 +252,7 @@ export default function SchedulePlanWizard() {
   const [towerCranes] = useState(2);   // 자원계획 미입력 시 폴백(inline 입력 제거됨)
   const [workCrews] = useState(3);     // 자원계획 미입력 시 폴백
   const [civilEquip, setCivilEquip] = useState(5); // 토목 굴착 장비 세트(백호·CIP) — 토목 기간 산정
+  const [excavEquip, setExcavEquip] = useState(""); // 굴착 백호 규격(온톨로지 Equipment) — 조당 생산성. ""=default(1.0㎥)
   const [discCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 폴백(자원계획 작업조 우선)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
   const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
@@ -564,7 +565,8 @@ export default function SchedulePlanWizard() {
         work_days_per_week: projWdpw,
         tower_cranes: discEquip["구조"]?.["크레인"] ?? discEquip["종합"]?.["크레인"] ?? towerCranes,
         work_crews: discEquip["구조"]?.["작업조"] ?? discEquip["종합"]?.["작업조"] ?? workCrews,
-        civil_equipment: discEquip["토목"]?.["굴삭기(백호)"] || civilEquip,   // 토목 굴착 driver
+        civil_equipment: discEquip["토목"]?.["굴삭기(백호)"] || civilEquip,   // 토목 굴착 driver(세트 수)
+        excav_equipment: excavEquip || undefined,   // 굴착 백호 규격 → 온톨로지 조당 생산성
         civil_quantities: civilQty ?? undefined,
         discipline_crews: { ...discCrews, ...Object.fromEntries(["건축", "MEP", "조경"].map((k) => [k, discEquip[k]?.["작업조"] ?? discCrews[k] ?? 3])) },
         gross_floor_area: gfa ? Number(gfa) : undefined,
@@ -894,6 +896,23 @@ export default function SchedulePlanWizard() {
                                       </label>
                                     ))}
                                   </div>
+                                  {d.key === "토목" && (
+                                    <label style={{ fontSize: 11, color: "#78716c", display: "flex", alignItems: "center", gap: 4, marginTop: 5 }}>
+                                      ⛏️ 굴착 백호 규격
+                                      <select className="wz-in" style={{ width: 158, padding: "2px 4px", fontSize: 11 }}
+                                              value={excavEquip} onChange={(e) => setExcavEquip(e.target.value)}
+                                              title="굴착 조당 생산성을 장비 규격으로 결정(온톨로지 Equipment). 소형(0.4㎥)일수록 느리고, 대형(2.3㎥)일수록 빠름. 미선택=중형 1.0㎥.">
+                                        <option value="">자동(중형 1.0㎥)</option>
+                                        <option value="백호 0.4㎥(04W)">백호 0.4㎥(04W) — 소형 ~250㎥/일</option>
+                                        <option value="백호 0.6㎥(06W)">백호 0.6㎥(06W) — ~350㎥/일</option>
+                                        <option value="백호 0.8㎥(08W)">백호 0.8㎥(08W) — ~480㎥/일</option>
+                                        <option value="백호 1.0㎥">백호 1.0㎥ — 중형 ~600㎥/일</option>
+                                        <option value="백호 1.4㎥">백호 1.4㎥ — ~750㎥/일</option>
+                                        <option value="백호 2.3㎥">백호 2.3㎥ — 대형 ~900㎥/일</option>
+                                      </select>
+                                      <span style={{ color: "#a16207" }}>토사 기준 · 암반은 지층 보정 자동</span>
+                                    </label>
+                                  )}
                                   {(() => {
                                     const labor = laborOf(discEquip[d.key]!, d.key);
                                     const jobs = Object.keys(labor);

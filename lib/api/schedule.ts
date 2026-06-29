@@ -404,6 +404,7 @@ export interface GenerateScheduleRequest {
   tower_cranes: number;        // 타워크레인 수 — 동시 양중 한계(스태거)
   work_crews: number;          // 작업조 수 — 동시 동일공종 한계
   civil_equipment?: number;    // 토목 투입조(굴착기·CIP장비 대수) — 토목 기간 = 물량 ÷ (생산성 × 투입조)
+  excav_equipment?: string;    // 굴착 백호 규격(온톨로지 Equipment 명) — 조당 생산성 결정. 미지정=default(1.0㎥)
   discipline_crews?: Record<string, number>; // 공종별 작업조 {건축, MEP, 조경} — 슬롯 밑 입력, 해당 공종 기간 단축
   gross_floor_area?: number;   // 연면적(㎡) — 건축/MEP 물량 기반 기간(마감·설비는 연면적 비례). 없으면 부재수
   civil_quantities?: { depth_m?: number; footprint_m2?: number; perimeter_m?: number; pile_count?: number }; // 토목 물량(서버 도출)
