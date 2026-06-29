@@ -8,6 +8,8 @@
  * 원본 File 만 저장(파싱 결과는 미저장) → '이어서 열기' 시 재파싱.
  */
 
+import type { SerializedParsed } from "./ifc";
+
 const DB_NAME = "clm-fourd";
 const STORE = "files";
 const KEY = "last"; // 단일 슬롯 — 가장 최근 분석한 파일 한 쌍
@@ -108,6 +110,50 @@ export async function loadPlanIfcs(planId: string): Promise<PlanIfc[]> {
     return (rec?.ifcs ?? []).filter((x) => x.file instanceof File && x.discipline);
   } catch {
     return [];
+  }
+}
+
+// ── 파싱 결과 캐시 (재방문 시 341MB 재파싱 스킵 → 즉시 4D) ──────────────────
+// parsed 는 SerializedParsed(three→raw), ready 는 parsed 제외한 Ready(ranges Map 등은
+// structured-clone 지원이라 그대로 저장). plan 별 키.
+export interface ParsedCache {
+  parsed: SerializedParsed;
+  ready: Record<string, unknown>;
+  savedAt: number;
+}
+
+/** 분석 결과를 plan 별로 캐싱 — 다음 방문 시 파싱 없이 즉시 복원. */
+export async function saveParsedCache(planId: string, parsed: SerializedParsed, ready: Record<string, unknown>): Promise<void> {
+  if (!available() || !planId) return;
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put({ parsed, ready, savedAt: Date.now() } satisfies ParsedCache, `parsed:${planId}`);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {
+    /* 캐시 실패 무시 — 다음 방문 시 재파싱 폴백 */
+  }
+}
+
+/** plan 의 캐싱된 분석 결과 로드. 없거나 손상 시 null(→ 재파싱). */
+export async function loadParsedCache(planId: string): Promise<ParsedCache | null> {
+  if (!available() || !planId) return null;
+  try {
+    const db = await openDb();
+    const rec = await new Promise<ParsedCache | undefined>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const r = tx.objectStore(STORE).get(`parsed:${planId}`);
+      r.onsuccess = () => resolve(r.result as ParsedCache | undefined);
+      r.onerror = () => reject(r.error);
+    });
+    db.close();
+    return rec && rec.parsed ? rec : null;
+  } catch {
+    return null;
   }
 }
 

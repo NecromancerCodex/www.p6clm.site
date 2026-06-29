@@ -38,7 +38,7 @@ import {
   type ScheduleTask,
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
-import { saveFourdFiles, loadFourdFiles, clearFourdFiles, loadPlanIfcs, savePlanIfcs, type CachedFourd } from "../../../lib/fourd/fileCache";
+import { saveFourdFiles, loadFourdFiles, clearFourdFiles, loadPlanIfcs, savePlanIfcs, saveParsedCache, loadParsedCache, type CachedFourd } from "../../../lib/fourd/fileCache";
 import { DEFAULT_HIDDEN_TRADES } from "../../../lib/fourd/layers";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
 import { deriveWorkPackages, deriveActivityUnits, type DerivedPackage, type ActivityUnit } from "../../../lib/fourd/workpackage";
@@ -279,7 +279,7 @@ export default function FourDPage() {
       // C-2: 무거운 숨김 레이어(가설 TW·MEP)는 기하 미로드 → 브라우저 메모리 절약(토목 ~80%↓).
       //      사용자가 '로드'한 레이어(loadExtraRef)는 스킵 대상에서 제외.
       const skipTrades = new Set([...DEFAULT_HIDDEN_TRADES].filter((t) => !loadExtraRef.current.has(t)));
-      const { parseIfc, mergeParsed } = await import("../../../lib/fourd/ifc");
+      const { parseIfc, mergeParsed, serializeParsed } = await import("../../../lib/fourd/ifc");
       // 멀티 디시플린 통합 — 각 IFC(토목·구조…) 파싱 후 한 씬으로 병합(좌표계 동일 가정).
       const parsedList: ParsedIfc[] = [];
       for (let fi = 0; fi < infs.length; fi++) {
@@ -371,7 +371,7 @@ export default function FourDPage() {
         .map(([k, v]) => `${k}:${v}`)
         .join("  ");
 
-      setReady({
+      const readyObj: Ready = {
         parsed,
         ranges,
         minDate,
@@ -387,11 +387,18 @@ export default function FourDPage() {
         sessionId:
           typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `run-${tasks.length}`,
         diag: { procCount, topVia },
-      });
+      };
+      setReady(readyObj);
       // 분석 성공 → 원본 파일을 IndexedDB에 기억(다음 방문 시 재업로드 불필요).
       void saveFourdFiles(sf, infs);
-      // plan 이 있고 아직 영속화 안 됐으면 IFC 원본을 S3 에 저장(plan 연결) → 다른 기기/재방문 재업로드 제거.
       const pid = new URLSearchParams(window.location.search).get("plan");
+      // 파싱 결과 캐싱 — 다음 방문 시 341MB 재파싱 스킵(즉시 4D). parsed(three)만 직렬화, 나머지(ranges Map 등) 그대로.
+      if (pid) {
+        const { parsed: _omit, ...rest } = readyObj;
+        void _omit;
+        void saveParsedCache(pid, serializeParsed(parsed), rest as unknown as Record<string, unknown>);
+      }
+      // plan 이 있고 아직 영속화 안 됐으면 IFC 원본을 S3 에 저장(plan 연결) → 다른 기기/재방문 재업로드 제거.
       if (pid && !ifcPersistedRef.current) {
         ifcPersistedRef.current = true;
         void (async () => {
@@ -431,6 +438,17 @@ export default function FourDPage() {
     void (async () => {
       setBusy(true); setError(null); setProgress({ p: 0.02, msg: "플랜 IFC·공정표 로드 중…" });
       try {
+        // 캐시된 분석 결과 있으면 파싱 전부 스킵 → 즉시 4D(341MB 재파싱 X)
+        const cache = await loadParsedCache(planId);
+        if (cache) {
+          setProgress({ p: 0.5, msg: "캐시에서 즉시 복원 중…" });
+          const { deserializeParsed } = await import("../../../lib/fourd/ifc");
+          setReady({ ...(cache.ready as unknown as Ready), parsed: deserializeParsed(cache.parsed) });
+          void getPlanIfcsServer(planId).then(setServerIfcs);  // 삭제 UI 메타
+          ifcPersistedRef.current = true;
+          setBusy(false); setProgress(null);
+          return;
+        }
         let planIfcs = await loadPlanIfcs(planId);
         if (planIfcs.length) {
           // IndexedDB 에 이미 있음 → 한 번 처리된 것(재업로드 방지). 삭제 UI 메타만 별도 로드.

@@ -67,6 +67,75 @@ export interface ParsedIfc {
   skippedTrades?: string[]; // 메모리 절약 위해 기하 로드 안 한 trade(가설 등) — 패널이 '로드' 제공
 }
 
+// ── 파싱 결과 캐싱 직렬화 (재방문 시 341MB 재파싱 스킵 → 즉시 4D) ──────────────
+// IndexedDB structured-clone 은 THREE 클래스 인스턴스(BufferGeometry/Vector3/Box3) 미지원
+// → raw TypedArray/plain 으로 변환. TypedArray·Map 자체는 structured-clone 지원이라 그대로 둠.
+export interface SerializedGroup {
+  pos: Float32Array;
+  norm?: Float32Array;
+  idx?: Uint32Array | Uint16Array;
+  matrices: Float32Array;
+  elementIdx: Int32Array;
+  count: number;
+}
+export interface SerializedParsed {
+  groups: SerializedGroup[];
+  elements: ParsedElement[];
+  center: { x: number; y: number; z: number };
+  radius: number;
+  bbox: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } };
+  steelQto?: SteelQto[];
+  skippedTrades?: string[];
+}
+
+export function serializeParsed(p: ParsedIfc): SerializedParsed {
+  return {
+    groups: p.groups.map((g) => {
+      const pos = g.geometry.getAttribute("position").array as Float32Array;
+      const normAttr = g.geometry.getAttribute("normal");
+      const idxAttr = g.geometry.getIndex();
+      return {
+        pos,
+        norm: normAttr ? (normAttr.array as Float32Array) : undefined,
+        idx: idxAttr ? (idxAttr.array as Uint32Array | Uint16Array) : undefined,
+        matrices: g.matrices,
+        elementIdx: g.elementIdx,
+        count: g.count,
+      };
+    }),
+    elements: p.elements,
+    center: { x: p.center.x, y: p.center.y, z: p.center.z },
+    radius: p.radius,
+    bbox: {
+      min: { x: p.bbox.min.x, y: p.bbox.min.y, z: p.bbox.min.z },
+      max: { x: p.bbox.max.x, y: p.bbox.max.y, z: p.bbox.max.z },
+    },
+    steelQto: p.steelQto,
+    skippedTrades: p.skippedTrades,
+  };
+}
+
+export function deserializeParsed(s: SerializedParsed): ParsedIfc {
+  return {
+    groups: s.groups.map((g) => {
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute("position", new THREE.BufferAttribute(g.pos, 3));
+      if (g.norm) geom.setAttribute("normal", new THREE.BufferAttribute(g.norm, 3));
+      if (g.idx) geom.setIndex(new THREE.BufferAttribute(g.idx, 1));
+      return { geometry: geom, matrices: g.matrices, elementIdx: g.elementIdx, count: g.count };
+    }),
+    elements: s.elements,
+    center: new THREE.Vector3(s.center.x, s.center.y, s.center.z),
+    radius: s.radius,
+    bbox: new THREE.Box3(
+      new THREE.Vector3(s.bbox.min.x, s.bbox.min.y, s.bbox.min.z),
+      new THREE.Vector3(s.bbox.max.x, s.bbox.max.y, s.bbox.max.z),
+    ),
+    steelQto: s.steelQto,
+    skippedTrades: s.skippedTrades,
+  };
+}
+
 let _api: IfcAPI | null = null;
 
 async function getApi(): Promise<IfcAPI> {
