@@ -550,6 +550,56 @@ export async function extractIfcWorkUnitsViaS3(file: File): Promise<IfcWorkUnits
   return (await ext.json()) as IfcWorkUnitsResult;
 }
 
+// ── 4D IFC 영속화 (재업로드 제거 + 삭제) — plan 에 S3 키 연결 ──────────────
+export interface PlanIfcMeta {
+  object_key: string;
+  filename: string;
+  size_mb: number;
+  discipline: string;
+  download_url?: string | null;   // GET 시에만 — presigned 다운로드 URL
+}
+
+/** presign → S3 직접 업로드만 (work_units 추출 없이). 4D 3D 렌더용 원본 영속화. object_key 반환. */
+export async function uploadIfcToS3(file: File): Promise<string> {
+  const pres = await fetch(`${API_BASE}/schedule/ifc/presign`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, content_type: file.type || "application/octet-stream" }),
+  });
+  if (!pres.ok) throw new Error(`presign 실패 (${pres.status})`);
+  const { upload_url, object_key, headers } = (await pres.json()) as {
+    object_key: string; upload_url: string; headers: Record<string, string>;
+  };
+  const put = await fetch(upload_url, { method: "PUT", body: file, headers });
+  if (!put.ok) throw new Error(`S3 업로드 실패 (${put.status})`);
+  return object_key;
+}
+
+/** plan 에 IFC S3 키 연결 영속화 (전체 교체 — 멀티 IFC 일괄). */
+export async function savePlanIfcsServer(planId: string, files: PlanIfcMeta[]): Promise<void> {
+  const res = await fetch(`${API_BASE}/schedule/plan/${planId}/ifc`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files }),
+  });
+  if (!res.ok) throw new Error(`IFC 저장 실패 (${res.status})`);
+}
+
+/** plan 연결 IFC 목록 + presigned 다운로드 URL. 재방문 시 S3 에서 원본 복원. */
+export async function getPlanIfcsServer(planId: string): Promise<PlanIfcMeta[]> {
+  const res = await fetch(`${API_BASE}/schedule/plan/${planId}/ifc`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.ifc_files || []) as PlanIfcMeta[];
+}
+
+/** plan 연결 IFC 1건 삭제 (S3 고아 객체 정리 포함). */
+export async function deletePlanIfcServer(planId: string, objectKey: string): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/schedule/plan/${planId}/ifc?object_key=${encodeURIComponent(objectKey)}`,
+    { method: "DELETE" },
+  );
+  if (!res.ok) throw new Error(`IFC 삭제 실패 (${res.status})`);
+}
+
 // ═══ PM 4단계 단계별 계획 (휴먼인더루프) — /schedule/plan/* ═══════════════════
 
 export type PlanStage =

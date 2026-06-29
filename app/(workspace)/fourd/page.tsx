@@ -16,7 +16,8 @@ import { loadBoreholes } from "../../../lib/api/earthwork";
 import type { Borehole } from "../../../lib/earthwork/model";
 import { DashboardSchedule } from "../../../components/fourd/DashboardSchedule";
 import { ScheduleFormView } from "../../../components/documents/DocumentFormViews";
-import { analyzeSchedule, uploadSchedule, planP6XmlUrl, type ScheduleReportDoc } from "../../../lib/api/schedule";
+import { analyzeSchedule, uploadSchedule, planP6XmlUrl, type ScheduleReportDoc,
+         uploadIfcToS3, savePlanIfcsServer, getPlanIfcsServer, deletePlanIfcServer, type PlanIfcMeta } from "../../../lib/api/schedule";
 import { getUnitProgress, saveUnitProgress, type UnitStatus } from "../../../lib/api/fourdProgress";
 import {
   buildCandidates,
@@ -37,7 +38,7 @@ import {
   type ScheduleTask,
 } from "../../../lib/fourd/match";
 import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
-import { saveFourdFiles, loadFourdFiles, clearFourdFiles, loadPlanIfcs, type CachedFourd } from "../../../lib/fourd/fileCache";
+import { saveFourdFiles, loadFourdFiles, clearFourdFiles, loadPlanIfcs, savePlanIfcs, type CachedFourd } from "../../../lib/fourd/fileCache";
 import { DEFAULT_HIDDEN_TRADES } from "../../../lib/fourd/layers";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
 import { deriveWorkPackages, deriveActivityUnits, type DerivedPackage, type ActivityUnit } from "../../../lib/fourd/workpackage";
@@ -216,6 +217,9 @@ export default function FourDPage() {
     void loadFourdFiles().then(setCached);
   }, []);
   const planLoadedRef = useRef(false);
+  // 플랜 연결 IFC(S3) — 삭제 UI 용 메타(object_key 포함)
+  const [serverIfcs, setServerIfcs] = useState<PlanIfcMeta[]>([]);
+  const ifcPersistedRef = useRef(false);   // 서버 복원/저장 완료 시 true → 재업로드 방지
 
   // C-2: 무거운 숨김 레이어(가설 등) 기하는 기본 미로드(브라우저 메모리 절약). 사용자가 '로드'하면 추가.
   const loadExtraRef = useRef<Set<string>>(new Set());
@@ -386,6 +390,24 @@ export default function FourDPage() {
       });
       // 분석 성공 → 원본 파일을 IndexedDB에 기억(다음 방문 시 재업로드 불필요).
       void saveFourdFiles(sf, infs);
+      // plan 이 있고 아직 영속화 안 됐으면 IFC 원본을 S3 에 저장(plan 연결) → 다른 기기/재방문 재업로드 제거.
+      const pid = new URLSearchParams(window.location.search).get("plan");
+      if (pid && !ifcPersistedRef.current) {
+        ifcPersistedRef.current = true;
+        void (async () => {
+          try {
+            const metas: PlanIfcMeta[] = [];
+            for (const f of infs) {
+              const key = await uploadIfcToS3(f);
+              metas.push({ object_key: key, filename: f.name,
+                           size_mb: Math.round((f.size / 1024 / 1024) * 10) / 10,
+                           discipline: ifcDiscRef.current[f.name] || "" });
+            }
+            await savePlanIfcsServer(pid, metas);
+            setServerIfcs(metas);
+          } catch { /* 영속화 실패는 무시 — IndexedDB 캐시는 있음 */ }
+        })();
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -409,9 +431,32 @@ export default function FourDPage() {
     void (async () => {
       setBusy(true); setError(null); setProgress({ p: 0.02, msg: "플랜 IFC·공정표 로드 중…" });
       try {
-        const planIfcs = await loadPlanIfcs(planId);
+        let planIfcs = await loadPlanIfcs(planId);
+        if (planIfcs.length) {
+          // IndexedDB 에 이미 있음 → 한 번 처리된 것(재업로드 방지). 삭제 UI 메타만 별도 로드.
+          ifcPersistedRef.current = true;
+          void getPlanIfcsServer(planId).then(setServerIfcs);
+        } else {
+          // 다른 브라우저/기기 → 서버 S3 에서 원본 복원(재업로드 불필요)
+          setProgress({ p: 0.05, msg: "서버에서 IFC 복원 중…" });
+          const server = await getPlanIfcsServer(planId);
+          setServerIfcs(server);
+          const dl: { file: File; discipline: string }[] = [];
+          for (const m of server) {
+            if (!m.download_url) continue;
+            const r = await fetch(m.download_url);
+            if (!r.ok) continue;
+            const blob = await r.blob();
+            dl.push({ file: new File([blob], m.filename || m.object_key, { type: "application/octet-stream" }), discipline: m.discipline || "" });
+          }
+          if (dl.length) {
+            planIfcs = dl;
+            ifcPersistedRef.current = true;     // 서버에서 받은 것 → 재업로드 금지
+            void savePlanIfcs(planId, dl);      // IndexedDB 재캐시(다음엔 빠르게)
+          }
+        }
         if (!planIfcs.length) {
-          setError("이 플랜의 IFC 캐시가 없습니다 — 공정표를 생성한 브라우저에서 '4D로 보기'를 눌렀는지 확인하세요. (또는 아래에서 직접 드롭)");
+          setError("이 플랜에 연결된 IFC 가 없습니다 — 아래에서 직접 드롭해 분석하면 이후 자동 저장됩니다.");
           setBusy(false); setProgress(null); return;
         }
         const res = await fetch(planP6XmlUrl(planId), { credentials: "include" });
@@ -883,6 +928,27 @@ export default function FourDPage() {
                         return [...prev, ...fs.filter((f) => !names.has(f.name))]; // 중복 파일명 제외하고 누적
                       })} />
           </div>
+          {serverIfcs.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12, alignItems: "center" }}>
+              <span style={{ color: "#0369a1", fontWeight: 600 }}>☁ 플랜 저장 IFC:</span>
+              {serverIfcs.map((m) => (
+                <span key={m.object_key} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "2px 8px", color: "#1d4ed8" }}>
+                  {m.filename}{m.discipline ? ` · ${m.discipline}` : ""}
+                  <button
+                    onClick={async () => {
+                      const pid = new URLSearchParams(window.location.search).get("plan");
+                      if (!pid) return;
+                      if (!confirm(`${m.filename} 연결을 삭제할까요? (S3 원본도 함께 삭제)`)) return;
+                      try {
+                        await deletePlanIfcServer(pid, m.object_key);
+                        setServerIfcs((p) => p.filter((x) => x.object_key !== m.object_key));
+                      } catch (e) { alert("삭제 실패: " + (e instanceof Error ? e.message : String(e))); }
+                    }}
+                    style={{ marginLeft: 6, border: "none", background: "none", color: "#dc2626", cursor: "pointer", fontWeight: 700 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
           {ifcFiles.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
               {ifcFiles.map((f) => (
