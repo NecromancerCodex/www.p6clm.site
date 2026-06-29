@@ -444,23 +444,23 @@ export default function FourDPage() {
           setProgress({ p: 0.5, msg: "캐시에서 즉시 복원 중…" });
           const { deserializeParsed } = await import("../../../lib/fourd/ifc");
           setReady({ ...(cache.ready as unknown as Ready), parsed: deserializeParsed(cache.parsed) });
-          void getPlanIfcsServer(planId).then(setServerIfcs);  // 삭제 UI 메타
-          ifcPersistedRef.current = true;
+          const serverList = await getPlanIfcsServer(planId);   // 삭제 UI 메타 + S3 저장 여부
+          setServerIfcs(serverList);
+          ifcPersistedRef.current = serverList.length > 0;
           setBusy(false); setProgress(null);
           return;
         }
         let planIfcs = await loadPlanIfcs(planId);
-        if (planIfcs.length) {
-          // IndexedDB 에 이미 있음 → 한 번 처리된 것(재업로드 방지). 삭제 UI 메타만 별도 로드.
-          ifcPersistedRef.current = true;
-          void getPlanIfcsServer(planId).then(setServerIfcs);
-        } else {
-          // 다른 브라우저/기기 → 서버 S3 에서 원본 복원(재업로드 불필요)
+        const serverList = await getPlanIfcsServer(planId);
+        setServerIfcs(serverList);
+        // ★ ifcPersistedRef 는 S3 저장 여부 기준(IndexedDB 아님). 마법사 경유 plan 은 IndexedDB 만
+        //   있고 S3 엔 없으므로 false → 분석 후 run 이 S3 업로드(다른 기기 복원 가능).
+        ifcPersistedRef.current = serverList.length > 0;
+        if (!planIfcs.length) {
+          // IndexedDB 없음(다른 기기) → 서버 S3 에서 원본 복원(재업로드 불필요)
           setProgress({ p: 0.05, msg: "서버에서 IFC 복원 중…" });
-          const server = await getPlanIfcsServer(planId);
-          setServerIfcs(server);
           const dl: { file: File; discipline: string }[] = [];
-          for (const m of server) {
+          for (const m of serverList) {
             if (!m.download_url) continue;
             const r = await fetch(m.download_url);
             if (!r.ok) continue;
