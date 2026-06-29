@@ -1030,6 +1030,27 @@ export default function FourDPage() {
               새로 분석
             </button>
           </div>
+          {serverIfcs.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12, alignItems: "center" }}>
+              <span style={{ color: "#0369a1", fontWeight: 600 }}>☁ 플랜 저장 IFC:</span>
+              {serverIfcs.map((m) => (
+                <span key={m.object_key} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "2px 8px", color: "#1d4ed8" }}>
+                  {m.filename}{m.discipline ? ` · ${m.discipline}` : ""}
+                  <button
+                    onClick={async () => {
+                      const pid = new URLSearchParams(window.location.search).get("plan");
+                      if (!pid) return;
+                      if (!confirm(`${m.filename} 연결을 삭제할까요? (S3 원본 + 캐시도 함께 삭제)`)) return;
+                      try {
+                        await deletePlanIfcServer(pid, m.object_key);
+                        setServerIfcs((p) => p.filter((x) => x.object_key !== m.object_key));
+                      } catch (e) { alert("삭제 실패: " + (e instanceof Error ? e.message : String(e))); }
+                    }}
+                    style={{ marginLeft: 6, border: "none", background: "none", color: "#dc2626", cursor: "pointer", fontWeight: 700 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
           {ready.codeIndex && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
               <button
