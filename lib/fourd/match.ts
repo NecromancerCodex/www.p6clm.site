@@ -36,11 +36,12 @@ export interface DecodedCode {
 
 /** 502HG... 코드 디코드. 형식 불일치 시 null. */
 export function decodeActId(code: string): DecodedCode | null {
-  // 범용 4D 포맷 (생성기 산출): 4D.{ST|MO}.{zone}.{storey}.{op}.{phase}.{seq}
+  // 범용 4D 포맷 (생성기 산출): 4D.{ST|MO}.{zone}.{storey}.{op}.{phase}.{seq}[.U{unit}]
   const clean = /^4D\.(ST|MO)\.([^.]+)\.([^.]+)\.([^.]+)\.([^.]*)/.exec(code.trim());
   if (clean) {
     const [, trade, zone, storey, op, phase] = clean;
-    return { trade: trade as Trade, zone, storey, worktype: op, mtype: op, phase: phase || "" };
+    const um = /\.U(\w+)\b/.exec(code);   // 모듈 호 접미(.U51) — 호 단위 매칭(byUnit)
+    return { trade: trade as Trade, zone, storey, worktype: op, mtype: op, phase: phase || "", unit: um ? um[1] : undefined };
   }
   const m = /^502HG(ST|MO)(.+)$/.exec(code.trim());
   if (!m) return null;
@@ -237,6 +238,7 @@ export interface CodeIndex {
   byStorey: Map<string, DateRange>; // 층(canonStorey)별 골조 window — 가설(TW) 층 추종용(zone 무관)
   moByZoneStorey: Map<string, DateRange>; // 모듈러: zone|canonStorey → 모듈 양중~토핑 window (storey 포맷 '02'='2F' 흡수)
   moByStorey: Map<string, DateRange>; // 모듈러: canonStorey → 모듈 window (zone 무관 폴백)
+  moByUnit: Map<string, DateRange>; // 모듈러: zone|canonStorey|unit → 호 단위 모듈 window (호 세분)
   earthworkWindow: DateRange | null; // 토공(흙막이/굴착/차수) 공통활동 기간 — 토목(CV) 매칭용
   finishWindow: DateRange | null; // 마감(창호·문·마감재) 활동 기간 — 마감 부재(골조 후) 매칭용
   mepWindow: DateRange | null; // 설비(배관·덕트·전기·소방·통신) 활동 기간 — MEP 부재 매칭용
@@ -336,6 +338,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   const byStorey = new Map<string, DateRange>();
   const moByZoneStorey = new Map<string, DateRange>();
   const moByStorey = new Map<string, DateRange>();
+  const moByUnit = new Map<string, DateRange>();
   let ewStart = Infinity;
   let ewEnd = -Infinity;
   let fwStart = Infinity;
@@ -395,6 +398,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
       if (cs) {
         mergeRange(moByZoneStorey, `${d.zone}|${cs}`, s, e);
         mergeRange(moByStorey, cs, s, e);
+        if (d.unit) mergeRange(moByUnit, `${d.zone}|${cs}|${d.unit}`, s, e);   // 호 단위
       }
     } else {
       const wt = d.worktype ?? "";
@@ -411,6 +415,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     byStorey,
     moByZoneStorey,
     moByStorey,
+    moByUnit,
     earthworkWindow: ewStart === Infinity ? null : { start: ewStart, end: ewEnd },
     finishWindow: fwStart === Infinity ? null : { start: fwStart, end: fwEnd },
     mepWindow: mwStart === Infinity ? null : { start: mwStart, end: mwEnd },
@@ -579,7 +584,12 @@ export function matchAllHybrid(
       const cs = canonStorey(el.storey4d);
       let rmo: DateRange | undefined;
       let mvia = "";
-      if (cs && el.zone) {
+      // 0순위 — 호(unit) 단위 정확 매칭(호별 모듈 활동 있으면). 없으면 층·구역 폴백.
+      if (cs && el.zone && el.unit) {
+        rmo = codeIdx.moByUnit.get(`${el.zone}|${cs}|${el.unit}`);
+        if (rmo) mvia = `mo_unit:${el.zone}|${cs}|${el.unit}`;
+      }
+      if (!rmo && cs && el.zone) {
         rmo = codeIdx.moByZoneStorey.get(`${el.zone}|${cs}`);
         if (rmo) mvia = `mo:${el.zone}|${cs}`;
       }
