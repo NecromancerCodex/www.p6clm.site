@@ -249,11 +249,13 @@ export default function SchedulePlanWizard() {
   const [startDate] = useState(() => new Date().toISOString().slice(0, 10)); // 폴백(공종 카드 착공일이 우선)
   const [durationMonths] = useState("");  // 폴백(공종 카드 마감일로 산출)
   const [wdpw] = useState(6);  // 폴백(공종 카드 근무가 우선)
-  const [towerCranes] = useState(2);   // 자원계획 미입력 시 폴백(inline 입력 제거됨)
-  const [workCrews] = useState(3);     // 자원계획 미입력 시 폴백
-  const [civilEquip, setCivilEquip] = useState(5); // 토목 굴착 장비 세트(백호·CIP) — 토목 기간 산정
-  const [excavEquip, setExcavEquip] = useState(""); // 굴착 백호 규격(온톨로지 Equipment) — 조당 생산성. ""=default(1.0㎥)
-  const [discCrews] = useState<Record<string, number>>({ 건축: 3, MEP: 3, 조경: 2 }); // 폴백(자원계획 작업조 우선)
+  // ── 자원(투입조·장비) 모델 ──────────────────────────────────────────────
+  //   단일 출처 = discEquip (공종별 자원계획 {장비/작업조: 수}, 자원계획 패널·내역서 자동).
+  //   값이 없을 때만 RES_FALLBACK 표준값 사용. (백엔드는 crew.work_front 단일 모델로 병렬도 산정.)
+  //   토목 굴착만 별도 2-축: excavFleet(세트 '수') × excavSize(백호 '규격' → 조당 생산성).
+  const RES_FALLBACK = { 크레인: 2, 작업조: 3, 공종작업조: { 건축: 3, MEP: 3, 조경: 2 } as Record<string, number> };
+  const [excavFleet, setExcavFleet] = useState(5);  // 토목 굴착 장비 세트 '수'(백호·덤프·CIP) — 병렬 work-front
+  const [excavSize, setExcavSize] = useState("");   // 굴착 백호 '규격'(온톨로지 Equipment) — 조당 생산성. ""=default(1.0㎥)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
   const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
   const [discBoq, setDiscBoq] = useState<Record<string, BoqResult & { loading?: boolean; confirm?: boolean }>>({});  // 공종 카드별 내역서 파싱 결과(+기간보정 컨펌)
@@ -464,7 +466,7 @@ export default function SchedulePlanWizard() {
               KEEP.has(String(w.discipline || "")) ? w : { ...w, discipline: disc })));
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
         if (r.civil_quantities) cq = r.civil_quantities;
-        if (r.suggested_equip) setCivilEquip(r.suggested_equip);  // 물량 기반 권장 장비 세트 자동 반영(대형현장 현실화)
+        if (r.suggested_equip) setExcavFleet(r.suggested_equip);  // 물량 기반 권장 장비 세트 자동 반영(대형현장 현실화)
         setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary), ai: r.ai_classified } }));
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
@@ -563,12 +565,12 @@ export default function SchedulePlanWizard() {
         start_date: projStart, duration_months: projMonths,
         // 자원 = 자원 계획(discEquip, 내역서 자동+수동)에서 도출. 없으면 기존 기본값 폴백.
         work_days_per_week: projWdpw,
-        tower_cranes: discEquip["구조"]?.["크레인"] ?? discEquip["종합"]?.["크레인"] ?? towerCranes,
-        work_crews: discEquip["구조"]?.["작업조"] ?? discEquip["종합"]?.["작업조"] ?? workCrews,
-        civil_equipment: discEquip["토목"]?.["굴삭기(백호)"] || civilEquip,   // 토목 굴착 driver(세트 수)
-        excav_equipment: excavEquip || undefined,   // 굴착 백호 규격 → 온톨로지 조당 생산성
+        tower_cranes: discEquip["구조"]?.["크레인"] ?? discEquip["종합"]?.["크레인"] ?? RES_FALLBACK.크레인,
+        work_crews: discEquip["구조"]?.["작업조"] ?? discEquip["종합"]?.["작업조"] ?? RES_FALLBACK.작업조,
+        civil_equipment: discEquip["토목"]?.["굴삭기(백호)"] || excavFleet,   // 토목 굴착 세트 '수'(병렬도)
+        excav_equipment: excavSize || undefined,   // 굴착 백호 '규격' → 온톨로지 조당 생산성
         civil_quantities: civilQty ?? undefined,
-        discipline_crews: { ...discCrews, ...Object.fromEntries(["건축", "MEP", "조경"].map((k) => [k, discEquip[k]?.["작업조"] ?? discCrews[k] ?? 3])) },
+        discipline_crews: { ...RES_FALLBACK.공종작업조, ...Object.fromEntries(["건축", "MEP", "조경"].map((k) => [k, discEquip[k]?.["작업조"] ?? RES_FALLBACK.공종작업조[k] ?? 3])) },
         gross_floor_area: gfa ? Number(gfa) : undefined,
         discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) + 자원계획 병합
           Object.keys({ ...discSet, ...discBoq, ...discEquip }).map((k) => [k, {
@@ -900,7 +902,7 @@ export default function SchedulePlanWizard() {
                                     <label style={{ fontSize: 11, color: "#78716c", display: "flex", alignItems: "center", gap: 4, marginTop: 5 }}>
                                       ⛏️ 굴착 백호 규격
                                       <select className="wz-in" style={{ width: 158, padding: "2px 4px", fontSize: 11 }}
-                                              value={excavEquip} onChange={(e) => setExcavEquip(e.target.value)}
+                                              value={excavSize} onChange={(e) => setExcavSize(e.target.value)}
                                               title="굴착 조당 생산성을 장비 규격으로 결정(온톨로지 Equipment). 소형(0.4㎥)일수록 느리고, 대형(2.3㎥)일수록 빠름. 미선택=중형 1.0㎥.">
                                         <option value="">자동(중형 1.0㎥)</option>
                                         <option value="백호 0.4㎥(04W)">백호 0.4㎥(04W) — 소형 ~250㎥/일</option>
@@ -976,7 +978,7 @@ export default function SchedulePlanWizard() {
                     )}
                     {(slots["토목"] || (civilQty && (civilQty.footprint_m2 || civilQty.depth_m))) && (
                       <div>· 🏗️ <b>토목</b> {civilQty?.footprint_m2 && civilQty?.depth_m
-                        ? <>굴착 약 <b>{Math.round(civilQty.footprint_m2 * civilQty.depth_m).toLocaleString()}㎥</b> (흙막이 {civilQty.depth_m}m) · 권장 장비 {civilEquip}세트</>
+                        ? <>굴착 약 <b>{Math.round(civilQty.footprint_m2 * civilQty.depth_m).toLocaleString()}㎥</b> (흙막이 {civilQty.depth_m}m) · 권장 장비 {excavFleet}세트</>
                         : "흙막이·굴착"} <span style={{ color: "#94a3b8" }}>(지반 시추 저장 시 굴착 물량 지질모델로 자동 정밀화)</span></div>
                     )}
                     {(slots["건축"] || slots["MEP"] || slots["조경"]) && (
@@ -1077,8 +1079,8 @@ export default function SchedulePlanWizard() {
                   🏗️ 굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
                   · 굴착체적 ≈ {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥
                   · 흙막이 {(civilQty.pile_count ?? 0).toLocaleString()}공/둘레 {civilQty.perimeter_m}m
-                  <br />→ 물량 기반 <b>권장 장비 {civilEquip}세트</b>(굴착기+덤프) 기준 ·
-                  굴착 ≈ {Math.ceil((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0) / (600 * Math.max(1, civilEquip)) / 26)}개월 추정
+                  <br />→ 물량 기반 <b>권장 장비 {excavFleet}세트</b>(굴착기+덤프) 기준 ·
+                  굴착 ≈ {Math.ceil((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0) / (600 * Math.max(1, excavFleet)) / 26)}개월 추정
                   (토목 슬롯에서 장비 세트 조정 가능 — 늘릴수록 단축)
                 </p>
               </Field>
@@ -1492,11 +1494,11 @@ export default function SchedulePlanWizard() {
                 🏗️ 토목이 길면 <b>굴착 장비 세트(백호·덤프·CIP 대수)</b>를 늘리세요 — 굴착 {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥ ÷ (표준품셈 생산성 × 장비 세트). 늘릴수록 토목 기간 단축.
               </span>
               <label style={{ display: "flex", alignItems: "center", gap: 4 }}>굴착 장비(백호) 세트
-                <input type="number" min={1} className="wz-in" style={{ width: 72 }} value={civilEquip} onChange={(e) => setCivilEquip(Number(e.target.value))} />
+                <input type="number" min={1} className="wz-in" style={{ width: 72 }} value={excavFleet} onChange={(e) => setExcavFleet(Number(e.target.value))} />
               </label>
               <button className="wz-btn" disabled={busy} onClick={() => {
                 setBusy(true);
-                void confirmPlan(planId!, { civil_equipment: civilEquip }).then(() => refresh(planId!)).finally(() => setBusy(false));
+                void confirmPlan(planId!, { civil_equipment: excavFleet }).then(() => refresh(planId!)).finally(() => setBusy(false));
               }}>토목 기간 재계산</button>
             </div>
           )}
