@@ -795,16 +795,34 @@ export default function SchedulePlanWizard() {
                                 value={discSet[d.key]?.strategy ?? ""} onChange={(e) => setDS(d.key, { strategy: e.target.value })}>
                           <option value="">기본</option><option value="bottom_up">순타·일괄</option><option value="bottom_up_phased">순타·단계</option><option value="top_down">역타</option>
                         </select></label>
-                      {isStruct && (<>
+                      {isStruct && d.key === "종합" && (<>
+                        {/* 종합 = OSC(탈현장) 카드 — 거푸집(현장)은 무의미(공장제작)라 제거. OSC 공법 + 조강(공장양생). */}
+                        <label style={pr} title="조강콘크리트 — 양생 단축(PC모듈러 공장양생)">조강
+                          <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} /></label>
+                        <label style={pr} title="OSC 공법 (탈현장 건설 — AI 자동분류, 수정 가능)">OSC공법
+                          <select className="wz-in" style={{ width: 132, padding: "2px 4px" }} value={structureType} onChange={(e) => setStructureType(e.target.value)}>
+                            <option value="">자동(AI분류)</option>
+                            <option value="모듈러-철골">모듈러(철골)</option>
+                            <option value="모듈러-PC일체">모듈러(PC·일체/PPVC)</option>
+                            <option value="모듈러-PC패널">모듈러(PC·패널조립)</option>
+                            <option value="모듈러-목조">모듈러(목조CLT)</option>
+                            <option value="하이브리드">하이브리드(모듈+코어)</option>
+                            <option value="패널라이즈드">패널라이즈드</option>
+                            <option value="PC">PC(하프슬래브/DfMA)</option>
+                            <option value="RC">재래식(RC)</option>
+                          </select></label>
+                      </>)}
+                      {isStruct && d.key !== "종합" && (<>
+                        {/* 구조 = 재래식(현장타설) 카드 — 거푸집 시스템 + 구조유형(RC/철골/SRC/혼합). OSC(PC·모듈러)는 종합 카드 전용. */}
                         <label style={pr} title="거푸집 시스템(기준층 사이클)">거푸집
                           <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={formwork} onChange={(e) => setFormwork(e.target.value)}>
                             <option value="">자동</option><option value="재래식">재래식</option><option value="유로폼">유로폼</option><option value="갱폼">갱폼</option><option value="알폼">알폼</option><option value="시스템폼">시스템폼</option>
                           </select></label>
                         <label style={pr} title="조강콘크리트 — 양생 단축">조강
                           <input type="checkbox" checked={rapidConcrete} onChange={(e) => setRapidConcrete(e.target.checked)} /></label>
-                        <label style={pr} title="구조유형">구조유형
+                        <label style={pr} title="구조유형(재래식)">구조유형
                           <select className="wz-in" style={{ width: 88, padding: "2px 4px" }} value={structureType} onChange={(e) => setStructureType(e.target.value)}>
-                            <option value="">자동</option><option value="RC">RC</option><option value="철골">철골</option><option value="SRC">SRC</option><option value="PC·모듈러">PC·모듈러</option><option value="혼합">혼합</option>
+                            <option value="">자동</option><option value="RC">RC</option><option value="철골">철골</option><option value="SRC">SRC</option><option value="혼합">혼합</option>
                           </select></label>
                       </>)}
                       {d.key === "가설" && (
@@ -933,7 +951,9 @@ export default function SchedulePlanWizard() {
                   </div>
                   <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.75 }}>
                     {(slots["구조"] || slots["종합"]) && structureType && (
-                      <div>· 🏢 <b>구조</b> {structureType} · 거푸집 {rec.formwork} · 시공전략 {rec.strategy} <span style={{ color: "#94a3b8" }}>(BIM 판정)</span></div>
+                      <div>· 🏢 <b>{slots["종합"] ? "OSC" : "구조"}</b> {structureType}
+                        {!slots["종합"] && <> · 거푸집 {rec.formwork}</>} · 시공전략 {rec.strategy}
+                        <span style={{ color: "#94a3b8" }}> (BIM 판정)</span></div>
                     )}
                     {(slots["토목"] || (civilQty && (civilQty.footprint_m2 || civilQty.depth_m))) && (
                       <div>· 🏗️ <b>토목</b> {civilQty?.footprint_m2 && civilQty?.depth_m
