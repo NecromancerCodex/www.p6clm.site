@@ -626,7 +626,11 @@ export default function SchedulePlanWizard() {
       start: String(t.start).slice(0, 10), end: bump(String(t.start).slice(0, 10), String(t.end).slice(0, 10)),
       progress: 0, is_cp: false, total_float_hr_cnt: null, status: "",
       dependencies: ((t.predecessors as string[]) ?? []).filter((p) => p !== t.code),
-    })) as GanttTask[];
+    }))
+      // 시공 순서(시간순)로 정렬 — 기초(PT)가 지하(B1)보다 먼저 착공이므로 위에. 코드 문자열 순(B1<PT)이
+      // 시간순을 역전시키던 문제 차단. 동일 시작일은 코드순.
+      .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1
+        : a.activity_code < b.activity_code ? -1 : a.activity_code > b.activity_code ? 1 : 0)) as GanttTask[];
   }, [plan]);
 
   const editAct = (i: number, patch: Partial<PlanActivity>) => {

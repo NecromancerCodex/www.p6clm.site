@@ -257,6 +257,9 @@ const _FINISH_KW = /조적|방수|미장|창호|문 설치|타일|석재|천장|
 const _MEP_KW = /슬리브|인서트|배관|덕트|배선|소방|통신|TAB|시운전/;
 // 조경 활동(landscape.py 활동명) — 조경 부재가 이 기간(준공 직전)에 매칭.
 const _LANDSCAPE_KW = /식재|교목|관목|잔디|지피|관수|활착|조경|객토/;
+// 마감/단열 자재명(부재) — 종합 파일에서 PSet Trade=ST 로 오태깅된 단열판넬·석고칸막이를 이름으로
+// 건축 판정(골조 매칭 차단). 백엔드 ifc_workunits._FINISH_NM 미러. '판넬'(PC패널=구조) 같은 양가 토큰 제외.
+const _FINISH_NM_EL = /단열|그라스울|글라스울|석고보드|석고|벽지|도배|징두리|걸레받이|몰딩|루버|미장|뿜칠|방수시트|점토벽돌|치장벽돌|데코타일|아트월|코너비드|쇠흙손|배수판|방통|레벨링|바닥마감|A_FIN|A_INS|마감재/i;
 // 건축 마감/FF&E 타입 — 골조(구조) 부재 아님. IFC 타입이 진실 → 마감 window 매칭(골조 후).
 const _FINISH_TYPES = new Set([
   "IfcWindow", "IfcDoor", "IfcCovering", "IfcRailing", "IfcFurnishingElement", "IfcFurniture",
@@ -594,13 +597,17 @@ export function matchAllHybrid(
     }
     // ★ 슬롯이 정한 공종(disc)이 진실 — 타입보다 우선. 건축 슬롯 마감 벽/바닥(IfcSlab/Wall)·조명까지
     //   전부 그 공종 window 로. (타입 기반은 disc 없는 종합 파일용으로 아래에서 처리)
-    if (el.disc === "건축" || el.disc === "MEP" || el.disc === "조경") {
+    //   + 종합 파일(disc 없음)은 마감/단열 자재명으로 건축 판정 — PSet Trade=ST 오태깅(단열판넬·석고
+    //     칸막이가 IfcWall+ST)을 무시하고 finishWindow 로. 백엔드 _FINISH_NM 미러(단열벽이 골조 매칭 차단).
+    const finishByName = !el.disc && _FINISH_NM_EL.test(el.name || "");
+    if (el.disc === "건축" || el.disc === "MEP" || el.disc === "조경" || finishByName) {
       const w = el.disc === "MEP" ? codeIdx.mepWindow : el.disc === "조경" ? codeIdx.landscapeWindow : codeIdx.finishWindow;
+      const dlabel = el.disc || "건축";
       const via = el.disc === "MEP" ? "mep" : el.disc === "조경" ? "landscape" : "finish";
-      const rd: MatchResult = w ? { range: w, via: `${via}:${el.disc}` } : { range: null, via: `${via}:no_act` };
+      const rd: MatchResult = w ? { range: w, via: `${via}:${dlabel}` } : { range: null, via: `${via}:no_act` };
       ranges.set(el.globalId, rd);
       if (rd.range) matched++;
-      const tag = rd.range ? el.disc : `${el.disc}무활동`;
+      const tag = rd.range ? dlabel : `${dlabel}무활동`;
       byVia[tag] = (byVia[tag] ?? 0) + 1;
       continue;
     }
