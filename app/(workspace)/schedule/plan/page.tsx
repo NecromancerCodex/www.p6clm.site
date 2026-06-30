@@ -1397,60 +1397,42 @@ export default function SchedulePlanWizard() {
             );
           })()}
           {(() => {
-            const conf = (plan?.payload.schedule as Record<string, unknown> | undefined)?.confidence as
-              | { grade?: string; note?: string; total_man_days?: number; peak_manpower?: number; labor_per_m2?: number;
-                  crew?: Record<string, { man_days: number; peak: number }>;
-                  equipment?: Record<string, { equip_days: number; peak: number }> } | undefined;
-            if (!conf || !conf.crew) return null;
+            // ── 공기 검증 — PM 이 알아야 할 것만: 등급+조치 · 인력/장비 · (문제일 때만) 경고 1줄. ──
+            //    내부 검증 출처(쿠팡·과거P6·CPE)·적산 원단위·방법 설명은 노이즈라 비표시.
+            const sched = plan?.payload.schedule as Record<string, unknown> | undefined;
+            const conf = sched?.confidence as
+              | { grade?: string; note?: string; crew?: Record<string, { peak: number }>; equipment?: Record<string, { peak: number }> } | undefined;
+            const prod = sched?.productivity_check as { heavy_crew?: string[] } | undefined;
+            const cpe = sched?.cpe_check as { items?: { verdict: string }[] } | undefined;
+            if (!conf?.crew) return null;
             const c = conf.grade === "적정" ? { bg: "#ecfdf5", bd: "#a7f3d0", fg: "#059669", icon: "✅" }
               : conf.grade === "과소" ? { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" }
               : conf.grade === "과다" ? { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📉" }
-              : { bg: "#f8fafc", bd: "#e2e8f0", fg: "#475569", icon: "📊" };   // 등급 미산정(가설-only 등)
-            return (
-              <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "10px 14px", fontSize: 12.5, marginBottom: 10 }}>
-                <b style={{ color: c.fg }}>{c.icon} 공기 신뢰도{conf.grade ? ` [${conf.grade}]` : " (적산)"}</b>{conf.note ? ` — ${conf.note}` : ""}
-                <div style={{ marginTop: 4, color: "#475569" }}>적산: 총 {conf.total_man_days?.toLocaleString()}인일 · 피크 {conf.peak_manpower}명 · 원단위 {conf.labor_per_m2}인일/㎡</div>
-                <div style={{ marginTop: 4 }}><b>직종별 피크 동원:</b> {Object.entries(conf.crew).map(([j, v]) => `${j} ${v.peak}명`).join(" · ")}</div>
-                {conf.equipment && Object.keys(conf.equipment).length > 0 && (
-                  <div style={{ marginTop: 2 }}><b>장비:</b> {Object.entries(conf.equipment).map(([e, v]) => `${e} ${v.peak}대`).join(" · ")}</div>
-                )}
-                <div style={{ marginTop: 3, color: "#94a3b8", fontSize: 11 }}>표준품셈 직종 크루 × BOQ 물량 ÷ 공기 — 직종별 분리(조 퉁침 X)</div>
-              </div>
+              : { bg: "#f8fafc", bd: "#e2e8f0", fg: "#475569", icon: "📊" };
+            const chip = (txt: string, tone: "labor" | "equip") => (
+              <span key={txt} style={{ display: "inline-block", padding: "1px 7px", borderRadius: 6, marginRight: 4, marginBottom: 3,
+                fontSize: 11.5, background: tone === "labor" ? "#eef2ff" : "#fff7ed", color: tone === "labor" ? "#4338ca" : "#9a3412" }}>{txt}</span>
             );
-          })()}
-          {(() => {
-            // 3겹 검증 레이어 — adequacy(과거P6) · productivity_check(쿠팡 실측) · cpe_check(CPE 표준)
-            const sched = plan?.payload.schedule as Record<string, unknown> | undefined;
-            const adq = sched?.adequacy as { summary?: string } | undefined;
-            const prod = sched?.productivity_check as { summary?: string; heavy_crew?: string[] } | undefined;
-            const cpe = sched?.cpe_check as { summary?: string; items?: { method: string; eff_rate: number; std: number; unit: string; verdict: string; ratio: number }[] } | undefined;
-            if (!adq && !prod && !cpe) return null;
+            // 표준 대비 차이가 있을 때만 경고 1줄(공법명/배수 노출 X — 행동만).
+            const fast = (cpe?.items || []).some((it) => it.verdict.includes("빠름")) || (prod?.heavy_crew?.length ?? 0) > 0;
+            const slow = (cpe?.items || []).some((it) => it.verdict.includes("느림"));
             return (
-              <div style={{ border: "1px solid #ddd6fe", background: "#faf5ff", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, marginBottom: 10 }}>
-                <b style={{ color: "#6d28d9" }}>🔬 공기 적정성 — 3겹 교차검증</b>
-                <span style={{ fontSize: 11, color: "#9333ea", marginLeft: 6 }}>생성 듀레이션을 과거P6·실측·표준 대비 대조(검증만, 생성값 불변)</span>
-                {adq?.summary && <div style={{ marginTop: 5 }}><b style={{ color: "#7c3aed" }}>① 과거 P6:</b> {adq.summary}</div>}
-                {prod?.summary && (
-                  <div style={{ marginTop: 3 }}>
-                    <b style={{ color: "#7c3aed" }}>② 쿠팡 실측:</b> {prod.summary}
-                    {prod.heavy_crew && prod.heavy_crew.length > 0 && (
-                      <span style={{ color: "#b45309", fontWeight: 600 }}> — 다투입 의심: {prod.heavy_crew.join(" · ")}</span>
-                    )}
+              <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "11px 14px", fontSize: 12.5, marginBottom: 10 }}>
+                <div><b style={{ color: c.fg, fontSize: 13.5 }}>{c.icon} 공기 검증{conf.grade ? ` · ${conf.grade}` : ""}</b>
+                  {conf.note && <span style={{ color: "#475569" }}> — {conf.note}</span>}</div>
+                <div style={{ marginTop: 7 }}>
+                  <span style={{ color: "#94a3b8", fontSize: 11, marginRight: 4 }}>인력</span>
+                  {Object.entries(conf.crew).map(([j, v]) => chip(`${j} ${v.peak}`, "labor"))}
+                  {conf.equipment && Object.keys(conf.equipment).length > 0 && (
+                    <><span style={{ color: "#94a3b8", fontSize: 11, margin: "0 4px 0 8px" }}>장비</span>
+                      {Object.entries(conf.equipment).map(([e, v]) => chip(`${e} ${v.peak}`, "equip"))}</>
+                  )}
+                </div>
+                {(fast || slow) && (
+                  <div style={{ marginTop: 6, color: "#b45309", fontSize: 11.5 }}>
+                    ⚠️ 표준 대비 {fast ? "빠른" : "느린"} 공법 있음 — 투입 장비·작업조 가정 확인 권장
                   </div>
                 )}
-                {cpe?.summary && (
-                  <div style={{ marginTop: 3 }}>
-                    <b style={{ color: "#7c3aed" }}>③ CPE 표준:</b> {cpe.summary}
-                    {cpe.items && cpe.items.length > 0 && (
-                      <div style={{ marginTop: 2, color: "#64748b", fontSize: 11 }}>
-                        {cpe.items.slice(0, 3).map((it, i) => (
-                          <span key={i}>{it.method} 역산 {it.eff_rate}{it.unit} vs 표준 {it.std} → <b style={{ color: it.verdict.includes("적정") ? "#059669" : "#b45309" }}>{it.verdict} {it.ratio}배</b>{i < Math.min(2, cpe.items!.length - 1) ? " · " : ""}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div style={{ marginTop: 4, color: "#a78bfa", fontSize: 11 }}>다투입 배수 = 우리 가정 ÷ 표준 — 높으면 work-front(조) 가정 검토 신호</div>
               </div>
             );
           })()}
