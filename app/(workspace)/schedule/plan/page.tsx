@@ -908,7 +908,7 @@ export default function SchedulePlanWizard() {
                                       <select className="wz-in" style={{ width: 158, padding: "2px 4px", fontSize: 11 }}
                                               value={excavSize} onChange={(e) => setExcavSize(e.target.value)}
                                               title="굴착 조당 생산성을 장비 규격으로 결정(온톨로지 Equipment). 소형(0.4㎥)일수록 느리고, 대형(2.3㎥)일수록 빠름. 미선택=중형 1.0㎥.">
-                                        <option value="">자동(중형 1.0㎥)</option>
+                                        <option value="">기본 1.0㎥ — 현장 규격 직접 선택 권장</option>
                                         <option value="백호 0.4㎥(04W)">백호 0.4㎥(04W) — 소형 ~250㎥/일</option>
                                         <option value="백호 0.6㎥(06W)">백호 0.6㎥(06W) — ~350㎥/일</option>
                                         <option value="백호 0.8㎥(08W)">백호 0.8㎥(08W) — ~480㎥/일</option>
@@ -1208,16 +1208,10 @@ export default function SchedulePlanWizard() {
                   <p><b>액티비티 분해</b> — {plan.payload.rationale.define}</p>
                 )}
                 {plan.payload.rationale.relation && (
-                  <p><b>선후행</b> — {plan.payload.rationale.relation}
-                    {plan.payload.stats?.relation && (
-                      <span className="wz-rat-stat"> (AI 판단 {plan.payload.stats.relation.llm ?? 0}활동 + 물리 백스톱 {plan.payload.stats.relation.backstop ?? 0}건)</span>
-                    )}</p>
+                  <p><b>선후행</b> — {plan.payload.rationale.relation}</p>
                 )}
                 {plan.payload.rationale.duration && (
-                  <p><b>기간 산정</b> — {plan.payload.rationale.duration}
-                    {plan.payload.stats?.duration && (
-                      <span className="wz-rat-stat"> ({plan.payload.stats.duration.applied ?? 0}/{plan.payload.stats.duration.total ?? 0} 활동 산정)</span>
-                    )}</p>
+                  <p><b>기간 산정</b> — {plan.payload.rationale.duration}</p>
                 )}
               </div>
             </details>
@@ -1534,7 +1528,7 @@ export default function SchedulePlanWizard() {
           {stage === "scheduled" && civilQty && (
             <div style={{ border: "1px solid #bae6fd", background: "#f0f9ff", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#0369a1", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ flex: 1 }}>
-                🏗️ 토목이 길면 <b>굴착 장비 세트(백호·덤프·CIP 대수)</b>를 늘리세요 — 굴착 {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥ ÷ (표준품셈 생산성 × 장비 세트). 늘릴수록 토목 기간 단축.
+                🏗️ 토목이 길면 <b>굴착 장비 세트(백호·덤프·CIP 대수)</b>를 늘리세요 — 굴착 {(discBoq["토목"]?.quantities?.excavation_m3 || Math.round((civilQty?.footprint_m2 ?? 0) * (civilQty?.depth_m ?? 0))).toLocaleString()}㎥ ÷ (표준품셈 생산성 × 장비 세트). 늘릴수록 토목 기간 단축.
               </span>
               <label style={{ display: "flex", alignItems: "center", gap: 4 }}>굴착 장비(백호) 세트
                 <input type="number" min={1} className="wz-in" style={{ width: 72 }} value={excavFleet} onChange={(e) => setExcavFleet(Number(e.target.value))} />
