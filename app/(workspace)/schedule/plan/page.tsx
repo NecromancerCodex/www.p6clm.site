@@ -1419,6 +1419,42 @@ export default function SchedulePlanWizard() {
             );
           })()}
           {(() => {
+            // 3겹 검증 레이어 — adequacy(과거P6) · productivity_check(쿠팡 실측) · cpe_check(CPE 표준)
+            const sched = plan?.payload.schedule as Record<string, unknown> | undefined;
+            const adq = sched?.adequacy as { summary?: string } | undefined;
+            const prod = sched?.productivity_check as { summary?: string; heavy_crew?: string[] } | undefined;
+            const cpe = sched?.cpe_check as { summary?: string; items?: { method: string; eff_rate: number; std: number; unit: string; verdict: string; ratio: number }[] } | undefined;
+            if (!adq && !prod && !cpe) return null;
+            return (
+              <div style={{ border: "1px solid #ddd6fe", background: "#faf5ff", borderRadius: 10, padding: "10px 14px", fontSize: 12.5, marginBottom: 10 }}>
+                <b style={{ color: "#6d28d9" }}>🔬 공기 적정성 — 3겹 교차검증</b>
+                <span style={{ fontSize: 11, color: "#9333ea", marginLeft: 6 }}>생성 듀레이션을 과거P6·실측·표준 대비 대조(검증만, 생성값 불변)</span>
+                {adq?.summary && <div style={{ marginTop: 5 }}><b style={{ color: "#7c3aed" }}>① 과거 P6:</b> {adq.summary}</div>}
+                {prod?.summary && (
+                  <div style={{ marginTop: 3 }}>
+                    <b style={{ color: "#7c3aed" }}>② 쿠팡 실측:</b> {prod.summary}
+                    {prod.heavy_crew && prod.heavy_crew.length > 0 && (
+                      <span style={{ color: "#b45309", fontWeight: 600 }}> — 다투입 의심: {prod.heavy_crew.join(" · ")}</span>
+                    )}
+                  </div>
+                )}
+                {cpe?.summary && (
+                  <div style={{ marginTop: 3 }}>
+                    <b style={{ color: "#7c3aed" }}>③ CPE 표준:</b> {cpe.summary}
+                    {cpe.items && cpe.items.length > 0 && (
+                      <div style={{ marginTop: 2, color: "#64748b", fontSize: 11 }}>
+                        {cpe.items.slice(0, 3).map((it, i) => (
+                          <span key={i}>{it.method} 역산 {it.eff_rate}{it.unit} vs 표준 {it.std} → <b style={{ color: it.verdict.includes("적정") ? "#059669" : "#b45309" }}>{it.verdict} {it.ratio}배</b>{i < Math.min(2, cpe.items!.length - 1) ? " · " : ""}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div style={{ marginTop: 4, color: "#a78bfa", fontSize: 11 }}>다투입 배수 = 우리 가정 ÷ 표준 — 높으면 work-front(조) 가정 검토 신호</div>
+              </div>
+            );
+          })()}
+          {(() => {
             const risks = (plan?.payload.schedule as Record<string, unknown> | undefined)?.risks as ScheduleRisk[] | undefined;
             if (!risks || !risks.length) return null;
             const col = (s: string) => s === "high" ? { fg: "#991b1b", icon: "🔴" } : s === "medium" ? { fg: "#92400e", icon: "🟡" } : { fg: "#475569", icon: "⚪" };
