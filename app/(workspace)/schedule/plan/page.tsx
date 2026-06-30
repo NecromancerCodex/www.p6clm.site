@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, planAuditLoop, type AuditFinding, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, planAuditLoop, getBasis, type BasisResult, type AuditFinding, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
   type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
@@ -312,6 +312,8 @@ export default function SchedulePlanWizard() {
   const [auditFixBusy, setAuditFixBusy] = useState(false);
   const [auditFixMsg, setAuditFixMsg] = useState<string | null>(null);
   const [auditLoopBusy, setAuditLoopBusy] = useState(false);   // 모순 자동해소 루프
+  const [basis, setBasis] = useState<BasisResult | null>(null);   // 공정계획서 산정근거
+  const [basisBusy, setBasisBusy] = useState(false);
   const [auditLoopMsg, setAuditLoopMsg] = useState<string | null>(null);
   const [boqBriefTxt, setBoqBriefTxt] = useState<string | null>(null); // AI 내역서 대조 브리핑
   const [boqBriefBusy, setBoqBriefBusy] = useState(false);
@@ -1301,6 +1303,13 @@ export default function SchedulePlanWizard() {
                 <a className="wz-btn ghost" style={{ textDecoration: "none" }} href={planXerUrl(planId)}>P6 XER 다운로드</a>
               )}
               {planId && (
+                <button className="wz-btn ghost" disabled={basisBusy}
+                  title="물량÷생산성÷투입조÷가동율 = Calendar Day 산정근거 표"
+                  onClick={() => { setBasisBusy(true); void getBasis(planId).then(setBasis).finally(() => setBasisBusy(false)); }}>
+                  {basisBusy ? "산정근거 불러오는 중…" : "📋 공정계획서(산정근거)"}
+                </button>
+              )}
+              {planId && (
                 <a className="wz-btn" style={{ textDecoration: "none" }} href={`/fourd?plan=${planId}`}
                    title="업로드한 IFC(공종 태그째) + 이 공정표로 통합 4D 시뮬레이션">🧊 4D로 보기</a>
               )}
@@ -1613,6 +1622,65 @@ export default function SchedulePlanWizard() {
         .wz-skel-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,#c7d2fe 25%,#e0e7ff 50%,#c7d2fe 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; }
         @keyframes wz-shim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
       `}</style>
+      {basis && (() => {
+        const fmt = (v: number | null) => (v == null ? "" : Number.isInteger(v) ? String(v) : String(v));
+        const exportCsv = () => {
+          const head = ["공정", "공종", "활동", "구역", "층", "단위", "물량", "생산성", "투입조", "생산량/일", "작업기간(WD)", "가동율", "CalendarDay"];
+          const lines = [head.join(",")];
+          for (const g of basis.groups) for (const r of g.rows)
+            lines.push([g.phase, r.discipline, `"${(r.name || "").replace(/"/g, "''")}"`, r.zone || "", r.storey || "",
+              r.unit || "", fmt(r.qty), fmt(r.productivity), fmt(r.crew), fmt(r.daily), r.wd, r.util, r.cd].join(","));
+          lines.push(["", "", "총계", "", "", "", "", "", "", "", "", "", basis.total_cd].join(","));
+          const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+          const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+          a.download = `공정계획서_산정근거_${basis.project_name}.csv`; a.click(); URL.revokeObjectURL(a.href);
+        };
+        return (
+          <div onClick={() => setBasis(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, maxWidth: 1280, width: "100%", maxHeight: "90vh", overflow: "auto", padding: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, position: "sticky", top: 0, background: "#fff", paddingBottom: 8, borderBottom: "1px solid #e2e8f0" }}>
+                <div><b style={{ fontSize: 15 }}>📋 공정계획서 — 산정근거</b>
+                  <span style={{ color: "#64748b", fontSize: 12.5, marginLeft: 8 }}>물량 ÷ (생산성 × 투입조) ÷ 가동율 = Calendar Day</span>
+                  <div style={{ fontSize: 12.5, color: "#0f172a", marginTop: 3 }}>적정공기 <b>{basis.total_cd.toLocaleString()}일 = {basis.total_months}개월</b>
+                    {Object.keys(basis.util).length > 0 && <span style={{ color: "#64748b", marginLeft: 10 }}>가동율: {Object.entries(basis.util).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ")}</span>}</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button className="wz-btn ghost" onClick={exportCsv}>⬇ Excel(CSV)</button>
+                  <button className="wz-btn ghost" onClick={() => setBasis(null)}>닫기</button>
+                </div>
+              </div>
+              {basis.groups.map((g) => (
+                <div key={g.phase} style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#1d4ed8", background: "#eff6ff", padding: "5px 10px", borderRadius: 6 }}>
+                    {g.phase} <span style={{ color: "#64748b", fontWeight: 400 }}>— {g.cd.toLocaleString()}일 ({g.months}개월)</span></div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5, marginTop: 4 }}>
+                    <thead><tr style={{ color: "#64748b", textAlign: "right" }}>
+                      {["공종", "활동", "단위", "물량", "생산성", "투입조", "생산량/일", "WD", "가동율", "CD"].map((h, i) => (
+                        <th key={h} style={{ padding: "3px 6px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{h}</th>))}
+                    </tr></thead>
+                    <tbody>
+                      {g.rows.map((r, i) => (
+                        <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "3px 6px", color: "#475569" }}>{r.discipline}</td>
+                          <td style={{ padding: "3px 6px" }}>{r.name}{r.inferred && <span style={{ color: "#a78bfa", marginLeft: 4 }} title="온톨로지 미수록 추정">🤖</span>}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right", color: "#94a3b8" }}>{r.unit}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right" }}>{r.qty?.toLocaleString()}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right" }}>{r.productivity ?? "—"}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right" }}>{r.crew ?? "—"}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right", color: "#64748b" }}>{r.daily?.toLocaleString()}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right" }}>{r.wd}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right", color: "#94a3b8" }}>{Math.round(r.util * 100)}%</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right", fontWeight: 600 }}>{r.cd}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

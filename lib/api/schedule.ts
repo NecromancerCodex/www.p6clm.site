@@ -722,6 +722,21 @@ export async function getResourceMap(planId: string): Promise<{ project_name: st
   return planFetch(`/${planId}/resource-map`, { method: "GET" });
 }
 
+/** 공정계획서 산정근거 — 물량÷생산성÷투입조÷가동율 = Calendar Day (현엔 산정기준 형식) */
+export interface BasisRow {
+  discipline: string; name: string; op: string | null; zone: string | null; storey: string | null;
+  unit: string | null; qty: number | null; productivity: number | null; crew: number | null;
+  daily: number | null; wd: number; util: number; cd: number; inferred: boolean;
+}
+export interface BasisGroup { phase: string; rows: BasisRow[]; cd: number; months: number; }
+export interface BasisResult {
+  project_name: string; stage: string; util: Record<string, number>;
+  groups: BasisGroup[]; total_cd: number; total_months: number;
+}
+export async function getBasis(planId: string): Promise<BasisResult> {
+  return planFetch(`/${planId}/basis`, { method: "GET" });
+}
+
 /** P6 XML 다운로드 URL */
 export function planP6XmlUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/p6xml`;
