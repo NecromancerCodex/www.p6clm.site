@@ -1406,7 +1406,7 @@ export default function SchedulePlanWizard() {
             const conf = sched?.confidence as
               | { grade?: string; note?: string; crew?: Record<string, { peak: number }>; equipment?: Record<string, { peak: number }> } | undefined;
             const prod = sched?.productivity_check as { heavy_crew?: string[] } | undefined;
-            const cpe = sched?.cpe_check as { items?: { verdict: string }[] } | undefined;
+            const cpe = sched?.cpe_check as { items?: { method?: string; verdict: string; ratio?: number }[] } | undefined;
             if (!conf?.crew) return null;
             const c = conf.grade === "적정" ? { bg: "#ecfdf5", bd: "#a7f3d0", fg: "#059669", icon: "✅" }
               : conf.grade === "과소" ? { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" }
@@ -1416,9 +1416,11 @@ export default function SchedulePlanWizard() {
               <span key={txt} style={{ display: "inline-block", padding: "1px 7px", borderRadius: 6, marginRight: 4, marginBottom: 3,
                 fontSize: 11.5, background: tone === "labor" ? "#eef2ff" : "#fff7ed", color: tone === "labor" ? "#4338ca" : "#9a3412" }}>{txt}</span>
             );
-            // 표준 대비 차이가 있을 때만 경고 1줄(공법명/배수 노출 X — 행동만).
-            const fast = (cpe?.items || []).some((it) => it.verdict.includes("빠름")) || (prod?.heavy_crew?.length ?? 0) > 0;
-            const slow = (cpe?.items || []).some((it) => it.verdict.includes("느림"));
+            // 표준 대비 어긋난 공법 — 구체 근거(공법·배수) 표시. 출처명(쿠팡/CPE)·중복은 제거.
+            const _seen = new Set<string>();
+            const offenders = (cpe?.items || []).filter((it) => !it.verdict.includes("적정"))
+              .filter((it) => { const k = it.method || ""; if (_seen.has(k)) return false; _seen.add(k); return true; })
+              .slice(0, 2);
             return (
               <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "11px 14px", fontSize: 12.5, marginBottom: 10 }}>
                 <div><b style={{ color: c.fg, fontSize: 13.5 }}>{c.icon} 공기 검증{conf.grade ? ` · ${conf.grade}` : ""}</b>
@@ -1431,9 +1433,9 @@ export default function SchedulePlanWizard() {
                       {Object.entries(conf.equipment).map(([e, v]) => chip(`${e} ${v.peak}`, "equip"))}</>
                   )}
                 </div>
-                {(fast || slow) && (
+                {offenders.length > 0 && (
                   <div style={{ marginTop: 6, color: "#b45309", fontSize: 11.5 }}>
-                    ⚠️ 표준 대비 {fast ? "빠른" : "느린"} 공법 있음 — 투입 장비·작업조 가정 확인 권장
+                    ⚠️ {offenders.map((it) => `${it.method} 표준 대비 ${it.verdict}${it.ratio ? ` ${it.ratio}배` : ""}`).join(" · ")} — 투입 장비·작업조 가정 확인 권장
                   </div>
                 )}
               </div>
