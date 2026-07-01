@@ -257,7 +257,7 @@ export default function SchedulePlanWizard() {
   const [excavFleet, setExcavFleet] = useState(5);  // 토목 굴착 장비 세트 '수'(백호·덤프·CIP) — 병렬 work-front
   const [excavSize, setExcavSize] = useState("");   // 굴착 백호 '규격'(온톨로지 Equipment) — 조당 생산성. ""=default(1.0㎥)
   // 공종별 분리 입력(WBS개수·착공일·마감일·가동률·시공전략·참고) — 비우면 프로젝트 기본값(③④) 폴백. 백엔드 적용=Phase 2.
-  const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string }>>({});
+  const [discSet, setDiscSet] = useState<Record<string, { wbs?: string; start?: string; finish?: string; util?: string; wdpw?: string; strategy?: string; notes?: string; win?: string; heat?: string; rain?: string; snow?: string; wind?: string; cell_days?: string; crewRb?: string; crewFm?: string; crewCn?: string }>>({});
   const [discBoq, setDiscBoq] = useState<Record<string, BoqResult & { loading?: boolean; confirm?: boolean }>>({});  // 공종 카드별 내역서 파싱 결과(+기간보정 컨펌)
   // 장비별 1일 표준 생산성(단위/일) — 추천 대수 산정용(qty ÷ (rate × 목표작업일 200)). 크레인은 고정.
   const EQUIP_RATE: Record<string, number> = {
@@ -295,7 +295,7 @@ export default function SchedulePlanWizard() {
       setDiscBoq((s) => ({ ...s, [cardKey]: { loading: false, error: e instanceof Error ? e.message : "파싱 실패" } }));
     }
   };
-  const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; wdpw: string; strategy: string; notes: string; win: string; heat: string; rain: string; snow: string; wind: string }>) =>
+  const setDS = (k: string, patch: Partial<{ wbs: string; start: string; finish: string; util: string; wdpw: string; strategy: string; notes: string; win: string; heat: string; rain: string; snow: string; wind: string; cell_days: string; crewRb: string; crewFm: string; crewCn: string }>) =>
     setDiscSet((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [weatherStation, setWeatherStation] = useState(""); // 기상 지역(ASOS) — 선택 시 공종별 가동률 기상 기반 산정
@@ -588,14 +588,23 @@ export default function SchedulePlanWizard() {
         discipline_crews: { ...RES_FALLBACK.공종작업조, ...Object.fromEntries(["건축", "MEP", "조경"].map((k) => [k, discEquip[k]?.["작업조"] ?? RES_FALLBACK.공종작업조[k] ?? 3])) },
         gross_floor_area: gfa ? Number(gfa) : undefined,
         discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) + 자원계획 병합
-          Object.keys({ ...discSet, ...discBoq, ...discEquip }).map((k) => [k, {
-            ...(discSet[k] || {}),
-            ...(discBoq[k]?.quantities ? {
-              boq: discBoq[k].quantities, boq_confirm: true,  // 내역서 올리면 물량 보정 기본 적용(factor=물량비, 일치 시 1.0=무해)
-              boq_items: (discBoq[k]?.items ?? []).map((it) => ({ name: it.name, unit: it.unit, qty: it.qty, op: it.op })),
-            } : {}),
-            ...(discEquip[k] ? { equipment: discEquip[k] } : {}),
-          }]),
+          Object.keys({ ...discSet, ...discBoq, ...discEquip }).map((k) => {
+            const base: Record<string, unknown> = {
+              ...(discSet[k] || {}),
+              ...(discBoq[k]?.quantities ? {
+                boq: discBoq[k].quantities, boq_confirm: true,  // 내역서 올리면 물량 보정 기본 적용(factor=물량비, 일치 시 1.0=무해)
+                boq_items: (discBoq[k]?.items ?? []).map((it) => ({ name: it.name, unit: it.unit, qty: it.qty, op: it.op })),
+              } : {}),
+              ...(discEquip[k] ? { equipment: discEquip[k] } : {}),
+            };
+            if (k === "구조") {   // 구조 공종별 투입조(사용자 입력) → crews dict(백엔드 duration.py). 비우면 자동 스케일.
+              const crews = Object.fromEntries(
+                ([["철근", discSet["구조"]?.crewRb], ["거푸집", discSet["구조"]?.crewFm], ["콘크리트", discSet["구조"]?.crewCn]] as [string, string | undefined][])
+                  .map(([t, v]) => [t, Number(v)]).filter(([, v]) => (v as number) > 0));
+              if (Object.keys(crews).length) base.crews = crews;
+            }
+            return [k, base];
+          }),
         ),
         weather_station: weatherStation || undefined,   // 기상 지역 — 있으면 공종별 가동률 기상 기반 산정
         utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
@@ -814,6 +823,21 @@ export default function SchedulePlanWizard() {
                                 value={discSet[d.key]?.strategy ?? ""} onChange={(e) => setDS(d.key, { strategy: e.target.value })}>
                           <option value="">기본</option><option value="bottom_up">순타·일괄</option><option value="bottom_up_phased">순타·단계</option><option value="top_down">역타</option>
                         </select></label>
+                      {d.key === "구조" && (<>
+                        <label style={pr} title="셀당 목표 사이클(일) — 초과 시 투입조 자동 증가(초대형 층 93일 방지). 비우면 15일">목표사이클
+                          <input type="number" min={5} className="wz-in" style={{ width: 58, padding: "2px 4px" }} placeholder="15"
+                                 value={discSet["구조"]?.cell_days ?? ""} onChange={(e) => setDS("구조", { cell_days: e.target.value })} /></label>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}>골조 투입조(조·비우면 자동):</span>
+                        <label style={pr} title="철근 배근 투입조 (현엔 8조). 비우면 자동 스케일">철근
+                          <input type="number" min={1} className="wz-in" style={{ width: 46, padding: "2px 4px" }} placeholder="자동"
+                                 value={discSet["구조"]?.crewRb ?? ""} onChange={(e) => setDS("구조", { crewRb: e.target.value })} /></label>
+                        <label style={pr} title="거푸집 투입조 (현엔 8조). 비우면 자동 스케일">거푸집
+                          <input type="number" min={1} className="wz-in" style={{ width: 46, padding: "2px 4px" }} placeholder="자동"
+                                 value={discSet["구조"]?.crewFm ?? ""} onChange={(e) => setDS("구조", { crewFm: e.target.value })} /></label>
+                        <label style={pr} title="콘크리트 타설 투입조 (현엔 2조). 비우면 자동 스케일">타설
+                          <input type="number" min={1} className="wz-in" style={{ width: 46, padding: "2px 4px" }} placeholder="자동"
+                                 value={discSet["구조"]?.crewCn ?? ""} onChange={(e) => setDS("구조", { crewCn: e.target.value })} /></label>
+                      </>)}
                       {isStruct && d.key === "종합" && (<>
                         {/* 종합 = OSC(탈현장) 카드 — 거푸집(현장)은 무의미(공장제작)라 제거. OSC 공법 + 조강(공장양생). */}
                         <label style={pr} title="조강콘크리트 — 양생 단축(PC모듈러 공장양생)">조강
