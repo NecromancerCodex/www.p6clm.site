@@ -135,7 +135,8 @@ export default function ResourcePlanPage() {
                 <thead>
                   <tr style={{ background: "#f8fafc", textAlign: "left", color: "#475569" }}>
                     <th style={th}>공정</th><th style={th}>활동</th><th style={th}>구역/층</th>
-                    <th style={thR}>물량</th><th style={th}>예정(착수~완료)</th><th style={th}>장비</th>
+                    <th style={thR}>물량</th><th style={thR} title="생산성 1조 1일 작업량">생산성</th><th style={thR} title="투입 작업조 수">투입조</th><th style={thR} title="작업일수(W.D)">기간</th>
+                    <th style={th}>예정(착수~완료)</th><th style={th}>장비</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -147,6 +148,11 @@ export default function ResourcePlanPage() {
                       <td style={{ ...tdR, color: r.qty ? "#3730a3" : "#cbd5e1" }}>
                         {r.qty ? `${fmt(r.qty)} ${r.unit}` : "—"}
                       </td>
+                      <td style={{ ...tdR, color: r.productivity ? "#475569" : "#cbd5e1" }} title={r.daily ? `일작업량 ${r.daily} ${r.unit}/일` : ""}>
+                        {r.productivity ? `${fmt(r.productivity)}${r.unit ? ` ${r.unit}/일` : ""}` : "—"}
+                      </td>
+                      <td style={{ ...tdR, color: r.crew ? "#475569" : "#cbd5e1" }}>{r.crew ? `${r.crew}조` : "—"}</td>
+                      <td style={{ ...tdR, color: r.duration ? "#334155" : "#cbd5e1", fontWeight: 600 }}>{r.duration ? `${r.duration}일` : "—"}</td>
                       <td style={{ ...td, color: "#64748b", whiteSpace: "nowrap" }}>{dt(r.start)} ~ {dt(r.end)}</td>
                       <td style={td}>
                         {r.equip.length

@@ -716,6 +716,7 @@ export interface ResourceRow {
   code: string; name: string; discipline: string; op: string;
   start: string | null; end: string | null; duration: number | null;
   qty: number | null; unit: string; zone: string | null; storey: string | null;
+  productivity: number | null; crew: number | null; daily: number | null;   // 산정근거(PM): 생산성·투입조·일작업량
   equip: { name: string; count: number }[];
 }
 export async function getResourceMap(planId: string): Promise<{ project_name: string; stage: string; activities: ResourceRow[] }> {
