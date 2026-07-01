@@ -572,10 +572,14 @@ export default function SchedulePlanWizard() {
       if (md > 0) projMonths = Math.round(md);
     }
     setBusy(true); setErr(null);
+    // 모듈러/OSC 구조유형은 종합(OSC) 슬롯 전용 — 종합 없이 구조 슬롯만이면 모듈러 값 잔재 차단(재래식 경로로).
+    //   예전 모듈러 테스트가 structureType="PC·모듈러" 남겨도 구조 생성이 모듈러 경로 타는 것 방지.
+    const _stRaw = structureType.trim();
+    const _stClamped = (!slots["종합"] && /모듈러|하이브리드|패널라이즈드|OSC|PPVC|PC·|PC모듈/.test(_stRaw)) ? "" : _stRaw;
     try {
       const r = await startPlan({
         building_type: buildingType.trim() || "건물", scope: scope.trim() || undefined,
-        structure_type: structureType.trim() || undefined, discipline: discipline.trim() || undefined,
+        structure_type: _stClamped || undefined, discipline: discipline.trim() || undefined,
         zones, storeys, work_units: workUnits, methods: [],
         start_date: projStart, duration_months: projMonths,
         // 자원 = 자원 계획(discEquip, 내역서 자동+수동)에서 도출. 없으면 기존 기본값 폴백.
