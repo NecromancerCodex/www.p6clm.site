@@ -211,6 +211,19 @@ const _EQUIP_CREW: Record<string, Record<string, number>> = {
   "그라우팅장비": { 운전수: 1, 보통인부: 1 },
   "콘크리트펌프카": { 운전수: 1, 보통인부: 1 },
 };
+
+// 공종별 투입 가능 장비 — 자원계획이 아무 장비나 아무 카드에 뜨는 것 방지(구조에 굴삭기 등 stale 잔재 필터).
+//   토목=토공·기초 장비 / 구조·종합=타설·양중 / 건축·MEP·조경=작업조 위주. 작업조는 모든 공종 공통.
+const DISC_EQUIP: Record<string, string[]> = {
+  토목: ["굴삭기(백호)", "덤프트럭", "록브레이커/천공", "다짐롤러", "천공기(오거/RCD)", "그라우팅장비", "항타기", "콘크리트펌프카", "작업조"],
+  구조: ["콘크리트펌프카", "크레인", "작업조"],
+  종합: ["콘크리트펌프카", "크레인", "작업조"],
+  건축: ["이동식크레인", "작업조"],
+  MEP: ["작업조"],
+  조경: ["굴삭기(백호)", "작업조"],
+  가설: ["크레인", "작업조"],
+};
+const equipAllowed = (disc: string, name: string): boolean => (DISC_EQUIP[disc] ?? ["작업조"]).includes(name);
 // 공종별 '작업조' 1조 직종 구성(표준품셈) — 장비 아닌 직영 인력(형틀목공·철근공…)을 작업조 수에서 도출.
 const _CREW_COMPOSITION: Record<string, Record<string, number>> = {
   구조: { 형틀목공: 6, 철근공: 5, 콘크리트공: 2, 보통인부: 4 },   // 골조 사이클 1작업조
@@ -290,7 +303,10 @@ export default function SchedulePlanWizard() {
         // 건축·MEP·조경: 자기 물량(마감㎡·설비m 합)으로 작업조 스케일. 토목은 굴삭기=장비 세트.
         auto["작업조"] = clamp(Math.round(itemSum / 25000), 3, 12);
       }
-      setDiscEquip((s) => ({ ...s, [cardKey]: { ...auto, ...s[cardKey] } }));   // 기존 수동값 보존
+      setDiscEquip((s) => {   // 기존 수동값 보존 + 공종 무효 장비(stale 잔재) 필터
+        const merged = { ...auto, ...s[cardKey] };
+        return { ...s, [cardKey]: Object.fromEntries(Object.entries(merged).filter(([name]) => equipAllowed(cardKey, name))) };
+      });
     } catch (e) {
       setDiscBoq((s) => ({ ...s, [cardKey]: { loading: false, error: e instanceof Error ? e.message : "파싱 실패" } }));
     }
@@ -599,7 +615,7 @@ export default function SchedulePlanWizard() {
                 boq: discBoq[k].quantities, boq_confirm: true,  // 내역서 올리면 물량 보정 기본 적용(factor=물량비, 일치 시 1.0=무해)
                 boq_items: (discBoq[k]?.items ?? []).map((it) => ({ name: it.name, unit: it.unit, qty: it.qty, op: it.op })),
               } : {}),
-              ...(discEquip[k] ? { equipment: discEquip[k] } : {}),
+              ...(discEquip[k] ? { equipment: Object.fromEntries(Object.entries(discEquip[k]).filter(([name]) => equipAllowed(k, name))) } : {}),
             };
             if (k === "구조") {   // 구조 공종별 투입조(사용자 입력) → crews dict(백엔드 duration.py). 비우면 자동 스케일.
               const crews = Object.fromEntries(
@@ -931,7 +947,7 @@ export default function SchedulePlanWizard() {
                                 <div style={{ marginTop: 5, padding: "6px 8px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6 }}>
                                   <span style={{ fontSize: 10.5, color: "#92400e", fontWeight: 600 }}>🚜 자원 계획 — 작업조·장비 (내역서 자동, 수정 가능)</span>
                                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                                    {Object.entries(discEquip[d.key]!).map(([name, cnt]) => (
+                                    {Object.entries(discEquip[d.key]!).filter(([name]) => equipAllowed(d.key, name)).map(([name, cnt]) => (
                                       <label key={name} style={{ fontSize: 11, color: "#78716c", display: "inline-flex", alignItems: "center", gap: 3 }}>
                                         {name}
                                         <input type="number" min={0} className="wz-in" style={{ width: 46, padding: "2px 4px", fontSize: 11 }}
@@ -959,7 +975,7 @@ export default function SchedulePlanWizard() {
                                     </label>
                                   )}
                                   {(() => {
-                                    const labor = laborOf(discEquip[d.key]!, d.key);
+                                    const labor = laborOf(Object.fromEntries(Object.entries(discEquip[d.key]!).filter(([name]) => equipAllowed(d.key, name))), d.key);
                                     const jobs = Object.keys(labor);
                                     if (!jobs.length) return null;
                                     return (
