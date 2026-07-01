@@ -634,7 +634,7 @@ export default function SchedulePlanWizard() {
         ),
         weather_station: weatherStation || undefined,   // 기상 지역 — 있으면 공종별 가동률 기상 기반 산정
         utilization_rate: projUtil, formwork_system: formwork || undefined, rapid_concrete: rapidConcrete,
-        seasonal_weather: seasonal,
+        seasonal_weather: weatherStation ? false : seasonal,   // 기상지역 실측 가동률이 계절 손실 포함 → 이중계산 차단
         milestones: milestones.filter((m) => m.name.trim() && m.target_date),
         constraints: noteStr || undefined, strategy: projStrategy, wbs_structure: wbsStructure,
       });
@@ -1105,10 +1105,13 @@ export default function SchedulePlanWizard() {
                       <input className="wz-in" type="number" style={{ width: 130, padding: "2px 5px", fontSize: 11.5 }} value={gfa} onChange={(e) => setGfa(e.target.value)}
                              placeholder="㎡ (선택)" title="연면적 — 건축·MEP 기간 정밀화(부재수 대신 물량 기반)" />
                       <span style={{ color: "#94a3b8", fontSize: 11 }}>건축·MEP 기간 정밀화</span>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "#475569", marginLeft: 10 }}
-                             title="동절기(12·1·2월)·우기(7·8월) 기상 중단일 자동 제외 — 가동률과 별개 축">
-                        <input type="checkbox" checked={seasonal} onChange={(e) => setSeasonal(e.target.checked)} />
-                        계절 비작업일(동절기·우기)
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: weatherStation ? "#94a3b8" : "#475569", marginLeft: 10, opacity: weatherStation ? 0.6 : 1 }}
+                             title={weatherStation
+                               ? `${weatherStation} 실측 가동률에 계절 손실이 이미 반영됨 → 중복(이중계산) 방지 위해 자동 비활성화`
+                               : "동절기(12·1·2월)·우기(7·8월) 기상 중단일 자동 제외 — 프리셋 가동률에 계절 버퍼 추가"}>
+                        <input type="checkbox" checked={weatherStation ? false : seasonal} disabled={!!weatherStation}
+                               onChange={(e) => setSeasonal(e.target.checked)} />
+                        계절 비작업일(동절기·우기){weatherStation ? " — 실측 가동률에 포함됨(자동)" : ""}
                       </label>
                     </div>
                     <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
