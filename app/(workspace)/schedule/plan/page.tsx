@@ -224,6 +224,9 @@ const DISC_EQUIP: Record<string, string[]> = {
   가설: ["크레인", "작업조"],
 };
 const equipAllowed = (disc: string, name: string): boolean => (DISC_EQUIP[disc] ?? ["작업조"]).includes(name);
+// 구조/종합에서 '작업조'는 SGS 동시 시공 '구역 수'(병렬도) — 셀당 인력인 '골조 투입조'와 혼동 방지 표기.
+const equipLabel = (disc: string, name: string): string =>
+  (name === "작업조" && (disc === "구조" || disc === "종합")) ? "동시구역" : name;
 // 공종별 '작업조' 1조 직종 구성(표준품셈) — 장비 아닌 직영 인력(형틀목공·철근공…)을 작업조 수에서 도출.
 const _CREW_COMPOSITION: Record<string, Record<string, number>> = {
   구조: { 형틀목공: 6, 철근공: 5, 콘크리트공: 2, 보통인부: 4 },   // 골조 사이클 1작업조
@@ -948,12 +951,13 @@ export default function SchedulePlanWizard() {
                                   <span style={{ fontSize: 10.5, color: "#92400e", fontWeight: 600 }}>🚜 자원 계획 — 작업조·장비 (내역서 자동, 수정 가능)</span>
                                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
                                     {Object.entries(discEquip[d.key]!).filter(([name]) => equipAllowed(d.key, name)).map(([name, cnt]) => (
-                                      <label key={name} style={{ fontSize: 11, color: "#78716c", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                                        {name}
+                                      <label key={name} style={{ fontSize: 11, color: "#78716c", display: "inline-flex", alignItems: "center", gap: 3 }}
+                                             title={name === "작업조" ? ((d.key === "구조" || d.key === "종합") ? "동시 시공 구역 수 — 병렬도(공기 지배). 셀당 인력인 '골조 투입조'와 다름" : "이 공종 작업조 수(기간 driver)") : `${name} 대수`}>
+                                        {equipLabel(d.key, name)}
                                         <input type="number" min={0} className="wz-in" style={{ width: 46, padding: "2px 4px", fontSize: 11 }}
                                                value={cnt}
                                                onChange={(ev) => setDiscEquip((s) => ({ ...s, [d.key]: { ...s[d.key], [name]: Number(ev.target.value) } }))} />
-                                        {name === "작업조" ? "조" : "대"}
+                                        {name === "작업조" ? ((d.key === "구조" || d.key === "종합") ? "구역" : "조") : "대"}
                                       </label>
                                     ))}
                                   </div>
