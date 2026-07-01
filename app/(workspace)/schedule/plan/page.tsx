@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, planAuditLoop, getBasis, type BasisResult, type AuditFinding, type IfcWorkUnitsResult,
+  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, planAuditLoop, getBasis, getWeatherRates, type BasisResult, type AuditFinding, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
   type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
@@ -299,6 +299,7 @@ export default function SchedulePlanWizard() {
     setDiscSet((s) => ({ ...s, [k]: { ...s[k], ...patch } }));
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [weatherStation, setWeatherStation] = useState(""); // 기상 지역(ASOS) — 선택 시 공종별 가동률 기상 기반 산정
+  const [weatherRates, setWeatherRates] = useState<Record<string, number> | null>(null); // 기상지역 실측 가동률(카드 표시용)
   const [formwork, setFormwork] = useState(""); // 거푸집 시스템(골조 기준층 사이클) — 비우면 LLM 기준(재래식급)
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
   const [seasonal, setSeasonal] = useState(false); // 계절 비작업일(동절기·우기) — 가동률과 별개 축
@@ -402,6 +403,16 @@ export default function SchedulePlanWizard() {
     if (stage === "scheduled" || stage === "done")
       loadFrappeGantt().then(() => setGanttReady(true)).catch(() => setGanttReady(false));
   }, [stage]);
+
+  // 기상지역 선택 시 실측 가동률 조회 → 카드가 하드코딩 프리셋 대신 실측값 표시.
+  useEffect(() => {
+    if (!weatherStation) { setWeatherRates(null); return; }
+    let live = true;
+    void getWeatherRates(weatherStation)
+      .then((r) => { if (live) setWeatherRates(r.source === "asos" ? r.rates : null); })
+      .catch(() => { if (live) setWeatherRates(null); });
+    return () => { live = false; };
+  }, [weatherStation]);
 
   // ── 슬롯 업로드 = 파일만 보관(즉시). 분석은 '생성' 클릭 시 일괄(onStart). 업로드마다 서버추출 안 함. ──
   const onBim = (file: File, fixedDiscipline?: string) => {
@@ -988,15 +999,21 @@ export default function SchedulePlanWizard() {
                     {(slots["건축"] || slots["MEP"] || slots["조경"]) && (
                       <div>· 🏛️ <b>{[slots["건축"] && "건축", slots["MEP"] && "MEP", slots["조경"] && "조경"].filter(Boolean).join("·")}</b> <span style={{ color: "#94a3b8" }}>(내역서 있으면 마감·설비 시퀀스 생성)</span></div>
                     )}
-                    <div style={{ marginTop: 4 }}>· <b>가동률(공정별 자동 적용)</b> — 공기 = 공수 ÷ 가동률:</div>
+                    <div style={{ marginTop: 4 }}>· <b>가동률(공정별 자동 적용)</b> — 공기 = 공수 ÷ 가동률
+                      {weatherStation && weatherRates
+                        ? <span style={{ color: "#15803d", fontSize: 11, marginLeft: 4 }}>· {weatherStation} 실측(ASOS 최근 5년)</span>
+                        : <span style={{ color: "#94a3b8", fontSize: 11, marginLeft: 4 }}>· 프리셋(기상지역 선택 시 실측 재계산)</span>}:</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
-                      {UTIL_PRESET.map((u) => (
-                        <span key={u.cat} title={u.note}
-                              style={{ background: "#fff", border: "1px solid #e9d5ff", borderRadius: 6, padding: "2px 8px", fontSize: 11.5,
-                                       color: u.val <= 0.7 ? "#b91c1c" : u.val >= 0.92 ? "#15803d" : "#475569" }}>
-                          {u.cat} <b>{Math.round(u.val * 100)}%</b>
-                        </span>
-                      ))}
+                      {UTIL_PRESET.map((u) => {
+                        const v = (weatherStation && weatherRates && weatherRates[u.cat] != null) ? weatherRates[u.cat] : u.val;
+                        return (
+                          <span key={u.cat} title={u.note}
+                                style={{ background: "#fff", border: `1px solid ${weatherStation && weatherRates ? "#a7f3d0" : "#e9d5ff"}`, borderRadius: 6, padding: "2px 8px", fontSize: 11.5,
+                                         color: v <= 0.7 ? "#b91c1c" : v >= 0.92 ? "#15803d" : "#475569" }}>
+                            {u.cat} <b>{Math.round(v * 100)}%</b>
+                          </span>
+                        );
+                      })}
                     </div>
                     <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       · <b>기상지역</b>

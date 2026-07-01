@@ -737,6 +737,13 @@ export async function getBasis(planId: string): Promise<BasisResult> {
   return planFetch(`/${planId}/basis`, { method: "GET" });
 }
 
+/** 기상지역 공종 가동률 — 실측(ASOS) 재계산. 카드가 하드코딩 프리셋 대신 실측값 표시용. */
+export async function getWeatherRates(station: string): Promise<{ station: string | null; source: string; rates: Record<string, number> }> {
+  const res = await fetch(`${API_BASE}/schedule/weather-rates?station=${encodeURIComponent(station)}`);
+  if (!res.ok) throw new Error("가동률 조회 실패");
+  return res.json();
+}
+
 /** P6 XML 다운로드 URL */
 export function planP6XmlUrl(planId: string): string {
   return `${API_BASE}/schedule/plan/${planId}/p6xml`;
