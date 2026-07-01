@@ -948,6 +948,19 @@ export default function SchedulePlanWizard() {
                                   <span key={k} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px" }}>{lbl} {Math.round(b.quantities![k]).toLocaleString()}</span>
                                 ))}
                                 {b.has_prices && b.total_cost ? <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
+                                {(() => {   // IFC 실측(NetVolume) ↔ 내역서 콘크리트 대조 — 모델·내역 정합 검증(있을 때만)
+                                  const ifcVol = workUnits.filter((w) => (w.discipline || "") === d.key).reduce((s, w) => s + (w.volume_m3 || 0), 0);
+                                  const boqConc = b.quantities?.concrete_m3 || 0;
+                                  if (!ifcVol || !boqConc) return null;
+                                  const pct = Math.round(100 * Math.min(ifcVol, boqConc) / Math.max(ifcVol, boqConc));
+                                  const ok = pct >= 95;
+                                  return (
+                                    <span style={{ background: ok ? "#dcfce7" : "#fef3c7", color: ok ? "#166534" : "#92400e", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}
+                                          title={`IFC 실측(NetVolume) ${Math.round(ifcVol).toLocaleString()}㎥ vs 내역서 콘크리트 ${Math.round(boqConc).toLocaleString()}㎥ — 모델·내역 정합 검증`}>
+                                      {ok ? "✓" : "⚠"} IFC 실측 {pct}% 일치
+                                    </span>
+                                  );
+                                })()}
                               </div>
                               {discEquip[d.key] && Object.keys(discEquip[d.key]).length > 0 && (
                                 <div style={{ marginTop: 5, padding: "6px 8px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6 }}>

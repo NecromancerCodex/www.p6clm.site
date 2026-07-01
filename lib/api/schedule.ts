@@ -517,7 +517,7 @@ export async function wbsFromText(text: string): Promise<{ keys: string[]; struc
 
 // ── IFC → S3 → 서버 work_unit 추출 (C-1) — 대용량 IFC 브라우저 부담 0 ───────────
 export interface IfcWorkUnitsResult {
-  work_units: { zone: string; storey: string; element_type: string; count: number; discipline?: string }[];
+  work_units: { zone: string; storey: string; element_type: string; count: number; discipline?: string; volume_m3?: number }[];
   zones: string[];
   storeys: string[];
   trade_summary: { trade: string; count: number }[];
