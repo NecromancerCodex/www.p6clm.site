@@ -319,6 +319,7 @@ export default function SchedulePlanWizard() {
   const [util, setUtil] = useState(0.85); // 가동률(0<u≤1) — 공기 현실화(공수÷가동률). 공휴일은 서버가 항상 자동 제외
   const [weatherStation, setWeatherStation] = useState(""); // 기상 지역(ASOS) — 선택 시 공종별 가동률 기상 기반 산정
   const [weatherRates, setWeatherRates] = useState<Record<string, number> | null>(null); // 기상지역 실측 가동률(카드 표시용)
+  const [weatherLoading, setWeatherLoading] = useState(false); // 실측 가동률 계산 중 — 프리셋 68% 오해 방지(계산중 표시)
   const [formwork, setFormwork] = useState(""); // 거푸집 시스템(골조 기준층 사이클) — 비우면 LLM 기준(재래식급)
   const [rapidConcrete, setRapidConcrete] = useState(false); // 조강콘크리트 — 양생 단축
   const [seasonal, setSeasonal] = useState(false); // 계절 비작업일(동절기·우기) — 가동률과 별개 축
@@ -425,11 +426,13 @@ export default function SchedulePlanWizard() {
 
   // 기상지역 선택 시 실측 가동률 조회 → 카드가 하드코딩 프리셋 대신 실측값 표시.
   useEffect(() => {
-    if (!weatherStation) { setWeatherRates(null); return; }
+    if (!weatherStation) { setWeatherRates(null); setWeatherLoading(false); return; }
     let live = true;
+    setWeatherRates(null); setWeatherLoading(true);   // 로딩 시작 — 프리셋 대신 '계산중' 표시(오해 방지)
     void getWeatherRates(weatherStation)
       .then((r) => { if (live) setWeatherRates(r.source === "asos" ? r.rates : null); })
-      .catch(() => { if (live) setWeatherRates(null); });
+      .catch(() => { if (live) setWeatherRates(null); })
+      .finally(() => { if (live) setWeatherLoading(false); });
     return () => { live = false; };
   }, [weatherStation]);
 
@@ -1048,9 +1051,19 @@ export default function SchedulePlanWizard() {
                       <div>· 🏛️ <b>{[slots["건축"] && "건축", slots["MEP"] && "MEP", slots["조경"] && "조경"].filter(Boolean).join("·")}</b> <span style={{ color: "#94a3b8" }}>(내역서 있으면 마감·설비 시퀀스 생성)</span></div>
                     )}
                     <div style={{ marginTop: 4 }}>· <b>가동률(공정별 자동 적용)</b> — 공기 = 공수 ÷ 가동률
-                      {weatherStation && weatherRates
+                      {weatherStation && weatherLoading
+                        ? <span style={{ color: "#b45309", fontSize: 11, marginLeft: 4 }}>· {weatherStation} 실측 계산 중…</span>
+                        : weatherStation && weatherRates
                         ? <span style={{ color: "#15803d", fontSize: 11, marginLeft: 4 }}>· {weatherStation} 실측(ASOS 최근 5년)</span>
                         : <span style={{ color: "#94a3b8", fontSize: 11, marginLeft: 4 }}>· 프리셋(기상지역 선택 시 실측 재계산)</span>}:</div>
+                    {weatherStation && weatherLoading ? (
+                      // 실측 계산 중 — 프리셋(68% 등) 노출 금지(오해→플래닝 방지). 값 대신 안내.
+                      <div style={{ marginTop: 3, fontSize: 11.5, color: "#b45309", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span className="wz-spin" style={{ width: 11, height: 11, border: "2px solid #fcd34d", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+                        {weatherStation} 최근 5년 기상 실측으로 공종별 가동률 계산 중… (잠시 후 표시)
+                        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                      </div>
+                    ) : (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
                       {UTIL_PRESET.map((u) => {
                         const v = (weatherStation && weatherRates && weatherRates[u.cat] != null) ? weatherRates[u.cat] : u.val;
@@ -1063,6 +1076,7 @@ export default function SchedulePlanWizard() {
                         );
                       })}
                     </div>
+                    )}
                     <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       · <b>기상지역</b>
                       <select className="wz-in" style={{ width: 132, padding: "2px 5px", fontSize: 11.5 }} value={weatherStation} onChange={(e) => setWeatherStation(e.target.value)}>
