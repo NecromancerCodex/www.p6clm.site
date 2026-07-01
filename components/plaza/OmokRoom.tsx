@@ -128,7 +128,11 @@ export function OmokRoom({
   const statusText = () => {
     if (!st) return "불러오는 중…";
     if (st.status === "waiting") return "참가하여 좌석을 채우세요 (흑/백)";
-    if (st.status === "done") return st.winner ? `${st.winner === 1 ? "흑" : "백"} (${nameOf(st.winner === 1 ? st.black : st.white)}) 승리! 🏆` : "종료";
+    if (st.status === "done") {
+      if (st.winner === 1 || st.winner === 2)
+        return `${st.winner === 1 ? "흑" : "백"} (${nameOf(st.winner === 1 ? st.black : st.white)}) 승리! 🏆`;
+      return "무승부 — 판이 가득 찼어요 🤝";
+    }
     return `${st.turn === 1 ? "흑" : "백"} 차례${myTurn ? " — 당신!" : ""}`;
   };
 
