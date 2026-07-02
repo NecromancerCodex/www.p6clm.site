@@ -1587,7 +1587,22 @@ export default function SchedulePlanWizard() {
                   <div style={{ marginTop: 5, fontSize: 11.5, color: "#475569" }}>
                     P80 준공 <b>{pert.p80_date}</b>{(pert.buffer_to_p80 ?? 0) > 0 && <> · 80% 달성엔 버퍼 <b style={{ color: "#7c3aed" }}>+{pert.buffer_to_p80}일</b> 권장</>}
                   </div>
-                  {adq?.summary && <div style={{ marginTop: 4, fontSize: 11, color: (adq.over?.length ?? 0) > 0 ? "#b45309" : "#64748b" }}>🗂 {adq.summary}</div>}
+                  {adq?.summary && <div style={{ marginTop: 4, fontSize: 11, color: (adq.over?.length ?? 0) > 0 ? "#b45309" : "#64748b" }}>🗂 {adq.summary}
+                    {(adq.over ?? []).includes("FM") && !["알폼", "시스템폼", "갱폼"].includes(formwork) && (
+                      <button type="button" disabled={busy}
+                        onClick={async () => {
+                          if (!planId || !confirm("거푸집을 알폼으로 바꿔 재계산할까요? (사이클 ×0.5 — 실적 과다 해소 시뮬)")) return;
+                          setBusy(true); setErr(null);
+                          try { setFormwork("알폼"); await confirmPlan(planId, { formwork_system: "알폼" }); await refresh(planId); }
+                          catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+                          finally { setBusy(false); }
+                        }}
+                        style={{ marginLeft: 8, padding: "1px 9px", borderRadius: 6, border: "1px solid #c4b5fd",
+                                 background: "#f5f3ff", color: "#6d28d9", fontSize: 10.5, cursor: "pointer" }}>
+                        ⚡ 알폼 적용 + 재계산
+                      </button>
+                    )}
+                  </div>}
                 </div>
               );
             })() : null;
