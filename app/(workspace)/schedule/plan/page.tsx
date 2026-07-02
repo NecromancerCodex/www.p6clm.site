@@ -491,22 +491,34 @@ export default function SchedulePlanWizard() {
       const zoneSet = new Set<string>(); const storeySet = new Set<string>();
       let cq = civilQty;
       let inferSrc: IfcWorkUnitsResult | null = null;
+      const declared = new Set(entries.map(([d]) => d));   // 명시 슬롯 = 사용자의 scope 선언
       for (const [disc, file] of entries) {
         setInferReason(`분석 중 — ${disc} (${file.name})…`);
         const r = await analyzeSlotFile(file);
         // 슬롯 = 기본 공종. 단 실제 파일은 섞임(건축 IFC에 조경·구조 IFC에 흙막이 pile) → 분류기가
-        // **확실히 잡은 타 공종(토목·MEP·조경)은 살리고**, 애매한 것(마감벽→구조 오분류 등)만 슬롯으로 강제.
-        // 종합 슬롯은 전부 분류기. (예: 건축 슬롯의 "조경-화강석포장"→조경, 구조 슬롯의 흙막이 pile→토목)
+        // 확실히 잡은 타 공종(토목·MEP·조경)은 **그 공종 슬롯이 함께 올라온 경우에만** 살린다.
+        // 슬롯에 없는 공종 부재를 살려두면 백엔드가 그 공종 전체를 켜(최소 증거 3개) 지반 영속 물량까지
+        // 끌어와 과대 생성(실측: 구조만 올렸는데 토목 104활동+굴착 164만㎥) — "넣은 공종만 반영" 약속 위반.
+        // 제외분은 슬롯 카드 경고로 가시화(조용히 누락 X). 종합 슬롯은 전부 분류기(전 공종 허용).
         const comprehensive = disc === "종합";
         const KEEP = new Set(["토목", "MEP", "조경"]);   // 이름·타입이 확실한 공종(분류기 신뢰)
+        const droppedCnt: Record<string, number> = {};
         allWu.push(...(comprehensive
           ? (r.work_units as GenWorkUnit[])
-          : (r.work_units as GenWorkUnit[]).map((w) =>
-              KEEP.has(String(w.discipline || "")) ? w : { ...w, discipline: disc })));
+          : (r.work_units as GenWorkUnit[]).flatMap((w) => {
+              const d = String(w.discipline || "");
+              if (!KEEP.has(d)) return [{ ...w, discipline: disc }];
+              if (declared.has(d)) return [w];           // 그 공종 슬롯도 올라옴 → 분류기 결과 존중
+              droppedCnt[d] = (droppedCnt[d] || 0) + (w.count || 1);
+              return [];                                  // 슬롯 미선언 공종 → 제외(약속: 넣은 공종만)
+            })));
         r.zones.forEach((z) => zoneSet.add(z)); r.storeys.forEach((s) => storeySet.add(s));
         if (r.civil_quantities) cq = r.civil_quantities;
         if (r.suggested_equip) setExcavFleet(r.suggested_equip);  // 물량 기반 권장 장비 세트 자동 반영(대형현장 현실화)
-        setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length, warn: validateSlot(disc, r.discipline_summary), ai: r.ai_classified } }));
+        const dropMsg = Object.entries(droppedCnt).map(([d, n]) => `${d} ${n.toLocaleString()}부재 제외(슬롯 미선언 — 필요 시 ${d} 슬롯에 IFC 추가)`).join(" · ");
+        const baseWarn = validateSlot(disc, r.discipline_summary);
+        setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length,
+          warn: [baseWarn, dropMsg ? `⚠️ ${dropMsg}` : null].filter(Boolean).join("  ") || null, ai: r.ai_classified } }));
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
       setWorkUnits(allWu); setZones([...zoneSet]); setStoreys([...storeySet]); setCivilQty(cq);
