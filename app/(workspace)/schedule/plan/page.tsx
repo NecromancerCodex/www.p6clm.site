@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, planAuditLoop, getBasis, getWeatherRates, type BasisResult, type AuditFinding, type IfcWorkUnitsResult,
+  cancelPlan, confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, planAuditLoop, getBasis, getWeatherRates, type BasisResult, type AuditFinding, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
   type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
@@ -765,6 +765,15 @@ export default function SchedulePlanWizard() {
             <span className="wz-dot" />
             <b>공정 플래닝 진행 중</b>
             <span style={{ color: "#6366f1" }}>{plan?.progress ?? "AI 작업 중…"}</span>
+            <button type="button"
+              onClick={async () => {
+                if (!planId || !confirm("생성을 취소할까요?")) return;
+                try { await cancelPlan(planId); } catch { /* 이미 종료된 경우 무시 */ }
+              }}
+              style={{ marginLeft: "auto", padding: "3px 12px", borderRadius: 7, border: "1px solid #fca5a5",
+                       background: "#fef2f2", color: "#b91c1c", fontSize: 12, cursor: "pointer" }}>
+              ⏹ 취소
+            </button>
           </div>
           <div className="wz-skel-rows">
             {[78, 62, 88, 54, 70].map((w, i) => (

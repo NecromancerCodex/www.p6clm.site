@@ -667,6 +667,10 @@ export async function savePlanActivities(planId: string, activities: PlanActivit
 }
 
 /** 현 단계 컨펌 → 다음 단계. crane/crew 주면 그 자원으로 재스케줄(목표공기 역산 제안 적용) */
+export async function cancelPlan(planId: string): Promise<{ stage: PlanStage }> {
+  return planFetch(`/${planId}/cancel`, { method: "POST" });   // running_p2 취소 → error(재생성 가능)
+}
+
 export async function confirmPlan(planId: string, res?: { crane?: number; crew?: number; civil_equipment?: number; utilization_rate?: number; formwork_system?: string; rapid_concrete?: boolean; seasonal_weather?: boolean; milestones?: GenMilestone[] }): Promise<{ stage: PlanStage }> {
   return planFetch(`/${planId}/confirm`, { method: "POST", body: JSON.stringify(res ?? {}) });
 }
