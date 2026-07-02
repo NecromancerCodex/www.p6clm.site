@@ -1502,10 +1502,14 @@ export default function SchedulePlanWizard() {
               | { grade?: string; note?: string; crew?: Record<string, { peak: number }>; equipment?: Record<string, { peak: number }> } | undefined;
             const prod = sched?.productivity_check as { heavy_crew?: string[] } | undefined;
             const cpe = sched?.cpe_check as { items?: { method?: string; verdict: string; ratio?: number }[] } | undefined;
-            if (!conf?.crew) return null;
-            const c = conf.grade === "적정" ? { bg: "#ecfdf5", bd: "#a7f3d0", fg: "#059669", icon: "✅" }
-              : conf.grade === "과소" ? { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" }
-              : conf.grade === "과다" ? { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📉" }
+            const pert = sched?.pert as
+              | { planned_days: number; opt_days: number; pess_days: number; p50_days: number; p80_days: number;
+                  p50_date?: string; p80_date?: string; buffer_to_p80?: number; verdict?: string; note?: string } | undefined;
+            const adq = sched?.adequacy as { summary?: string; over?: string[] } | undefined;
+            if (!conf?.crew && !pert) return null;
+            const c = conf?.grade === "적정" ? { bg: "#ecfdf5", bd: "#a7f3d0", fg: "#059669", icon: "✅" }
+              : conf?.grade === "과소" ? { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" }
+              : conf?.grade === "과다" ? { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📉" }
               : { bg: "#f8fafc", bd: "#e2e8f0", fg: "#475569", icon: "📊" };
             const chip = (txt: string, tone: "labor" | "equip") => (
               <span key={txt} style={{ display: "inline-block", padding: "1px 7px", borderRadius: 6, marginRight: 4, marginBottom: 3,
@@ -1516,10 +1520,47 @@ export default function SchedulePlanWizard() {
             const offenders = (cpe?.items || []).filter((it) => !it.verdict.includes("적정"))
               .filter((it) => { const k = it.method || ""; if (_seen.has(k)) return false; _seen.add(k); return true; })
               .slice(0, 2);
+            // PERT 신뢰 밴드 — 낙관~비관 축 위에 P50/P80/계획 위치 시각화
+            const pertBand = pert && pert.pess_days > pert.opt_days ? (() => {
+              const span = pert.pess_days - pert.opt_days;
+              const pos = (d: number) => Math.max(0, Math.min(100, ((d - pert.opt_days) / span) * 100));
+              const vc = pert.verdict === "공격적" ? "#dc2626" : pert.verdict === "여유" ? "#d97706" : "#059669";
+              return (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #e2e8f0" }}>
+                  <div style={{ fontSize: 12 }}>
+                    <b style={{ color: "#334155" }}>📈 공기 신뢰도 (삼점추정 P50/P80)</b>
+                    <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 6, fontSize: 11, background: `${vc}18`, color: vc, fontWeight: 600 }}>{pert.verdict}</span>
+                    {pert.note && <span style={{ color: "#64748b", marginLeft: 6, fontSize: 11.5 }}>{pert.note}</span>}
+                  </div>
+                  <div style={{ position: "relative", height: 26, margin: "10px 2px 2px" }}>
+                    <div style={{ position: "absolute", top: 11, left: 0, right: 0, height: 5, borderRadius: 3,
+                      background: "linear-gradient(90deg,#a7f3d0 0%,#fde68a 60%,#fecaca 100%)" }} />
+                    {([["P50", pert.p50_days, "#0369a1"], ["P80", pert.p80_days, "#7c3aed"]] as [string, number, string][]).map(([lb, d, col]) => (
+                      <div key={lb} style={{ position: "absolute", left: `${pos(d)}%`, top: 0, transform: "translateX(-50%)", textAlign: "center" }}>
+                        <div style={{ fontSize: 9.5, color: col, fontWeight: 700, whiteSpace: "nowrap" }}>{lb} {d}일</div>
+                        <div style={{ width: 2, height: 12, background: col, margin: "0 auto" }} />
+                      </div>
+                    ))}
+                    <div style={{ position: "absolute", left: `${pos(pert.planned_days)}%`, top: 4, transform: "translateX(-50%)", textAlign: "center" }}>
+                      <div style={{ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: `7px solid ${vc}`, margin: "0 auto" }} />
+                      <div style={{ fontSize: 9.5, color: vc, fontWeight: 700, whiteSpace: "nowrap" }}>계획 {pert.planned_days}일</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94a3b8", margin: "0 2px" }}>
+                    <span>낙관 {pert.opt_days}일</span><span>비관 {pert.pess_days}일</span>
+                  </div>
+                  <div style={{ marginTop: 5, fontSize: 11.5, color: "#475569" }}>
+                    P80 준공 <b>{pert.p80_date}</b>{(pert.buffer_to_p80 ?? 0) > 0 && <> · 80% 달성엔 버퍼 <b style={{ color: "#7c3aed" }}>+{pert.buffer_to_p80}일</b> 권장</>}
+                  </div>
+                  {adq?.summary && <div style={{ marginTop: 4, fontSize: 11, color: (adq.over?.length ?? 0) > 0 ? "#b45309" : "#64748b" }}>🗂 {adq.summary}</div>}
+                </div>
+              );
+            })() : null;
             return (
               <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "11px 14px", fontSize: 12.5, marginBottom: 10 }}>
-                <div><b style={{ color: c.fg, fontSize: 13.5 }}>{c.icon} 공기 검증{conf.grade ? ` · ${conf.grade}` : ""}</b>
-                  {conf.note && <span style={{ color: "#475569" }}> — {conf.note}</span>}</div>
+                <div><b style={{ color: c.fg, fontSize: 13.5 }}>{c.icon} 공기 검증{conf?.grade ? ` · ${conf.grade}` : ""}</b>
+                  {conf?.note && <span style={{ color: "#475569" }}> — {conf.note}</span>}</div>
+                {conf?.crew && (
                 <div style={{ marginTop: 7 }}>
                   <span style={{ color: "#94a3b8", fontSize: 11, marginRight: 4 }}>인력</span>
                   {Object.entries(conf.crew).map(([j, v]) => chip(`${j} ${v.peak}`, "labor"))}
@@ -1528,11 +1569,13 @@ export default function SchedulePlanWizard() {
                       {Object.entries(conf.equipment).map(([e, v]) => chip(`${e} ${v.peak}`, "equip"))}</>
                   )}
                 </div>
+                )}
                 {offenders.length > 0 && (
                   <div style={{ marginTop: 6, color: "#b45309", fontSize: 11.5 }}>
                     ⚠️ {offenders.map((it) => `${it.method} 표준 대비 ${it.verdict}${it.ratio ? ` ${it.ratio}배` : ""}`).join(" · ")} — 투입 장비·작업조 가정 확인 권장
                   </div>
                 )}
+                {pertBand}
               </div>
             );
           })()}
