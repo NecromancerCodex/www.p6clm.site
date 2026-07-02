@@ -415,6 +415,8 @@ export interface GenerateScheduleRequest {
   rapid_concrete?: boolean;    // 조강콘크리트 사용 — 양생기간 단축(×3/7)
   seasonal_weather?: boolean;  // 계절 비작업일 자동 반영 — 동절기(12·1·2월)·우기(7·8월). 가동률과 별개 축
   milestones?: GenMilestone[]; // 외부 마일스톤(인허가/자재반입/계약) — BIM에 없는 외부 게이트
+  prep_days?: number;          // 국토부 고시 ①준비기간(일) — 착공 전 가설·측량·인허가. 0/미지정=미반영(비파괴)
+  closeout_days?: number;      // 국토부 고시 ④정리기간(일) — 준공 검사·정리. 0/미지정=미반영
   constraints?: string;
   strategy?: string;   // bottom_up(순타)|top_down(역타) — BIM에 없는 발주·부지 조건(사람 선택)
   wbs_structure?: string;   // zone|trade|sequence|storey|trade_detail — WBS 그룹핑(PM 관리방식, 스케줄과 직교)

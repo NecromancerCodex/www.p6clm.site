@@ -258,6 +258,8 @@ export default function SchedulePlanWizard() {
   const [buildingType, setBuildingType] = useState("");
   const [scope, setScope] = useState("");
   const [gfa, setGfa] = useState(""); // 연면적(㎡) — 건축/MEP 물량 기반 기간(선택)
+  const [prepDays, setPrepDays] = useState("");     // 국토부 고시 ①준비기간(일) — 0/빈=미반영(비파괴 opt-in)
+  const [closeoutDays, setCloseoutDays] = useState(""); // 국토부 고시 ④정리기간(일)
   const [structureType, setStructureType] = useState("");
   const [discipline, setDiscipline] = useState(""); // 공종(토목/구조/건축/MEP/조경) — 자동채움+사람수정(휴먼인더루프)
   const [slots, setSlots] = useState<Record<string, { name: string; count?: number; wp?: number; warn?: string | null; ai?: number }>>({}); // 공종별 업로드 현황(count/wp/ai 는 분석 후)
@@ -613,6 +615,8 @@ export default function SchedulePlanWizard() {
         civil_quantities: civilQty ?? undefined,
         discipline_crews: { ...RES_FALLBACK.공종작업조, ...Object.fromEntries(["건축", "MEP", "조경"].map((k) => [k, discEquip[k]?.["작업조"] ?? RES_FALLBACK.공종작업조[k] ?? 3])) },
         gross_floor_area: gfa ? Number(gfa) : undefined,
+        prep_days: prepDays ? Number(prepDays) : 0,          // 국토부 고시 공사기간 프레임(opt-in)
+        closeout_days: closeoutDays ? Number(closeoutDays) : 0,
         discipline_settings: Object.fromEntries(   // 공종별 분리 + 내역서 물량(boq) + 자원계획 병합
           Object.keys({ ...discSet, ...discBoq, ...discEquip }).map((k) => {
             const base: Record<string, unknown> = {
@@ -1113,6 +1117,16 @@ export default function SchedulePlanWizard() {
                                onChange={(e) => setSeasonal(e.target.checked)} />
                         계절 비작업일(동절기·우기){weatherStation ? " — 실측 가동률에 포함됨(자동)" : ""}
                       </label>
+                    </div>
+                    <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      · <b>공사기간 프레임</b>
+                      <span style={{ color: "#64748b", fontSize: 11.5 }}>준비기간</span>
+                      <input className="wz-in" type="number" style={{ width: 70, padding: "2px 5px", fontSize: 11.5 }} value={prepDays} onChange={(e) => setPrepDays(e.target.value)}
+                             placeholder="일" min={0} max={180} title="①준비기간 — 착공 전 가설사무소·측량·인허가(통상 30~60일). 국토부 고시 제2021-1080호: 공사기간=준비+작업+비작업+정리" />
+                      <span style={{ color: "#64748b", fontSize: 11.5 }}>정리기간</span>
+                      <input className="wz-in" type="number" style={{ width: 70, padding: "2px 5px", fontSize: 11.5 }} value={closeoutDays} onChange={(e) => setCloseoutDays(e.target.value)}
+                             placeholder="일" min={0} max={90} title="④정리기간 — 준공 검사·청소·시설물 인계(통상 15~30일)" />
+                      <span style={{ color: "#94a3b8", fontSize: 11 }}>국토부 고시 산정기준(준비+본공사+정리) — 비우면 미반영</span>
                     </div>
                     <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       · <b>WBS 구조</b>
