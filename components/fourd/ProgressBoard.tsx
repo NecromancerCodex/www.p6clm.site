@@ -220,7 +220,7 @@ export function ProgressBoard() {
       {!loading && units.length === 0 && (
         <div style={{ padding: 24, background: "#f8fafc", borderRadius: 10, color: "#475569", fontSize: 14 }}>
           저장된 워크유닛이 없습니다. <strong>대시보드</strong>에서 공정표·BIM을 올려 분석한 뒤
-          <strong> 🧩 워크패키지 → 💾 저장</strong>하면 여기에 목록이 나타납니다.
+          <strong> 💾 진도율·PMIS-X 저장</strong> 버튼을 누르면 여기에 목록이 나타납니다.
         </div>
       )}
 

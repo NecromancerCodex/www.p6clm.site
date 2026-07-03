@@ -41,7 +41,7 @@ import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
 import { saveFourdFiles, loadFourdFiles, clearFourdFiles, loadPlanIfcs, savePlanIfcs, saveParsedCache, loadParsedCache, type CachedFourd } from "../../../lib/fourd/fileCache";
 import { DEFAULT_HIDDEN_TRADES } from "../../../lib/fourd/layers";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
-import { deriveWorkPackages, deriveActivityUnits, type DerivedPackage, type ActivityUnit } from "../../../lib/fourd/workpackage";
+import { deriveWorkPackages } from "../../../lib/fourd/workpackage";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
 
 interface Ready {
@@ -652,7 +652,30 @@ export default function FourDPage() {
   const [report, setReport] = useState<ReportData | null>(null);
 
   // ── 워크패키지 — BIM 메타(호·타입·부재종류)로 세분, Neon 영속화 ──
-  const [wpOpen, setWpOpen] = useState(false);
+  const [wpSaving, setWpSaving] = useState<"idle" | "saving" | "done" | "error">("idle");
+  // 원클릭 저장 — 4D 분석 결과(패키지 1:N 유닛)를 Neon 영속(진도율 보드·PMIS-X 연동 소스).
+  // 물량 확인=/schedule/resource, 활동 목록=공정표, 연결 진단=진단 보고서로 일원화 → 모달 제거.
+  const saveWorkPackages = async () => {
+    if (!ready) return;
+    setWpSaving("saving");
+    try {
+      const packages = deriveWorkPackages(ready.tasks, ready.parsed.elements, ready.ranges);
+      const res = await fetch("/api/clm/fourd/work-packages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: ready.sessionId, packages }),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        console.error("[워크패키지 저장]", res.status, txt.slice(0, 300));
+        alert(`저장 실패 (HTTP ${res.status})${res.status === 413 ? " — 페이로드가 서버 한도 초과(nginx client_max_body_size 증설 필요)" : ""}`);
+      }
+      setWpSaving(res.ok ? "done" : "error");
+    } catch (e) {
+      console.error("[워크패키지 저장]", e);
+      setWpSaving("error");
+    }
+  };
 
   // ── 공사일보 — 타임라인 슬라이더 '해당일' 기준, 기존 schedule/analyze 재사용 ──
   const [dailyBusy, setDailyBusy] = useState(false);
@@ -1148,18 +1171,19 @@ export default function FourDPage() {
                 📋 시뮬레이션 보고서
               </button>
               <button
-                onClick={() => setWpOpen(true)}
+                onClick={saveWorkPackages}
+                disabled={wpSaving === "saving"}
                 style={{
                   padding: "8px 14px",
                   borderRadius: 8,
                   border: "1px solid #7c3aed",
-                  background: "#7c3aed",
+                  background: wpSaving === "done" ? "#059669" : "#7c3aed",
                   color: "#fff",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
               >
-                🧩 워크패키지
+                {wpSaving === "saving" ? "💾 저장 중…" : wpSaving === "done" ? "✓ 진도율·PMIS-X 저장됨" : wpSaving === "error" ? "⚠ 저장 실패 — 재시도" : "💾 진도율·PMIS-X 저장"}
               </button>
             </div>
           )}
@@ -1220,14 +1244,7 @@ export default function FourDPage() {
       )}
       {dailyDoc && <DailyReportModal doc={dailyDoc} onClose={() => setDailyDoc(null)} />}
       {report && <ReportModal report={report} onClose={() => setReport(null)} />}
-      {wpOpen && ready && (
-        <WorkPackageModal
-          sessionId={ready.sessionId}
-          packages={deriveWorkPackages(ready.tasks, ready.parsed.elements, ready.ranges)}
-          activities={deriveActivityUnits(ready.tasks, ready.parsed.elements, ready.ranges)}
-          onClose={() => setWpOpen(false)}
-        />
-      )}
+
     </div>
   );
 }
@@ -1523,176 +1540,3 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
   );
 }
 
-function wpLabel(p: DerivedPackage): string {
-  if (p.trade === "MO") {
-    return `${p.zone ?? "단일동"} ${p.storey ?? "층미상"}층 ${p.module_unit ?? "-"}호${p.mtype ? ` ${p.mtype}타입` : ""}`;
-  }
-  return `${p.zone ?? "단일동"} ${p.storey ?? "층미상"}층 ${p.worktype ?? "골조"}`;
-}
-
-function WorkPackageModal({
-  sessionId,
-  packages,
-  activities,
-  onClose,
-}: {
-  sessionId: string;
-  packages: DerivedPackage[];
-  activities: ActivityUnit[];
-  onClose: () => void;
-}) {
-  const [saving, setSaving] = useState<"idle" | "saving" | "done" | "error">("idle");
-  const [view, setView] = useState<"bim" | "activity">("bim");
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const totalRule = packages.reduce((s, p) => s + p.bim_count_rule, 0);
-  const totalAi = packages.reduce((s, p) => s + p.bim_count_ai, 0);
-  const totalStorey = packages.reduce((s, p) => s + p.bim_count_storey, 0);
-  const actLinked = activities.filter((a) => a.status === "연결완료").length;
-
-  const save = async () => {
-    setSaving("saving");
-    try {
-      const res = await fetch("/api/clm/fourd/work-packages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, packages }),
-      });
-      if (!res.ok) {  // 상태코드 표면화 — 413(nginx body 한도)/422(스키마)/500 구분 진단
-        const txt = await res.text().catch(() => "");
-        console.error("[워크패키지 저장]", res.status, txt.slice(0, 300));
-        alert(`저장 실패 (HTTP ${res.status})${res.status === 413 ? " — 페이로드가 서버 한도 초과(nginx client_max_body_size 증설 필요)" : ""}`);
-      }
-      setSaving(res.ok ? "done" : "error");
-    } catch (e) {
-      console.error("[워크패키지 저장]", e);
-      setSaving("error");
-    }
-  };
-
-  return (
-    <div
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 12, padding: 24, maxWidth: 760, width: "100%", maxHeight: "85vh", overflow: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>🧩 워크패키지 (BIM 물리단위 · 모듈·악세사리별)</h2>
-          <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
-            닫기
-          </button>
-        </div>
-        <div style={{ fontSize: 13, color: "#475569", marginBottom: 12, padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
-          패키지 <strong>{packages.length.toLocaleString()}</strong>개 · 부재 매칭 출처{" "}
-          <span style={{ color: "#0d9488" }}>규칙 {totalRule.toLocaleString()}</span> +{" "}
-          <span style={{ color: "#7c3aed" }}>AI {totalAi.toLocaleString()}</span> +{" "}
-          <span style={{ color: "#64748b" }}>층근사 {totalStorey.toLocaleString()}</span>
-          <span style={{ marginLeft: 8, fontSize: 11, color: "#94a3b8" }}>(pmisx 정밀 + AI 보강)</span>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button
-            onClick={save}
-            disabled={saving === "saving" || saving === "done"}
-            style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: saving === "done" ? "#10b981" : "#7c3aed", color: "#fff", fontWeight: 600, cursor: saving === "saving" ? "default" : "pointer" }}
-          >
-            {saving === "idle" && "💾 Neon에 저장"}
-            {saving === "saving" && "저장 중…"}
-            {saving === "done" && "✓ 저장됨"}
-            {saving === "error" && "⚠ 저장 실패 — 재시도"}
-          </button>
-          <span style={{ fontSize: 11, color: "#94a3b8", alignSelf: "center" }}>
-            저장 시 이전 분석은 대체됩니다 (최신만 유지) · {sessionId.slice(0, 8)}
-          </span>
-        </div>
-
-        <div style={{ display: "flex", gap: 6, marginBottom: 10, borderBottom: "1px solid #e2e8f0" }}>
-          {([["bim", `🧩 BIM 패키지 (${packages.length})`], ["activity", `📋 공정 활동 (${activities.length}) · 연결 ${actLinked}/${activities.length}`]] as const).map(([v, label]) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              style={{ padding: "6px 12px", border: "none", borderBottom: view === v ? "2px solid #7c3aed" : "2px solid transparent", background: "transparent", color: view === v ? "#7c3aed" : "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {view === "bim" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {packages.slice(0, 400).map((p) => (
-              <div key={p.key} style={{ borderLeft: `3px solid ${p.bim_count_ai > 0 ? "#7c3aed" : "#0d9488"}`, paddingLeft: 10, paddingBottom: 4 }}>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>
-                  {wpLabel(p)}{" "}
-                  <span style={{ fontSize: 11, color: "#64748b", fontWeight: 400 }}>
-                    부재 {(p.bim_count_rule + p.bim_count_ai + p.bim_count_storey).toLocaleString()}
-                    {p.bim_count_ai > 0 && <span style={{ color: "#7c3aed" }}> (AI {p.bim_count_ai})</span>}
-                    {p.bim_count_storey > 0 && <span style={{ color: "#94a3b8" }}> (층근사 {p.bim_count_storey})</span>}
-                  </span>
-                </div>
-                <div style={{ fontSize: 11, color: "#475569", margin: "1px 0" }}>
-                  악세사리: {p.accessories.map((a) => `${a.type} ${a.count}`).join(" · ") || "—"}
-                </div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>
-                  공정활동: {p.units.length === 0 ? "(연결 없음)" : p.units.map((u) => `${u.name ?? u.activity_code}${u.phase ? `[${u.phase}]` : ""}`).slice(0, 4).join(", ")}
-                  {p.units.length > 4 && ` 외 ${p.units.length - 4}`}
-                  {p.start && <span style={{ marginLeft: 6, color: "#94a3b8" }}>{p.start}~{p.end}</span>}
-                </div>
-              </div>
-            ))}
-            {packages.length > 400 && (
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>… 외 {(packages.length - 400).toLocaleString()}개 (저장은 전체 포함)</div>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>
-              모든 공정 활동을 BIM 연결 상태로 (PT 포함). pmisx 스타일 — 활동마다 WS시그니처 + 매칭 부재 + 상태.
-            </div>
-            {activities.map((a, i) => (
-              <div key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <div
-                  onClick={() => setExpanded(expanded === i ? null : i)}
-                  style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12, padding: "3px 0", cursor: "pointer" }}
-                >
-                  <span style={{ width: 14 }}>{a.status === "연결완료" ? "✅" : "✗"}</span>
-                  <span style={{ width: 10, color: "#cbd5e1" }}>{expanded === i ? "▾" : "▸"}</span>
-                  <span style={{ flex: 1, color: "#334155" }}>{a.name}</span>
-                  <span style={{ width: 110, color: "#94a3b8", fontFamily: "monospace", fontSize: 11 }}>{a.ws}</span>
-                  <span style={{ width: 70, textAlign: "right", color: a.matched > 0 ? "#0d9488" : "#dc2626", fontWeight: 600 }}>
-                    {a.matched > 0 ? `${a.matched}개${a.ai > 0 ? `(AI${a.ai})` : ""}` : a.reason}
-                  </span>
-                </div>
-                {expanded === i && (
-                  <div style={{ background: "#f8fafc", borderRadius: 6, padding: "8px 12px", margin: "2px 0 6px 24px", fontSize: 12, lineHeight: 1.7, color: "#475569" }}>
-                    <div style={{ fontWeight: 600, color: "#7c3aed", marginBottom: 2 }}>
-                      근거 (공정표·BIM 실측 — 지어내지 않음)
-                    </div>
-                    <div>· BIM 객체 수: {a.matched.toLocaleString()}개{a.ai > 0 && ` (규칙 ${a.rule} + AI ${a.ai})`}</div>
-                    <div>· 공정표 기간: {a.durationDays > 0 ? `${a.durationDays}일` : "—"}{a.start && ` (${a.start} ~ ${a.end})`}</div>
-                    <div>
-                      · 함의 생산성:{" "}
-                      {a.impliedRate != null ? (
-                        <strong>{a.impliedRate}개/일 ({a.matched} ÷ {a.durationDays}, 역산)</strong>
-                      ) : (
-                        "— (매칭/기간 없음)"
-                      )}
-                    </div>
-                    <div>· 선행: {a.preds.length ? a.preds.slice(0, 5).join(", ") + (a.preds.length > 5 ? ` 외 ${a.preds.length - 5}` : "") : "—"}</div>
-                    <div>· 후행: {a.succs.length ? a.succs.slice(0, 5).join(", ") + (a.succs.length > 5 ? ` 외 ${a.succs.length - 5}` : "") : "—"}</div>
-                    {a.status === "미연결" && <div style={{ color: "#dc2626" }}>· 미연결 사유: {a.reason}</div>}
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3 }}>
-                      ※ 생산성 &quot;기준&quot;(품셈)은 미보유 — 위 생산성은 공정표 기간에서 역산한 값입니다.
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
