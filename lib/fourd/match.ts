@@ -643,6 +643,21 @@ export function matchAllHybrid(
     //     칸막이가 IfcWall+ST)을 무시하고 finishWindow 로. 백엔드 _FINISH_NM 미러(단열벽이 골조 매칭 차단).
     // disc='구조' 라도 마감 자재명이면 건축 — PSet trade ST 오태깅(실측: A_INS_그라스울판넬이
     // IfcWall+ST 로 '7층 코어·골조' 활동에 1,428개 묶여 강조되던 버그). 백엔드 _discipline ①-b 미러.
+    // PP(파라펫·옥상 보호층) worktype — 모델이 '구조 공정 PP 액티비티' 매칭을 명시 태깅한 부재
+    // (그라스울판넬·무근콘크리트 보호몰탈 등, 실측 M_502 RF/PH). 우리 생성기는 PP 전용 활동이
+    // 없으므로 같은 층·존 골조 창(코어와 동일)으로 결정론 근사 — 파라펫·보호층은 그 층 골조
+    // 직후 시공. 이름 게이트(마감 LoB)보다 앞: PSet 명시가 자재명 추정보다 강한 신호.
+    if ((el.wt || "").toUpperCase() === "PP" && el.storey4d) {
+      const cs = canonStorey(el.storey4d) || el.storey4d;
+      const rpp = (el.zone ? codeIdx.byZoneCat.get(zoneCatKey(el.zone, el.storey4d, "CORE")) : undefined)
+        || storeyIdx.crByStorey.get(cs) || storeyIdx.moByStorey.get(cs) || codeIdx.byStorey.get(cs);
+      if (rpp) {
+        ranges.set(el.globalId, { range: rpp, via: `pp_frame@${cs}` });
+        matched++;
+        byVia["PP골조추종"] = (byVia["PP골조추종"] ?? 0) + 1;
+        continue;
+      }
+    }
     const _discExplicit = ["건축", "MEP", "조경", "토목", "가설"].includes(el.disc ?? "");
     const finishByName = !_discExplicit && _FINISH_NM_EL.test(el.name || "");
     if (el.disc === "건축" || el.disc === "MEP" || el.disc === "조경" || finishByName) {
