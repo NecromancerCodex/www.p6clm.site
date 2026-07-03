@@ -753,6 +753,18 @@ export function matchAll(
       byVia[rd.range ? dlabel : `${dlabel}무활동`] = (byVia[rd.range ? dlabel : `${dlabel}무활동`] ?? 0) + 1;
       continue;
     }
+    // 토목/가설 — 구조 폴백 금지(hybrid 와 동일 원칙). 흙막이(DIAPHRAGM WALL=IfcWall)가 층근사에서
+    // 같은 층 코어·골조(CR)로 오매칭돼 "지하연속벽이 골조 일정에 색칠"되던 실측 버그. 토공 window
+    // 있으면 거기(페이지가 깊이 밴드로 재분배), 없으면(토목 미생성 플랜) 정직 미매칭.
+    if (el.disc === "토목" || el.disc === "가설" || el.trade === "CV" || el.trade === "TW") {
+      const rd: MatchResult = codeIdx?.earthworkWindow
+        ? { range: codeIdx.earthworkWindow, via: "earthwork:토목" }
+        : { range: null, via: "earthwork:no_act" };
+      ranges.set(el.globalId, rd);
+      if (rd.range) matched++;
+      byVia[rd.range ? "토목" : "토목무활동"] = (byVia[rd.range ? "토목" : "토목무활동"] ?? 0) + 1;
+      continue;
+    }
     const r = matchElement(el, idx);
     ranges.set(el.globalId, r);
     if (r.range) matched++;
