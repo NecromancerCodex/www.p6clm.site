@@ -25,7 +25,13 @@ export function parseIfcInWorker(
       const d = e.data;
       if (d.type === "progress") onProgress?.(d.p, d.msg);
       else if (d.type === "done") { settled = true; worker.terminate(); resolve(deserializeParsed(d.parsed)); }
-      else if (d.type === "error") { settled = true; worker.terminate(); reject(new Error(d.message)); }
+      else if (d.type === "error") {
+        // 워커 내부 실패(wasm 로드 등) — 인라인 파싱 폴백(동작 보존, 응답성만 손해)
+        settled = true;
+        worker.terminate();
+        console.warn("[ifc] worker 내부 실패 — 인라인 폴백:", d.message);
+        void parseIfc(buffer, onProgress, skipTrades).then(resolve, reject);
+      }
     };
     worker.onerror = (ev) => {
       if (settled) return;

@@ -142,7 +142,10 @@ let _api: IfcAPI | null = null;
 async function getApi(): Promise<IfcAPI> {
   if (_api) return _api;
   const api = new IfcAPI();
-  api.SetWasmPath("/web-ifc/", true); // absolute=true → origin 루트(/web-ifc/web-ifc.wasm)에서 로드. false면 JS 청크 상대경로(_next/static/chunks/web-ifc/)로 붙어 404
+  // Worker 컨텍스트에선 "/web-ifc/" 상대 루트가 URL 파싱 실패("Failed to parse URL") →
+  // location.origin 절대 URL 로(메인/워커 동일 동작). absolute=true 유지.
+  const _wasmBase = (typeof location !== "undefined" && location.origin ? location.origin : "") + "/web-ifc/";
+  api.SetWasmPath(_wasmBase, true);
   await api.Init();
   // web-ifc 의 GetMesh/GetColor 등 '못 그리는 요소' 로그 억제 → 콘솔 정리 + 파싱 가속
   // (LOG_LEVEL_OFF=6). 스킵되는 요소는 어차피 형상이 없어 렌더 대상 아님.
