@@ -221,6 +221,8 @@ function elemColor(el: ParsedElement, status: number, realistic: boolean): { c: 
   if (realistic) {
     if (status === -1) return { c: C_CONTEXT, a: 1 }; // 공정 없는 실제 형상 → 정적 컨텍스트
     const a = status === 2 ? 1 : status === 1 ? 0.45 : 0; // 완료=불투명, 진행중=반투명, 미착수=투명
+    // IFC 원본 재질색 우선(모델러 지정 색 + 유리 등 재질 알파) — 없으면 타입별 팔레트 폴백.
+    if (el.rgba) return { c: [el.rgba[0], el.rgba[1], el.rgba[2]], a: a * (el.rgba[3] ?? 1) };
     return { c: materialColor(el.ifcType), a };
   }
   return { c: colorFor(status), a: 1 };

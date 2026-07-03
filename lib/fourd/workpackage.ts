@@ -8,7 +8,7 @@
  * 패키지(물리) 1 : N 워크유닛(Primavera 공정활동). 공정 날짜는 활동에서 공유.
  * 부재는 매칭 출처(rule/ai/storey)별로 카운트 → "pmisx 정밀 + AI 보강" 가시화.
  */
-import { decodeActId, normStorey, classifyIfcType, type DecodedCode, type ScheduleTask } from "./match";
+import { decodeActId, normStorey, canonStorey, classifyIfcType, type DecodedCode, type ScheduleTask } from "./match";
 import type { ParsedElement } from "./ifc";
 
 export interface DerivedUnit {
@@ -229,10 +229,19 @@ export function deriveActivityUnits(
       bump(via.slice(7), true);
       continue;
     }
-    if (via.includes("@")) continue; // 층폴백 — 특정 활동 아님
+    if (via.includes("@")) {
+      // 층근사 via("CR@B3"/"MO@1"/"FT@PT") — 무PSet 프로젝트는 전부 이 형식이라 제외하면 연결 0
+      // (실측: Busan 연결 18/350). 층 단위 연결로 집계(zone '-', storey 는 canon 통일).
+      const [op, st] = via.split("@");
+      if (st && (op === "CR" || op === "MO" || op === "FT" || op === "PR")) {
+        bump(op === "MO" ? `MO|-|${st}|MD` : `ST|-|${st}|${op}`, false);
+      }
+      continue;
+    }
     if (via.includes("|")) {
       const p = via.split("|");
-      const key = p[0] === "MO" ? `MO|${p[1]}|${p[2]}|MD` : `ST|${p[1]}|${p[2]}|${p[3]}`;
+      const cst = canonStorey(p[2]) || p[2];   // 활동 키와 동일 canon(01↔1 표기 흡수)
+      const key = p[0] === "MO" ? `MO|${p[1]}|${cst}|MD` : `ST|${p[1]}|${cst}|${p[3]}`;
       bump(key, false);
     }
   }
@@ -253,7 +262,7 @@ export function deriveActivityUnits(
     const d = decodeActId(t.code);
     if (!d) continue;
     const wt = d.trade === "MO" ? "MD" : d.worktype ?? "";
-    const key = `${d.trade}|${d.zone}|${d.storey}|${wt}`;
+    const key = `${d.trade}|${d.zone}|${canonStorey(d.storey) || d.storey}|${wt}`;
     const c = loc.get(key) ?? { rule: 0, ai: 0 };
     const matched = c.rule + c.ai;
     let reason = "";

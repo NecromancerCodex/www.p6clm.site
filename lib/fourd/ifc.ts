@@ -20,6 +20,7 @@ import type { IfcElementMeta } from "./match";
 import { normStorey } from "./match";
 
 export interface ParsedElement extends IfcElementMeta {
+  rgba?: [number, number, number, number]; // IFC 원본 재질색(첫 인스턴스 RGBA) — 실사 모드용. 무스타일=미설정
   inst: { g: number; i: number }[]; // 이 요소의 인스턴스 참조 — g=그룹 index, i=그룹 내 슬롯 index
   cx: number; // bbox 중심 X (월드)
   cy: number; // bbox 중심 Y (월드, 수직)
@@ -521,6 +522,7 @@ export async function parseIfc(
     // 이 요소의 인스턴스 참조와 월드 bbox(전체 placed geometry 누적)
     const elemIndex = elements.length;
     const inst: { g: number; i: number }[] = [];
+    let rgba: [number, number, number, number] | undefined;   // IFC 원본 재질색(첫 유효 인스턴스)
     let mnx = Infinity, mny = Infinity, mnz = Infinity, mxx = -Infinity, mxy = -Infinity, mxz = -Infinity;
     // 깨진/비정상 지오메트리(가설·토목 모델에 흔함)가 GetVertexArray 등에서 "Invalid array length"를
     // 던져 전체 파싱이 죽지 않도록 메시별 방어. 실패 시 이 메시만 스킵(누적은 push 전이라 롤백 불요).
@@ -530,6 +532,10 @@ export async function parseIfc(
         const pg = placed.get(i);
         const gid = pg.geometryExpressID as number;
         const mat = pg.flatTransformation as number[];
+        if (!rgba) {   // 요소 대표색 = 첫 인스턴스 색. (1,1,1,1)=스타일 없음 기본값 → 미설정(팔레트 폴백)
+          const c = pg.color as { x: number; y: number; z: number; w: number } | undefined;
+          if (c && !(c.x === 1 && c.y === 1 && c.z === 1 && c.w === 1)) rgba = [c.x, c.y, c.z, c.w];
+        }
 
         // 유니크 지오메트리: 처음 보는 gid 만 tessellate(로컬 좌표·법선 그대로 보관). 이후 재사용.
         let gb = groupMap.get(gid);
@@ -611,6 +617,7 @@ export async function parseIfc(
         mtype: pm?.mtype,
         unit: pm?.unit,
         phase: pm?.phase,
+        rgba,
       });
     }
     count++;
@@ -757,4 +764,43 @@ export function mergeParsed(list: ParsedIfc[]): ParsedIfc {
     steelQto: steel.length ? steel : undefined,
     skippedTrades: skipped.size ? [...skipped] : undefined,
   };
+}
+
+
+/**
+ * Worker 파싱 래퍼 — wasm 동기 구간을 Web Worker 로 격리(메인스레드 응답성 확보).
+ * Worker 미지원/생성 실패 시 인라인 parseIfc 폴백(동작 동일, 응답성만 손해).
+ */
+export function parseIfcInWorker(
+  buffer: ArrayBuffer,
+  onProgress?: (p: number, msg: string) => void,
+  skipTrades?: Set<string>,
+): Promise<ParsedIfc> {
+  if (typeof Worker === "undefined") return parseIfc(buffer, onProgress, skipTrades);
+  return new Promise<ParsedIfc>((resolve, reject) => {
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("./ifc.worker.ts", import.meta.url));
+    } catch {
+      void parseIfc(buffer, onProgress, skipTrades).then(resolve, reject);
+      return;
+    }
+    let settled = false;
+    worker.onmessage = (e: MessageEvent) => {
+      const d = e.data;
+      if (d.type === "progress") onProgress?.(d.p, d.msg);
+      else if (d.type === "done") { settled = true; worker.terminate(); resolve(deserializeParsed(d.parsed)); }
+      else if (d.type === "error") { settled = true; worker.terminate(); reject(new Error(d.message)); }
+    };
+    worker.onerror = (ev) => {
+      if (settled) return;
+      settled = true;
+      worker.terminate();
+      // Worker 로드 실패(번들 환경 차이 등) — 인라인 폴백. buffer 는 transfer 안 했으므로 사용 가능.
+      console.warn("[ifc] worker 실패 — 인라인 파싱 폴백:", ev.message);
+      void parseIfc(buffer, onProgress, skipTrades).then(resolve, reject);
+    };
+    // buffer 는 transfer 하지 않음(복사) — onerror 인라인 폴백에서 재사용해야 하므로.
+    worker.postMessage({ buffer, skipTrades: skipTrades ? [...skipTrades] : undefined });
+  });
 }

@@ -279,13 +279,13 @@ export default function FourDPage() {
       // C-2: 무거운 숨김 레이어(가설 TW·MEP)는 기하 미로드 → 브라우저 메모리 절약(토목 ~80%↓).
       //      사용자가 '로드'한 레이어(loadExtraRef)는 스킵 대상에서 제외.
       const skipTrades = new Set([...DEFAULT_HIDDEN_TRADES].filter((t) => !loadExtraRef.current.has(t)));
-      const { parseIfc, mergeParsed, serializeParsed } = await import("../../../lib/fourd/ifc");
+      const { parseIfcInWorker, mergeParsed, serializeParsed } = await import("../../../lib/fourd/ifc");
       // 멀티 디시플린 통합 — 각 IFC(토목·구조…) 파싱 후 한 씬으로 병합(좌표계 동일 가정).
       const parsedList: ParsedIfc[] = [];
       for (let fi = 0; fi < infs.length; fi++) {
         const buf = await infs[fi].arrayBuffer();
         const tag = infs.length > 1 ? `[${fi + 1}/${infs.length}] ${infs[fi].name} — ` : "";
-        const p = await parseIfc(buf, (pr, msg) => setProgress({ p: pr, msg: tag + msg }), skipTrades);
+        const p = await parseIfcInWorker(buf, (pr, msg) => setProgress({ p: pr, msg: tag + msg }), skipTrades);  // Worker 파싱 — 메인스레드 응답성(응답없음 대화상자 근본 해소)
         // 공종 태그 — 파일 슬롯(플랜) 또는 파일명 추측이 '기본', 단 섞인 파일 분리: 건축 IFC의 조경 포장→조경,
         //   구조 IFC의 흙막이 pile→토목 등 확실한 타 공종은 classifyDisc 가 override(이름·타입). 애매한 건 슬롯.
         const fileDisc = ifcDiscRef.current[infs[fi].name] ?? discFromName(infs[fi].name);
@@ -553,7 +553,7 @@ export default function FourDPage() {
     try {
       const KO_CAT: Record<string, string> = { CORE: "벽·기둥", FOOT: "기초", MOD: "슬래브·보·모듈" };
       const koStorey = (s: string | null) =>
-        !s ? "?" : s === "PT" ? "기초(PT)" : s === "RF" ? "지붕(RF)" : `${Number(s)}층`;
+        !s ? "층미상" : s === "PT" ? "기초(PT)" : s === "RF" ? "지붕(RF)" : Number.isFinite(Number(s)) ? `${Number(s)}층` : s;
 
       // 1) 미매칭 요소 그룹핑 (zone|storey|category|reason)
       const groups = new Map<
@@ -746,7 +746,7 @@ export default function FourDPage() {
     const aiAttempted = ready.policyCount > 0 || (ready.policyResolved?.length ?? 0) > 0;
     const KO_CAT: Record<string, string> = { CORE: "벽·기둥", FOOT: "기초", MOD: "슬래브·보·모듈" };
     const koStorey = (s: string | null) =>
-      !s ? "?" : s === "PT" ? "기초(PT)" : s === "RF" ? "지붕(RF)" : `${Number(s)}층`;
+      !s ? "층미상" : s === "PT" ? "기초(PT)" : s === "RF" ? "지붕(RF)" : Number.isFinite(Number(s)) ? `${Number(s)}층` : s;
 
     // via → 대표 활동키 (유닛/단계/정책 → coarse 후보키)
     const viaToActivity = (via: string | undefined): string | null => {
@@ -1525,9 +1525,9 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
 
 function wpLabel(p: DerivedPackage): string {
   if (p.trade === "MO") {
-    return `${p.zone ?? "?"} ${p.storey ?? "?"}층 ${p.module_unit ?? "?"}호${p.mtype ? ` ${p.mtype}타입` : ""}`;
+    return `${p.zone ?? "단일동"} ${p.storey ?? "층미상"}층 ${p.module_unit ?? "-"}호${p.mtype ? ` ${p.mtype}타입` : ""}`;
   }
-  return `${p.zone ?? "?"} ${p.storey ?? "?"}층 ${p.worktype ?? "?"}`;
+  return `${p.zone ?? "단일동"} ${p.storey ?? "층미상"}층 ${p.worktype ?? "골조"}`;
 }
 
 function WorkPackageModal({
@@ -1557,8 +1557,14 @@ function WorkPackageModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, packages }),
       });
+      if (!res.ok) {  // 상태코드 표면화 — 413(nginx body 한도)/422(스키마)/500 구분 진단
+        const txt = await res.text().catch(() => "");
+        console.error("[워크패키지 저장]", res.status, txt.slice(0, 300));
+        alert(`저장 실패 (HTTP ${res.status})${res.status === 413 ? " — 페이로드가 서버 한도 초과(nginx client_max_body_size 증설 필요)" : ""}`);
+      }
       setSaving(res.ok ? "done" : "error");
-    } catch {
+    } catch (e) {
+      console.error("[워크패키지 저장]", e);
       setSaving("error");
     }
   };
