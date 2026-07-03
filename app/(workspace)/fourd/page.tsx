@@ -279,7 +279,8 @@ export default function FourDPage() {
       // C-2: 무거운 숨김 레이어(가설 TW·MEP)는 기하 미로드 → 브라우저 메모리 절약(토목 ~80%↓).
       //      사용자가 '로드'한 레이어(loadExtraRef)는 스킵 대상에서 제외.
       const skipTrades = new Set([...DEFAULT_HIDDEN_TRADES].filter((t) => !loadExtraRef.current.has(t)));
-      const { parseIfcInWorker, mergeParsed, serializeParsed } = await import("../../../lib/fourd/ifc");
+      const { mergeParsed, serializeParsed } = await import("../../../lib/fourd/ifc");
+      const { parseIfcInWorker } = await import("../../../lib/fourd/ifcWorkerClient");
       // 멀티 디시플린 통합 — 각 IFC(토목·구조…) 파싱 후 한 씬으로 병합(좌표계 동일 가정).
       const parsedList: ParsedIfc[] = [];
       for (let fi = 0; fi < infs.length; fi++) {
