@@ -357,6 +357,41 @@ export default function FourDPage() {
           }
         }
       }
+      // ── 건축 부재 Z(표고) 층 판정 — finishWindow(전체 창) 일괄완성 방지, 층별 LoB 활동 연동. ──
+      //    층 태깅된 부재(구조 등)의 층별 cy 중심을 학습 → 층 없는 건축 부재를 최근접 층에 배정 →
+      //    그 층 마감 window("B6 조적~바닥", archByStorey)로 교체. 토목 깊이 밴드와 동일 원리(기하=근거).
+      if (codeIndex && codeIndex.archByStorey.size >= 2) {
+        const stCy = new Map<string, number[]>();
+        for (const e of parsed.elements) {
+          const cs = canonStorey(e.storey4d ?? e.storeyName ?? "");
+          if (cs && Number.isFinite(e.cy)) {
+            if (!stCy.has(cs)) stCy.set(cs, []);
+            stCy.get(cs)!.push(e.cy as number);
+          }
+        }
+        const centers: { cs: string; y: number }[] = [];
+        for (const [cs, ys2] of stCy) {
+          if (ys2.length < 3 || !codeIndex.archByStorey.has(cs)) continue;   // 그 층 마감활동 있는 층만
+          ys2.sort((a, b) => a - b);
+          centers.push({ cs, y: ys2[Math.floor(ys2.length / 2)] });          // 중앙값(이상치 방어)
+        }
+        if (centers.length >= 2) {
+          let placed = 0;
+          for (const e of parsed.elements) {
+            const r = ranges.get(e.globalId);
+            if (!r?.via?.startsWith("finish") || !Number.isFinite(e.cy)) continue;   // 개략 매칭된 건축만
+            let best: { cs: string; y: number } | null = null;
+            for (const c of centers)
+              if (!best || Math.abs(c.y - (e.cy as number)) < Math.abs(best.y - (e.cy as number))) best = c;
+            const w = best ? codeIndex.archByStorey.get(best.cs) : null;
+            if (best && w) {
+              ranges.set(e.globalId, { range: w, via: `finish_storey:${best.cs}` });
+              placed++;
+            }
+          }
+          if (placed) summary.byVia["건축(층Z)"] = placed;
+        }
+      }
       // 4D 타임라인 = 전체 공정표 범위(모든 task). 코드/키워드 인덱스에 안 잡히는 활동(지반개량 등)도
       // 포함 → 슬라이더가 진짜 착공일(첫 활동)부터 시작. (안 그러면 흙막이부터 시작해 6~7월 공백)
       {

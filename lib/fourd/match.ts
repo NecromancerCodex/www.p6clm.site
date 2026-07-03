@@ -243,6 +243,7 @@ export interface CodeIndex {
   finishWindow: DateRange | null; // 마감(창호·문·마감재) 활동 기간 — 마감 부재(골조 후) 매칭용
   mepWindow: DateRange | null; // 설비(배관·덕트·전기·소방·통신) 활동 기간 — MEP 부재 매칭용
   landscapeWindow: DateRange | null; // 조경(식재·포장·시설물) 활동 기간 — 조경 부재 매칭용
+  archByStorey: Map<string, DateRange>; // 층별 마감(LoB) window — 건축 부재 Z 층판정 정밀 매칭용
   minDate: number;
   maxDate: number;
 }
@@ -339,6 +340,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   const moByZoneStorey = new Map<string, DateRange>();
   const moByStorey = new Map<string, DateRange>();
   const moByUnit = new Map<string, DateRange>();
+  const archByStorey = new Map<string, DateRange>();   // 층별 마감(LoB) window — "B6 조적 공사" 류 층 접두 활동
   let ewStart = Infinity;
   let ewEnd = -Infinity;
   let fwStart = Infinity;
@@ -367,6 +369,13 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
       fwEnd = Math.max(fwEnd, e);
       minD = Math.min(minD, s);
       maxD = Math.max(maxD, e);
+      // 층별 LoB 마감("B6 조적 공사"/"01 미장 공사") — 층 접두 토큰 → 층별 window 누적.
+      // 건축 부재를 Z(표고) 층 판정으로 층 순서대로 등장시키는 데 사용(전체 창 일괄완성 방지).
+      const stTok = /^([A-Z]{0,2}\d+F?|PT|PIT|RF|PH)\s/i.exec(t.name || "");
+      if (stTok) {
+        const cs = canonStorey(stTok[1]) || stTok[1];
+        mergeRange(archByStorey, cs, s, e);
+      }
     }
     // MEP 설비 활동 → mep window 누적 (설비 부재 매칭, 골조 후).
     if (_MEP_KW.test(t.name || "")) {
@@ -420,6 +429,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     finishWindow: fwStart === Infinity ? null : { start: fwStart, end: fwEnd },
     mepWindow: mwStart === Infinity ? null : { start: mwStart, end: mwEnd },
     landscapeWindow: lwStart === Infinity ? null : { start: lwStart, end: lwEnd },
+    archByStorey,
     minDate: minD === Infinity ? Date.now() : minD,
     maxDate: maxD === -Infinity ? Date.now() : maxD,
   };

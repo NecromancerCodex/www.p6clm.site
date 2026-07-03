@@ -431,7 +431,11 @@ export async function parseIfc(
   skipTrades?: Set<string>, // 이 trade(가설 TW 등)는 기하를 로드하지 않음 — 브라우저 메모리 절약(C-2)
 ): Promise<ParsedIfc> {
   const api = await getApi();
+  // 단계 경계 yield — wasm 동기 구간(OpenModel/StreamAllMeshes) 사이에 브라우저가 페인트·입력을
+  // 처리할 틈을 준다. 378MB 급에서 '응답 없는 페이지' 대화상자 완화(근본=Web Worker, 백로그).
+  const breathe = () => new Promise<void>((r) => setTimeout(r, 0));
   onProgress?.(0.05, "모델 여는 중…");
+  await breathe();
   const modelID = api.OpenModel(new Uint8Array(buffer));
 
   // 메타 맵 추출 — 하나가 실패해도(대형/비정상 IFC) 빈 맵으로 폴백, 지오메트리 파싱은 계속.
@@ -442,10 +446,13 @@ export async function parseIfc(
       return new Map<number, T>();
     }
   };
+  await breathe();
   onProgress?.(0.15, "층 구조 분석 중…");
   const storeyMap = safeMap(() => buildStoreyMap(api, modelID));
+  await breathe();
   onProgress?.(0.2, "공정 속성 분석 중…");
   const procMap = safeMap(() => buildProcMap(api, modelID));
+  await breathe();
   onProgress?.(0.22, "정량물량(체적·면적) 분석 중…");
   const qtyMap = safeMap(() => buildQtyMap(api, modelID));
   const steelQto = (() => { try { return extractSteelQto(api, modelID); } catch { return []; } })();
@@ -469,7 +476,8 @@ export async function parseIfc(
   // 전체 월드 bbox(모든 인스턴스 정점) — 바닥 높이·정합·framing 용.
   let wmnx = Infinity, wmny = Infinity, wmnz = Infinity, wmxx = -Infinity, wmxy = -Infinity, wmxz = -Infinity;
 
-  onProgress?.(0.25, "지오메트리 스트리밍 중… (대용량 IFC는 1~2분)");
+  await breathe();
+  onProgress?.(0.25, "지오메트리 스트리밍 중… (대용량 IFC는 2~5분 — '응답 없음' 대화상자가 뜨면 [대기]를 눌러 주세요)");
 
   // 요소별 메타 캐시 (globalId/type/name) — GetLine 호출 최소화
   const metaCache = new Map<number, { globalId: string; ifcType: string; name: string } | null>();
