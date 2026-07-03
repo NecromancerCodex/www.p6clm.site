@@ -543,6 +543,7 @@ export default function SchedulePlanWizard() {
         const ctx = await inferScheduleContext({
           storeys: [...storeySet], zones: [...zoneSet], element_summary: inferSrc.element_summary,
           trade_summary: inferSrc.trade_summary, discipline_summary: inferSrc.discipline_summary, total_count: inferSrc.element_count,
+          name_signals: inferSrc.name_signals,   // 부재명 신호(강재단면 54% 등) — RC 오추론 방지
         });
         if (ctx.building_type && !buildingType.trim()) setBuildingType(ctx.building_type);
         if (ctx.scope && !scope.trim()) setScope(ctx.scope);

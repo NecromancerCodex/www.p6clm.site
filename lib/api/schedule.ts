@@ -488,6 +488,7 @@ export async function inferScheduleContext(req: {
   element_summary: { type: string; count: number; names?: string[] }[]; total_count: number;
   trade_summary?: { trade: string; count: number }[];   // 공정 PSet Trade(ST/MO) — 구조유형 결정론 신호
   discipline_summary?: { discipline: string; count: number }[];   // 공종(흙막이 보정 후) — 멀티파싱 판정
+  name_signals?: { steel?: number; pc_module?: number };  // 부재명 신호(강재단면/PC·모듈) — 결정론 집계
 }): Promise<InferContextResult> {
   const res = await fetch(`${API_BASE}/schedule/infer-context`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),
@@ -528,6 +529,7 @@ export interface IfcWorkUnitsResult {
   suggested_equip?: number;      // 물량 기반 권장 토목 투입조(목표 굴착공기 기준) — 대형현장 비현실 기본값 방지
   project_name?: string;         // IFC 프로젝트/건물명 — 슬롯 간 다른 프로젝트 섞임 검출(보조 신호)
   element_summary: { type: string; count: number; names?: string[] }[];
+  name_signals?: { steel?: number; pc_module?: number };  // 부재명 신호 — 구조유형 추론 근거(결정론)
   unknown_types?: { type: string; count: number; names?: string[] }[]; // 미상(분류 실패) IFC타입
   ai_classified?: number;        // AI 가 이름·타입으로 추정 분류한 부재 수(확정과 구분)
   element_count: number;
