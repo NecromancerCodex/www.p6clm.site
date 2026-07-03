@@ -111,6 +111,10 @@ export function normStorey(storeyName: string | null | undefined): string | null
   const u = s.toUpperCase();
   if (s.includes("지붕") || s.includes("오탑") || s.includes("파라펫") || /\bRF\b/.test(u))
     return "RF";
+  // "지하N층"(한글 라벨, 예: 502_지하1층 SL) → BN — 종전엔 아래 "지하→PT" 가 먼저 걸려
+  // 지하 부재(계단·난간 등 무PSet 폴백)가 피트로 오귀속 → 미매칭되던 실측 버그.
+  const mkb = /지하\s*(\d{1,2})/.exec(s);
+  if (mkb) return "B" + mkb[1];
   if (u.includes("PIT") || s.includes("기초") || s.includes("지정") || s.includes("지하"))
     return "PT";
   // 인식 못 한 층(예: 영문 "Level 1", 임의 표기)은 원본 보존 — 502동 외 범용 BIM 매칭용.
