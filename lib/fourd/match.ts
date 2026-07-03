@@ -245,6 +245,7 @@ export interface CodeIndex {
   moByUnit: Map<string, DateRange>; // 모듈러: zone|canonStorey|unit → 호 단위 모듈 window (호 세분)
   earthworkWindow: DateRange | null; // 토공(흙막이/굴착/차수) 공통활동 기간 — 토목(CV) 매칭용
   finishWindow: DateRange | null; // 마감(창호·문·마감재) 활동 기간 — 마감 부재(골조 후) 매칭용
+  finishStoreys: string[]; // 구조 층 목록(시공순 rank) — 마감 창 층별 안분(LoB 근사)용
   mepWindow: DateRange | null; // 설비(배관·덕트·전기·소방·통신) 활동 기간 — MEP 부재 매칭용
   landscapeWindow: DateRange | null; // 조경(식재·포장·시설물) 활동 기간 — 조경 부재 매칭용
   archByStorey: Map<string, DateRange>; // 층별 마감(LoB) window — 건축 부재 Z 층판정 정밀 매칭용
@@ -425,6 +426,17 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
       mergeRange(byZoneCat, zoneCatKey(d.zone, d.storey, opToCat(wt)), s, e);
     }
   }
+  const _rank = (st: string) => {
+    if (st === "PT") return -99;
+    if (st.startsWith("B")) return -parseInt(st.slice(1) || "1", 10);
+    if (st === "RF") return 901;
+    if (st.startsWith("PH")) return 900;
+    const n = parseInt(st, 10);
+    return Number.isNaN(n) ? 500 : n;
+  };
+  const finishStoreys = Array.from(
+    new Set([...moByStorey.keys(), ...Array.from(byStorey.keys(), (k) => k.split("|")[0])]),
+  ).sort((a, b) => _rank(a) - _rank(b));
   return {
     byKey,
     byUnit,
@@ -434,6 +446,7 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     moByZoneStorey,
     moByStorey,
     moByUnit,
+    finishStoreys,
     earthworkWindow: ewStart === Infinity ? null : { start: ewStart, end: ewEnd },
     finishWindow: fwStart === Infinity ? null : { start: fwStart, end: fwEnd },
     mepWindow: mwStart === Infinity ? null : { start: mwStart, end: mwEnd },
@@ -633,9 +646,22 @@ export function matchAllHybrid(
     const _discExplicit = ["건축", "MEP", "조경", "토목", "가설"].includes(el.disc ?? "");
     const finishByName = !_discExplicit && _FINISH_NM_EL.test(el.name || "");
     if (el.disc === "건축" || el.disc === "MEP" || el.disc === "조경" || finishByName) {
-      const w = el.disc === "MEP" ? codeIdx.mepWindow : el.disc === "조경" ? codeIdx.landscapeWindow : codeIdx.finishWindow;
+      let w = el.disc === "MEP" ? codeIdx.mepWindow : el.disc === "조경" ? codeIdx.landscapeWindow : codeIdx.finishWindow;
       const dlabel = el.disc || "건축";
-      const via = el.disc === "MEP" ? "mep" : el.disc === "조경" ? "landscape" : "finish";
+      let via = el.disc === "MEP" ? "mep" : el.disc === "조경" ? "landscape" : "finish";
+      // 건축 층별 안분(LoB 근사, 표시용) — 공정표 건축이 공통 시퀀스(층 없음)라 부재 수만개가
+      // 마감 창 하나에 퉁쳐지던 것을, 창을 층 순서(저층→고층)로 슬라이스해 층별 웨이브로 표시.
+      // 공정표 데이터 불변 — 마감 실무 순서(하부층부터)의 결정론 근사.
+      if (via === "finish" && w && el.storey4d && codeIdx.finishStoreys.length > 1) {
+        const cs = canonStorey(el.storey4d);
+        const i = cs ? codeIdx.finishStoreys.indexOf(cs) : -1;
+        if (i >= 0) {
+          const n = codeIdx.finishStoreys.length;
+          const span = w.end - w.start;
+          w = { start: w.start + (span * i) / n, end: w.start + (span * (i + 1)) / n };
+          via = `finish_lob@${cs}`;
+        }
+      }
       const rd: MatchResult = w ? { range: w, via: `${via}:${dlabel}` } : { range: null, via: `${via}:no_act` };
       ranges.set(el.globalId, rd);
       if (rd.range) matched++;
