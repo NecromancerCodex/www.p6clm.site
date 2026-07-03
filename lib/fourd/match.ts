@@ -628,7 +628,9 @@ export function matchAllHybrid(
     //   전부 그 공종 window 로. (타입 기반은 disc 없는 종합 파일용으로 아래에서 처리)
     //   + 종합 파일(disc 없음)은 마감/단열 자재명으로 건축 판정 — PSet Trade=ST 오태깅(단열판넬·석고
     //     칸막이가 IfcWall+ST)을 무시하고 finishWindow 로. 백엔드 _FINISH_NM 미러(단열벽이 골조 매칭 차단).
-    const finishByName = !el.disc && _FINISH_NM_EL.test(el.name || "");
+    // disc='구조' 라도 마감 자재명이면 건축 — PSet trade ST 오태깅(실측: A_INS_그라스울판넬이
+    // IfcWall+ST 로 '7층 코어·골조' 활동에 1,428개 묶여 강조되던 버그). 백엔드 _discipline ①-b 미러.
+    const finishByName = (!el.disc || el.disc === "구조") && _FINISH_NM_EL.test(el.name || "");
     if (el.disc === "건축" || el.disc === "MEP" || el.disc === "조경" || finishByName) {
       const w = el.disc === "MEP" ? codeIdx.mepWindow : el.disc === "조경" ? codeIdx.landscapeWindow : codeIdx.finishWindow;
       const dlabel = el.disc || "건축";
