@@ -1158,6 +1158,7 @@ export default function SchedulePlanWizard() {
                         <option value="sequence">시공순서 중심 (단계 &gt; 차수 &gt; 구역) — CPM</option>
                         <option value="storey">층 중심 (층 &gt; 구역 &gt; 공종) — 층별 진도</option>
                         <option value="trade_detail">공종-구역-층 — 하도급 상세 기성</option>
+                        <option value="practical">실무형 (선행·후행동 &gt; 구간 &gt; 공종트랙) — 마스터 공정표 관행</option>
                         {wbsCustomLabel && <option value={wbsStructure}>커스텀: {wbsCustomLabel}</option>}
                       </select>
                       <button onClick={onRecommendWbs} disabled={wbsRecBusy}
