@@ -691,17 +691,32 @@ export default function SchedulePlanWizard() {
       const d = new Date(s + "T00:00:00"); d.setDate(d.getDate() + 1);
       return d.toISOString().slice(0, 10);
     };
-    return tasks.filter((t) => t.start && t.end).map((t) => ({
+    const mapped = tasks.filter((t) => t.start && t.end).map((t) => ({
       id: String(t.code), activity_code: String(t.code), name: String(t.name),
       wbs_code: String(t.wbs ?? "").split(/\s*>\s*/).filter(Boolean).join("."),
       start: String(t.start).slice(0, 10), end: bump(String(t.start).slice(0, 10), String(t.end).slice(0, 10)),
       progress: 0, is_cp: false, total_float_hr_cnt: null, status: "",
       dependencies: ((t.predecessors as string[]) ?? []).filter((p) => p !== t.code),
-    }))
-      // 시공 순서(시간순)로 정렬 — 기초(PT)가 지하(B1)보다 먼저 착공이므로 위에. 코드 문자열 순(B1<PT)이
-      // 시간순을 역전시키던 문제 차단. 동일 시작일은 코드순.
-      .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1
-        : a.activity_code < b.activity_code ? -1 : a.activity_code > b.activity_code ? 1 : 0)) as GanttTask[];
+    }));
+    // WBS(구역중심 등 사용자가 고른 구조) 그룹핑을 간트에 반영 — 그룹은 최초 착수일 순(공통→기초→
+    // 선행동→후행동), 그룹 안은 시간순. 종전 전체 시간순은 존들이 날짜로 뒤섞여(PT ZA/ZABC/ZC 교차)
+    // WBS 를 무시한 평면 나열이 되던 실측 문제.
+    const groupStart = new Map<string, string>();
+    for (const t of mapped) {
+      const g = t.wbs_code || "~공통";
+      const cur = groupStart.get(g);
+      if (!cur || t.start < cur) groupStart.set(g, t.start);
+    }
+    return mapped.sort((a, b) => {
+      const ga = a.wbs_code || "~공통", gb = b.wbs_code || "~공통";
+      if (ga !== gb) {
+        const sa = groupStart.get(ga)!, sb = groupStart.get(gb)!;
+        if (sa !== sb) return sa < sb ? -1 : 1;
+        return ga < gb ? -1 : 1;
+      }
+      if (a.start !== b.start) return a.start < b.start ? -1 : 1;
+      return a.activity_code < b.activity_code ? -1 : a.activity_code > b.activity_code ? 1 : 0;
+    }) as GanttTask[];
   }, [plan]);
 
   const editAct = (i: number, patch: Partial<PlanActivity>) => {
