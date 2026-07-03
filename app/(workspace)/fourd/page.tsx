@@ -318,8 +318,8 @@ export default function FourDPage() {
         minDate = Math.min(codeIndex.minDate, sidx.minDate);
         maxDate = Math.max(codeIndex.maxDate, sidx.maxDate);
       } else {
-        // 층 근사 매칭 (PSet 없음). codeIndex 는 버튼/AI용으로만 보유(매칭엔 미사용).
-        ({ ranges, summary } = matchAll(parsed.elements, sidx));
+        // 층 근사 매칭 (PSet 없음). codeIndex 는 공종 window(건축/MEP/조경 disc 단축경로)에 사용.
+        ({ ranges, summary } = matchAll(parsed.elements, sidx, codeIndex));
         minDate = codeIndex ? Math.min(codeIndex.minDate, sidx.minDate) : sidx.minDate;
         maxDate = codeIndex ? Math.max(codeIndex.maxDate, sidx.maxDate) : sidx.maxDate;
       }

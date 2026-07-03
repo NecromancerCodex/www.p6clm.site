@@ -720,13 +720,29 @@ export interface MatchSummary {
 
 /** 전체 요소 매칭 + 요약. */
 export function matchAll(
-  elements: IfcElementMeta[],
+  elements: (IfcElementMeta & Partial<ProcElement>)[],
   idx: ScheduleIndex,
+  codeIdx?: CodeIndex | null,
 ): { ranges: Map<string, MatchResult>; summary: MatchSummary } {
   const ranges = new Map<string, MatchResult>();
   const byVia: Record<string, number> = {};
   let matched = 0;
   for (const el of elements) {
+    // 슬롯 공종(disc) window 단축경로 — hybrid(matchAllHybrid)와 동일 원칙을 층근사 경로에도.
+    // (실측: 무PSet Busan 은 useCode=false → matchAll 로 오는데 이 분기가 없어 ARCH 건축
+    //  16,932부재가 층근사(층정보 없음)에서 전멸. 건축/MEP/조경은 공종 window 개략 매칭이 정답)
+    if (codeIdx && (el.disc === "건축" || el.disc === "MEP" || el.disc === "조경"
+                    || (!el.disc && _FINISH_NM_EL.test(el.name || "")))) {
+      const w = el.disc === "MEP" ? codeIdx.mepWindow
+        : el.disc === "조경" ? codeIdx.landscapeWindow : codeIdx.finishWindow;
+      const dlabel = el.disc || "건축";
+      const via = el.disc === "MEP" ? "mep" : el.disc === "조경" ? "landscape" : "finish";
+      const rd: MatchResult = w ? { range: w, via: `${via}:${dlabel}` } : { range: null, via: `${via}:no_act` };
+      ranges.set(el.globalId, rd);
+      if (rd.range) matched++;
+      byVia[rd.range ? dlabel : `${dlabel}무활동`] = (byVia[rd.range ? dlabel : `${dlabel}무활동`] ?? 0) + 1;
+      continue;
+    }
     const r = matchElement(el, idx);
     ranges.set(el.globalId, r);
     if (r.range) matched++;
