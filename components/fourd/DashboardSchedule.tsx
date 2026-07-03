@@ -99,7 +99,11 @@ function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
         status: "",
         dependencies: deps,
       } satisfies GanttTask;
-    });
+    })
+    // 시공 순서(시작일순) — 먼저 하는 활동이 위(실무 공정표 관례). 생성 순서(01층부터)를 그대로
+    // 그리면 B6(7월 착공)이 B5(10월)보다 아래에 놓이는 역전. 동일 시작일은 코드순(안정 정렬).
+    .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1
+      : a.activity_code < b.activity_code ? -1 : 1));
 }
 
 /** dateMs(epoch) → "YYYY-MM-DD" 로컬 (간트 마커용). */
