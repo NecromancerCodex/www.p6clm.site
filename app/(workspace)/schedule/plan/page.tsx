@@ -377,6 +377,25 @@ export default function SchedulePlanWizard() {
   const [ganttReady, setGanttReady] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // '동시구역' 소급 상한 — 대용량 IFC(생성 시 분석)는 내역서 업로드 시점에 존 정보가 없어
+  // 물량 기반 8이 그대로 남던 실측 버그. 존이 확보되는 순간 min(현재값, 메인존 수)로 교정.
+  // (이후 사용자가 수동으로 키우는 건 존 목록이 안 바뀌는 한 유지됨)
+  useEffect(() => {
+    const mz = new Set(zones.map((z) => String(z).replace(/[-_ ]?\d+$/, "").trim()).filter(Boolean)).size;
+    if (!mz) return;
+    const cap = Math.max(2, mz);
+    setDiscEquip((s) => {
+      let changed = false;
+      const out = { ...s };
+      for (const k of ["구조", "종합"]) {
+        const v = out[k]?.["작업조"];
+        if (v && v > cap) { out[k] = { ...out[k], 작업조: cap }; changed = true; }
+      }
+      return changed ? out : s;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zones]);
+
   // 복구 — URL ?plan= 우선, 없으면 localStorage 체크포인트 (페이지 이동/새로고침 후 이어서)
   useEffect(() => {
     const q = searchParams.get("plan") || (typeof window !== "undefined" ? localStorage.getItem(PLAN_CKPT) : null);
