@@ -921,6 +921,7 @@ export default function SchedulePlanWizard() {
                             <option value="모듈러-PC일체">모듈러(PC·일체/PPVC)</option>
                             <option value="모듈러-PC패널">모듈러(PC·패널조립)</option>
                             <option value="모듈러-목조">모듈러(목조CLT)</option>
+                            <option value="모듈러-인필">모듈러(인필/넥스트홈형)</option>
                             <option value="하이브리드">하이브리드(모듈+코어)</option>
                             <option value="패널라이즈드">패널라이즈드</option>
                             <option value="PC">PC(하프슬래브/DfMA)</option>
