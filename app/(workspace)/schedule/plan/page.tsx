@@ -309,6 +309,10 @@ export default function SchedulePlanWizard() {
         // 크레인: 실측 앵커 ~4대/15만㎥(포스코) → 1대당 ~4만㎥. 작업조 ≈ 크레인×2.
         auto["크레인"] = clamp(Math.round(conc / 40000), 2, 12);
         auto["작업조"] = clamp(Math.round(conc / 20000), 3, 16);
+        // '동시구역'은 병렬 전선 수 — IFC 메인존 수를 넘으면 무의미(존 4개에 8은 불가) + 인력 과대.
+        // 물량 기반 추천을 감지된 메인존 수로 상한(실측: 155,331㎥→8 vs 존 A~D 4개 모순).
+        const mainZones = new Set(zones.map((z) => String(z).replace(/[-_ ]?\d+$/, "").trim()).filter(Boolean)).size;
+        if (mainZones >= 1) auto["작업조"] = Math.min(auto["작업조"], Math.max(2, mainZones));
       } else if (cardKey !== "토목") {
         // 건축·MEP·조경: 자기 물량(마감㎡·설비m 합)으로 작업조 스케일. 토목은 굴삭기=장비 세트.
         auto["작업조"] = clamp(Math.round(itemSum / 25000), 3, 12);
