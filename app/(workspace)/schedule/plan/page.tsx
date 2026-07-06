@@ -1018,7 +1018,7 @@ export default function SchedulePlanWizard() {
                                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
                                     {Object.entries(discEquip[d.key]!).filter(([name]) => equipAllowed(d.key, name)).map(([name, cnt]) => (
                                       <label key={name} style={{ fontSize: 11, color: "#78716c", display: "inline-flex", alignItems: "center", gap: 3 }}
-                                             title={name === "작업조" ? ((d.key === "구조" || d.key === "종합") ? "동시 시공 구역 수 — 병렬도(공기 지배). 셀당 인력인 '골조 투입조'와 다름" : "이 공종 작업조 수(기간 driver)") : `${name} 대수`}>
+                                             title={name === "작업조" ? ((d.key === "구조" || d.key === "종합") ? "동시에 골조를 진행할 구역 수(병렬 한도 — 공기 지배). 아래 '인력'은 이 수 × 1구역 작업조 구성으로 자동 산출되는 파생값" : "이 공종 작업조 수(기간 driver)") : `${name} 대수`}>
                                         {equipLabel(d.key, name)}
                                         <input type="number" min={0} className="wz-in" style={{ width: 46, padding: "2px 4px", fontSize: 11 }}
                                                value={cnt}
@@ -1050,8 +1050,8 @@ export default function SchedulePlanWizard() {
                                     if (!jobs.length) return null;
                                     return (
                                       <div style={{ marginTop: 5, fontSize: 10.5, color: "#78716c", borderTop: "1px dashed #fde68a", paddingTop: 4 }}>
-                                        👷 <b>인력(직종별 자동)</b>: {jobs.map((j) => `${j} ${labor[j]}명`).join(" · ")}
-                                        <span style={{ color: "#a16207" }}> — 작업조·장비 수 수정 시 자동 반영</span>
+                                        👷 <b>투입 인력(자동 산출)</b>: {jobs.map((j) => `${j} ${labor[j]}명`).join(" · ")}
+                                        <span style={{ color: "#a16207" }}> — 동시구역 × 1구역 작업조 구성으로 계산(입력값 아님, 동시구역·장비 수정 시 갱신)</span>
                                       </div>
                                     );
                                   })()}
