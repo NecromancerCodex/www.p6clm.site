@@ -1670,6 +1670,21 @@ export default function SchedulePlanWizard() {
                   <div key={i} style={{ fontSize: 12, padding: "3px 0", borderTop: i ? "1px solid #fde0e0" : undefined, color: col(r.severity).fg }}>
                     {col(r.severity).icon} <b>{r.title}</b> <span style={{ color: "#78716c" }}>— {r.detail}</span>
                     <br /><span style={{ color: "#0369a1" }}>→ {r.mitigation}</span>
+                    {/* 동절기 타설 리스크 — 조강 원클릭(알폼 패턴). 감지·계산=시스템, 결정=클릭 1회(원가 할증은 사업 결정). */}
+                    {r.category === "동절기" && !rapidConcrete && (
+                      <button type="button" disabled={busy}
+                        onClick={async () => {
+                          if (!planId || !confirm("조강콘크리트를 적용해 재계산할까요? (양생 ×0.45 단축 — 원가 할증 있음)")) return;
+                          setBusy(true); setErr(null);
+                          try { setRapidConcrete(true); await confirmPlan(planId, { rapid_concrete: true }); await refresh(planId); }
+                          catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+                          finally { setBusy(false); }
+                        }}
+                        style={{ marginLeft: 8, padding: "1px 9px", borderRadius: 6, border: "1px solid #fca5a5",
+                                 background: "#fff1f2", color: "#b91c1c", fontSize: 10.5, cursor: "pointer" }}>
+                        ⚡ 조강 적용 + 재계산
+                      </button>
+                    )}
                   </div>
                 ))}
                 {brief && (
