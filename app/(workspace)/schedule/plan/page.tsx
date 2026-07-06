@@ -706,14 +706,17 @@ export default function SchedulePlanWizard() {
     // WBS(구역중심 등 사용자가 고른 구조) 그룹핑을 간트에 반영 — 그룹은 최초 착수일 순(공통→기초→
     // 선행동→후행동), 그룹 안은 시간순. 종전 전체 시간순은 존들이 날짜로 뒤섞여(PT ZA/ZABC/ZC 교차)
     // WBS 를 무시한 평면 나열이 되던 실측 문제.
+    // 그룹 = WBS 1차 계층(구역중심이면 Zone A/B/C/D) — 전체 경로(존>층>공종)로 묶으면 그룹이
+    // 수백 개라 시간순과 구분이 안 됨(실측: 조강 재계산 후 존이 교차 나열돼 보이던 문제).
+    const top = (t: { wbs_code: string }) => (t.wbs_code || "").split(".")[0] || "~공통";
     const groupStart = new Map<string, string>();
     for (const t of mapped) {
-      const g = t.wbs_code || "~공통";
+      const g = top(t);
       const cur = groupStart.get(g);
       if (!cur || t.start < cur) groupStart.set(g, t.start);
     }
     return mapped.sort((a, b) => {
-      const ga = a.wbs_code || "~공통", gb = b.wbs_code || "~공통";
+      const ga = top(a), gb = top(b);
       if (ga !== gb) {
         const sa = groupStart.get(ga)!, sb = groupStart.get(gb)!;
         if (sa !== sb) return sa < sb ? -1 : 1;
