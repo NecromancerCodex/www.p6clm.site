@@ -13,7 +13,7 @@ import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "reac
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
-  cancelPlan, confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, planAuditLoop, getBasis, getWeatherRates, type BasisResult, type AuditFinding, type IfcWorkUnitsResult,
+  cancelPlan, confirmPlan, extractIfcWorkUnitsViaS3, getPlan, inferScheduleContext, recommendWbs, wbsFromText, planP6XmlDownloadUrl, planXerUrl, riskBrief, planAudit, planAuditFix, getBasis, getWeatherRates, type BasisResult, type AuditFinding, type IfcWorkUnitsResult,
   savePlanActivities, startPlan, ScheduleApiError, parseBoq, boqBrief,
   type GanttTask, type GenMilestone, type GenWorkUnit, type PlanActivity, type PlanScopeWbs, type PlanStage, type PlanState, type ScheduleRisk, type BoqResult,
 } from "../../../../lib/api/schedule";
@@ -349,10 +349,8 @@ export default function SchedulePlanWizard() {
   const [auditBusy, setAuditBusy] = useState(false);
   const [auditFixBusy, setAuditFixBusy] = useState(false);
   const [auditFixMsg, setAuditFixMsg] = useState<string | null>(null);
-  const [auditLoopBusy, setAuditLoopBusy] = useState(false);   // 모순 자동해소 루프
   const [basis, setBasis] = useState<BasisResult | null>(null);   // 공정계획서 산정근거
   const [basisBusy, setBasisBusy] = useState(false);
-  const [auditLoopMsg, setAuditLoopMsg] = useState<string | null>(null);
   const [boqBriefTxt, setBoqBriefTxt] = useState<string | null>(null); // AI 내역서 대조 브리핑
   const [boqBriefBusy, setBoqBriefBusy] = useState(false);
   const [strategy] = useState("bottom_up");  // 폴백(공종 카드 시공전략이 우선)
@@ -1522,25 +1520,11 @@ export default function SchedulePlanWizard() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <b style={{ fontSize: 13, color: "#4338ca" }}>🧠 AI 공정 검토</b>
                 <span style={{ fontSize: 11.5, color: "#6366f1" }}>고성능 AI가 시공순서 모순(되메·단계역전·양생전타설 등)을 검토합니다 — 자동수정 X, 검토 후 사람이 결정</span>
-                <button className="wz-btn" disabled={auditBusy || auditLoopBusy} style={{ fontSize: 12, marginLeft: "auto" }}
-                  onClick={() => { setAuditBusy(true); setAuditFixMsg(null); setAuditLoopMsg(null); void planAudit(planId!).then((r) => setAudit(r.findings || [])).finally(() => setAuditBusy(false)); }}>
+                <button className="wz-btn" disabled={auditBusy} style={{ fontSize: 12, marginLeft: "auto" }}
+                  onClick={() => { setAuditBusy(true); setAuditFixMsg(null); void planAudit(planId!).then((r) => setAudit(r.findings || [])).finally(() => setAuditBusy(false)); }}>
                   {auditBusy ? "검토 중…" : "🔍 AI 검토 실행"}
                 </button>
-                <button className="wz-btn" disabled={auditBusy || auditLoopBusy} style={{ fontSize: 12, background: "#4338ca", color: "#fff" }}
-                  title="검토→수정을 모순이 사라질 때까지(최대 3회) 자동 반복하고 재스케줄합니다. 날짜는 결정론 CPM."
-                  onClick={() => {
-                    if (!confirm("AI가 시공순서 모순을 자동으로 해소합니다(검토→수정 최대 3회 반복 + 재스케줄). 진행할까요?")) return;
-                    setAuditLoopBusy(true); setAudit(null); setAuditFixMsg(null);
-                    void planAuditLoop(planId!, 3).then((r) => {
-                      const rem = r.remaining?.length ? ` · 잔존 ${r.remaining.length}건: ${r.remaining.map((x) => x.title).join(" / ")}` : "";
-                      setAuditLoopMsg(`${r.converged ? "✅ 모순 해소 완료" : "⚠️ 일부 잔존"} — ${r.iterations}회 반복·${r.fixed}건 수정${rem}`);
-                      void getPlan(planId!).then(setPlan);   // 갱신 베이스라인 반영
-                    }).finally(() => setAuditLoopBusy(false));
-                  }}>
-                  {auditLoopBusy ? "자동해소 중…(검토→수정 반복)" : "♻️ 모순 자동해소"}
-                </button>
               </div>
-              {auditLoopMsg && <div style={{ marginTop: 6, color: "#4338ca", fontSize: 12, fontWeight: 500 }}>{auditLoopMsg}</div>}
               {audit && audit.length === 0 && <div style={{ marginTop: 6, color: "#059669", fontSize: 12 }}>✅ 시공순서 모순이 발견되지 않았습니다.</div>}
               {audit && audit.length > 0 && (
                 <div style={{ marginTop: 8 }}>
