@@ -299,6 +299,11 @@ export default function SchedulePlanWizard() {
       for (const e of r.equipment ?? []) auto[e.equip] = suggestEquipCount(e.equip, e.qty);
       const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
       const conc = r.quantities?.concrete_m3 || (r.quantities?.formwork_m2 ?? 0) / 8.5;  // 구조 driver
+      // 연면적 자동(비었을 때만) — 데크/슬래브 면적 = 바닥판 면적 ≈ 연면적. 건축·MEP 물량 기간 정밀화.
+      const floorArea = r.quantities?.deck_m2
+        || (r.items ?? []).filter((it) => /슬래브|데크/.test(it.name || "") && it.unit === "㎡")
+          .reduce((sum, it) => sum + (it.qty || 0), 0);
+      if (floorArea > 1000) setGfa((g) => g || String(Math.round(floorArea)));
       const itemSum = (r.items ?? []).reduce((s, it) => s + (it.qty || 0), 0);            // 건축/MEP driver(마감·설비 물량)
       if (cardKey === "구조" || cardKey === "종합") {
         // 크레인: 실측 앵커 ~4대/15만㎥(포스코) → 1대당 ~4만㎥. 작업조 ≈ 크레인×2.
@@ -1305,7 +1310,9 @@ export default function SchedulePlanWizard() {
       {scopeWbs && step >= 1 && (
         <details className="wz-card" style={{ background: "#f8fafc" }} open={step === 1 && running}>
           <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#334155" }}>
-            P1 스코프 — WBS · 워크패키지 {scopeWbs.package_count} · 구역 {scopeWbs.zones.length}
+            P1 스코프 — WBS · 워크패키지 {scopeWbs.package_count} · 구역 {new Set(scopeWbs.zones.map((z) => String(z).replace(/[-_ ]?\d+$/, ""))).size}
+            {new Set(scopeWbs.zones.map((z) => String(z).replace(/[-_ ]?\d+$/, ""))).size < scopeWbs.zones.length
+              && <span style={{ color: "#94a3b8", fontWeight: 400 }}> (타설구획 {scopeWbs.zones.length} — 스케줄은 구역 단위 집계)</span>}
           </summary>
           <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 6, fontSize: 12, color: "#475569" }}>
             {scopeWbs.wbs.map((z) => (
