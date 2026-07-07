@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
 import { EarthworkSection } from "../../../components/earthwork/EarthworkSection";
-import { BoreholeTable } from "../../../components/earthwork/BoreholeTable";
+import { EarthworkDataEditor } from "../../../components/earthwork/EarthworkDataEditor";
 import { CadImportPanel } from "../../../components/earthwork/CadImportPanel";
 import {
   BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, generateContours, layerVolumes, makeTerrainPreset,
@@ -427,15 +427,19 @@ export default function EarthworkPage() {
 
       {/* ── 시추공 편집 카드 ── */}
       <div style={CARD}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "0 0 12px" }}>시추공 데이터</h3>
-        <BoreholeTable
+        <EarthworkDataEditor
           key={source}
           boreholes={boreholes}
-          onApply={(bh) => { setBoreholes(bh); setSec(farthestPair(bh)); setSource(`편집 적용 (${bh.length}공)`); }}
-          onSave={async (bh) => {
-            setBoreholes(bh);
-            setSec(farthestPair(bh));
-            try { const n = await saveEarthwork(bh, extra); setSource(`저장됨 (${n}공)`); }
+          extra={extra}
+          onApply={(bh, ex) => {
+            setBoreholes(bh); setExtra(ex);
+            if (bh.length >= 2) setSec(farthestPair(bh));
+            setSource(`편집 적용 (${bh.length}공)`);
+          }}
+          onSave={async (bh, ex) => {
+            setBoreholes(bh); setExtra(ex);
+            if (bh.length >= 2) setSec(farthestPair(bh));
+            try { const n = await saveEarthwork(bh, ex); setSource(`저장됨 (${n}공)`); }
             catch { setSource(`${bh.length}공 · 저장 실패-화면만`); }
           }}
         />
