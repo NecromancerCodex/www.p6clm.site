@@ -705,16 +705,17 @@ export async function boqBrief(planId: string): Promise<{ brief: string }> {
   return planFetch(`/${planId}/boq-brief`, { method: "POST", body: "{}" });
 }
 
-/** 고성능 AI 공정 검토 — 시공순서 논리 모순 탐지(검토만, 근거 안내) */
+/** 결정론 정합성 검사 — 계산된 날짜·링크 기반 모순 탐지(환각 0). LLM 검토(/audit)를 대체 —
+ *  LLM audit 엔드포인트는 내부 개발 도구로 백엔드에 존치(새 빌더 unknown-unknown 탐지용). */
 export interface AuditFinding { codes: string[]; names?: string[]; title: string; severity: string; reason: string; fix: string }
-export async function planAudit(planId: string): Promise<{ findings: AuditFinding[]; error?: string }> {
-  return planFetch(`/${planId}/audit`, { method: "POST", body: "{}" });
+export interface ConsistencyResult {
+  findings: AuditFinding[];
+  stats?: { activities: number; relations: number; checks: string[]; date_checked: boolean };
+  error?: string;
 }
-/** 고성능 AI 모순 수정 — 선후행 재설정 + 재스케줄(베이스라인 갱신) */
-export async function planAuditFix(planId: string): Promise<{ fixed: number; summary?: string; error?: string }> {
-  return planFetch(`/${planId}/audit-fix`, { method: "POST", body: "{}" });
+export async function planConsistency(planId: string): Promise<ConsistencyResult> {
+  return planFetch(`/${planId}/consistency`, { method: "POST", body: "{}" });
 }
-/** AI 모순 자동해소 루프 — 검토→수정 반복(깨끗할 때까지/최대 N회), 마지막 1회 재스케줄. 날짜는 결정론 CPM. */
 /** 공정계획 목록 — 자원 계획 화면 플랜 선택 */
 export interface PlanListItem { id: string; project_name: string; stage: string; created: string | null }
 export async function listPlans(): Promise<PlanListItem[]> {
