@@ -48,6 +48,23 @@ export async function loadBoreholes(): Promise<Borehole[]> {
   return (await loadEarthwork()).boreholes;
 }
 
+/** CAD 레이어 의미 분류 (gpt-5-mini) — {레이어명: 카테고리}. 실패 시 {} (클라 규칙기반 폴백). */
+export interface CadLayerMeta { name: string; types: string; samples: string[]; }
+export async function classifyCadLayers(layers: CadLayerMeta[]): Promise<Record<string, string>> {
+  if (!layers.length) return {};
+  try {
+    const res = await fetch(`${API_BASE}/earthwork/cad/classify-layers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ layers }),
+    });
+    if (!res.ok) return {};
+    return (await res.json()) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
 /** CSV 업로드 데이터 저장 — 시추+extra 기존 행 교체(최신만 유지, owner 개인화). 적재 건수 반환. */
 export async function saveEarthwork(boreholes: Borehole[], extra: EarthworkExtra): Promise<number> {
   const res = await fetch(`${API_BASE}/earthwork/boreholes/import`, {

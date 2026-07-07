@@ -5,18 +5,21 @@
  * 실무 도면은 55+ 레이어 중 의미있는 건 몇 개("00 시추공"·경계·등고선)뿐 →
  * 레이어마다 카테고리 자동추천 + 드롭다운 확정. 생성 CSV 는 기존 CSV 임포트와 동일 파이프라인.
  */
-import { useMemo, useState } from "react";
-import { FileUp, X, Download, ArrowRight, ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { FileUp, X, Download, ArrowRight, ChevronDown, Sparkles } from "lucide-react";
 
 import {
   readDxfFile, analyzeFiles, extractSelected, layerKey,
   CATS, CATEGORY_LABEL, type FileImport, type Category,
 } from "../../lib/earthwork/dxfImport";
 import { earthworkToCsv } from "../../lib/earthwork/csvExport";
+import { classifyCadLayers } from "../../lib/api/earthwork";
 
 export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, label: string) => void }) {
   const [files, setFiles] = useState<FileImport[]>([]);
-  const [sel, setSel] = useState<Record<string, Category>>({});
+  const [sel, setSel] = useState<Record<string, Category>>({});   // 사용자 확정(최우선)
+  const [aiMap, setAiMap] = useState<Record<string, Category>>({}); // AI 추천(규칙보다 우선)
+  const [aiBusy, setAiBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [err, setErr] = useState("");
 
@@ -34,10 +37,39 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
   };
 
   const layers = useMemo(() => analyzeFiles(files), [files]);
-  const catOf = (file: string, layer: string, suggested: Category) => sel[layerKey(file, layer)] ?? suggested;
-  const setCat = (file: string, layer: string, c: Category) => setSel((p) => ({ ...p, [layerKey(file, layer)]: c }));
 
-  const data = useMemo(() => (files.length ? extractSelected(files, sel) : null), [files, sel]);
+  // AI 레이어 분류 (gpt-5-mini) — 레이어명이 코드/제각각이라 키워드 규칙이 취약 → 의미 추론.
+  // 결과는 규칙 위·사용자 아래(3계층). 실패 시 {} → 규칙 폴백. 기하는 안 건드림.
+  useEffect(() => {
+    if (!files.length) { setAiMap({}); return; }
+    let alive = true;
+    setAiBusy(true);
+    const infos = analyzeFiles(files);
+    const byName = new Map<string, { name: string; types: string; samples: string[] }>();
+    for (const i of infos) {
+      const cur = byName.get(i.layer);
+      if (cur) { for (const s of i.samples) if (cur.samples.length < 3 && !cur.samples.includes(s)) cur.samples.push(s); }
+      else byName.set(i.layer, { name: i.layer, types: i.types, samples: [...i.samples] });
+    }
+    void classifyCadLayers([...byName.values()]).then((res) => {
+      if (!alive) return;
+      const m: Record<string, Category> = {};
+      for (const i of infos) {
+        const c = res[i.layer];
+        if (c && (CATS as string[]).includes(c)) m[layerKey(i.file, i.layer)] = c as Category;
+      }
+      setAiMap(m);
+    }).finally(() => { if (alive) setAiBusy(false); });
+    return () => { alive = false; };
+  }, [files]);
+
+  // 우선순위: 사용자 확정 > AI 추천 > 규칙(suggested)
+  const eff = useMemo(() => ({ ...aiMap, ...sel }), [aiMap, sel]);
+  const catOf = (file: string, layer: string, suggested: Category) => eff[layerKey(file, layer)] ?? suggested;
+  const setCat = (file: string, layer: string, c: Category) => setSel((p) => ({ ...p, [layerKey(file, layer)]: c }));
+  const aiCount = Object.keys(aiMap).length;
+
+  const data = useMemo(() => (files.length ? extractSelected(files, eff) : null), [files, eff]);
   const has = data && (data.boundary.length || data.piles.length || data.boreholes.length || data.terrain.length || data.walls.length);
 
   const shown = showAll ? layers : layers.filter((l) => catOf(l.file, l.layer, l.suggested) !== "ignore");
@@ -67,7 +99,13 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
           경계·pile·CIP·시추 여러 파일 한 번에 · <strong>레이어별</strong> 의미 지정 → CSV 생성
         </span>
         {files.length > 0 && (
-          <button type="button" onClick={() => { setFiles([]); setSel({}); }} style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>전체 지우기</button>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "var(--primary)" }}>
+            <Sparkles size={12} />
+            {aiBusy ? "AI 레이어 분류 중…" : aiCount > 0 ? `AI 추천 ${aiCount}개 적용` : "AI 추천 없음 (규칙 폴백)"}
+          </span>
+        )}
+        {files.length > 0 && (
+          <button type="button" onClick={() => { setFiles([]); setSel({}); setAiMap({}); }} style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>전체 지우기</button>
         )}
       </div>
 
