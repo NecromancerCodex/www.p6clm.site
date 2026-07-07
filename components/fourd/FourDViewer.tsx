@@ -1034,7 +1034,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                         color: mr.via.startsWith("policy")
                           ? "var(--primary)"
                           : mr.via.startsWith("seq")
-                            ? "#f0abfc"
+                            ? "var(--primary)"
                             : mr.via.includes("|")
                               ? "var(--green)"
                               : "var(--muted)",

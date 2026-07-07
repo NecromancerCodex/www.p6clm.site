@@ -2081,7 +2081,7 @@ select option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 2.5px solid #1a56db;
+  border-bottom: 2.5px solid var(--primary);
   padding-bottom: 8px;
 }
 

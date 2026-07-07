@@ -1368,7 +1368,7 @@ export default function SchedulePlanWizard() {
               {plan?.payload.strategy && (
                 <span style={{ marginLeft: 8, fontSize: 11.5, padding: "3px 10px", borderRadius: 12,
                                background: plan.payload.strategy === "top_down" ? "var(--red-soft)" : "var(--primary-soft)",
-                               color: plan.payload.strategy === "top_down" ? "#be185d" : "var(--primary-deep)", fontWeight: 700 }}>
+                               color: plan.payload.strategy === "top_down" ? "var(--red)" : "var(--primary-deep)", fontWeight: 700 }}>
                   {plan.payload.strategy === "top_down" ? "역타 (지하·지상 병행)" : plan.payload.strategy === "bottom_up_phased" ? "순타·단계 (구역별 연속)" : "순타·일괄 (전 구역 지하 먼저)"}
                 </span>
               )}
@@ -1710,7 +1710,7 @@ export default function SchedulePlanWizard() {
             return (
               <div style={{ border: "1px solid var(--primary-soft)", background: "var(--primary-soft)", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <b style={{ fontSize: 13, color: "#5b21b6" }}>내역서 대조 — {totUnc ? `${totUnc}개 항목 공정표 누락` : "전 항목 반영 "}</b>
+                  <b style={{ fontSize: 13, color: "var(--primary)" }}>내역서 대조 — {totUnc ? `${totUnc}개 항목 공정표 누락` : "전 항목 반영 "}</b>
                   {totUnc > 0 && (
                     <button className="wz-btn" disabled={boqBriefBusy} style={{ fontSize: 12 }}
                             onClick={() => { setBoqBriefBusy(true); void boqBrief(planId!).then((r) => setBoqBriefTxt(r.brief)).finally(() => setBoqBriefBusy(false)); }}>
@@ -1719,7 +1719,7 @@ export default function SchedulePlanWizard() {
                   )}
                 </div>
                 {entries.map(([disc, c]) => (
-                  <div key={disc} style={{ fontSize: 12, padding: "3px 0", color: "#4c1d95" }}>
+                  <div key={disc} style={{ fontSize: 12, padding: "3px 0", color: "var(--primary)" }}>
                     <b>{disc}</b> — 내역서 {c.total}항목 중 <b>{c.covered}</b> 반영
                     {c.uncovered?.length ? <span style={{ color: "var(--primary-deep)" }}> · 누락: {c.uncovered.join(", ")}</span> : <span style={{ color: "var(--green)" }}> · 누락 없음</span>}
                   </div>
