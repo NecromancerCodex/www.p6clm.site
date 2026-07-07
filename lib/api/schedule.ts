@@ -715,15 +715,6 @@ export async function planAuditFix(planId: string): Promise<{ fixed: number; sum
   return planFetch(`/${planId}/audit-fix`, { method: "POST", body: "{}" });
 }
 /** AI 모순 자동해소 루프 — 검토→수정 반복(깨끗할 때까지/최대 N회), 마지막 1회 재스케줄. 날짜는 결정론 CPM. */
-export interface AuditLoopResult {
-  iterations: number; fixed: number; converged: boolean;
-  remaining: { title: string; names?: string[] }[];
-  history: { iter: number; found: number; fixed?: number; summary?: string; titles?: string[] }[];
-}
-export async function planAuditLoop(planId: string, maxIters = 3): Promise<AuditLoopResult> {
-  return planFetch(`/${planId}/audit-loop?max_iters=${maxIters}`, { method: "POST", body: "{}" });
-}
-
 /** 공정계획 목록 — 자원 계획 화면 플랜 선택 */
 export interface PlanListItem { id: string; project_name: string; stage: string; created: string | null }
 export async function listPlans(): Promise<PlanListItem[]> {
