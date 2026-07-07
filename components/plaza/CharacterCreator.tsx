@@ -85,7 +85,7 @@ export function CharacterCreator({
     <div className="plaza-charsel-backdrop">
       <div className="plaza-creator">
         <div className="plaza-panel-head">
-          <span className="plaza-panel-title">캐릭터 만들기</span>
+          <span className="plaza-panel-title">🎨 캐릭터 만들기</span>
           {onClose && <button type="button" className="plaza-panel-x" onClick={onClose} aria-label="닫기"><X size={16} /></button>}
         </div>
 
@@ -137,7 +137,7 @@ export function CharacterCreator({
               const visible = paid ? cat.items.filter((s) => owned.has(partKey(activeCat, s))) : cat.items;
               const showNone = OPTIONAL_CATS.has(activeCat);
               if (paid && visible.length === 0 && !showNone) {
-                return <p className="plaza-panel-empty">아직 보유한 {CATEGORY_LABELS[activeCat]}가 없어요.<br />상점에서 구매하세요!</p>;
+                return <p className="plaza-panel-empty">아직 보유한 {CATEGORY_LABELS[activeCat]}가 없어요.<br />🛒 상점에서 구매하세요!</p>;
               }
               return (
                 <div className="plaza-creator-grid">

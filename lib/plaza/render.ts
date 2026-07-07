@@ -113,7 +113,7 @@ function drawNameTag(ctx: CanvasRenderingContext2D, x: number, feetY: number, na
   const tw = ctx.measureText(name).width;
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   roundRect(ctx, x - tw / 2 - 6, feetY + 5, tw + 12, 17, 8); ctx.fill();
-  ctx.fillStyle = isMe ? "var(--primary)" : "var(--surface)";
+  ctx.fillStyle = isMe ? "#ffe066" : "#fff";
   ctx.fillText(name, x, feetY + 17);
 }
 
@@ -203,7 +203,7 @@ function drawBubble(ctx: CanvasRenderingContext2D, cx: number, bottomY: number, 
   ctx.beginPath();
   ctx.moveTo(cx - 6, by + bh); ctx.lineTo(cx + 6, by + bh); ctx.lineTo(cx, by + bh + 8);
   ctx.closePath(); ctx.fillStyle = "rgba(255,255,255,0.97)"; ctx.fill();
-  ctx.fillStyle = "var(--text)"; ctx.textAlign = "left";
+  ctx.fillStyle = "#222"; ctx.textAlign = "left";
   lines.forEach((ln, i) => ctx.fillText(ln, bx + padX, by + padY + 13 + i * lineH));
   ctx.restore();
 }

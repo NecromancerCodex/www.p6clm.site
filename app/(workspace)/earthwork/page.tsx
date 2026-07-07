@@ -279,7 +279,7 @@ export default function EarthworkPage() {
 
       {/* ── 3D 뷰어 카드 (상단 컨트롤바 + 뷰어) ── */}
       <div style={{ ...CARD, padding: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid var(--surface-muted)", background: "#fafbfd" }}>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid var(--surface-muted)", background: "var(--surface-soft)" }}>
           <button
             type="button"
             onClick={() => setShowLabels((v) => !v)}
@@ -303,7 +303,7 @@ export default function EarthworkPage() {
                 display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px",
                 borderRadius: 999, border: "1px solid var(--line)", fontSize: 11.5, fontWeight: 600,
                 background: visible[L.key] ? "var(--surface)" : "var(--surface-soft)",
-                color: visible[L.key] ? "var(--muted-strong)" : "#a8b3c2", cursor: "pointer",
+                color: visible[L.key] ? "var(--muted-strong)" : "var(--muted)", cursor: "pointer",
                 opacity: visible[L.key] ? 1 : 0.55,
               }}
               title={visible[L.key] ? "숨기기" : "표시"}

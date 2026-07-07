@@ -1702,7 +1702,7 @@ function SignaturePad({
     c.setPointerCapture(e.pointerId);
     const ctx = c.getContext("2d"); if (!ctx) return;
     const r = c.getBoundingClientRect();
-    ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.strokeStyle = "var(--text)";
+    ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.strokeStyle = "#e9e5dc";
     ctx.beginPath();
     ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
     drawingRef.current = true;

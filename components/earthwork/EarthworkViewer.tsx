@@ -62,9 +62,9 @@ function makeTextSprite(text: string, span: number): THREE.Sprite {
   canvas.width = tw + 24;
   canvas.height = fs + 18;
   ctx.font = `bold ${fs}px sans-serif`; // 리사이즈로 초기화 → 재설정
-  ctx.fillStyle = "rgba(15,17,22,0.72)";
-  roundRect(ctx, 0, 0, canvas.width, canvas.height, 10);
-  ctx.fillStyle = "var(--surface)";
+  ctx.fillStyle = "rgba(150, 42, 37, 0.88)";   // 딥 크림슨 — 다크 지형 위 시인성
+  roundRect(ctx, 0, 0, canvas.width, canvas.height, 6);
+  ctx.fillStyle = "#f3efe6";
   ctx.textBaseline = "middle";
   ctx.fillText(text, 12, canvas.height / 2 + 1);
 

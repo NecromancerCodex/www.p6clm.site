@@ -76,7 +76,7 @@ const FOOTHOLDS: Foothold[] = [
 // 슬라이스 재드로 방식은 1층에 반투명 벽/레이어 아티팩트를 만들어 제거함.
 
 // 캐릭터 색상 팔레트 — id 로 결정 (입장마다 일관)
-const PALETTE = ["var(--red)", "var(--primary)", "var(--green)", "var(--primary)", "var(--primary)", "var(--primary)", "var(--green)", "var(--red)"];
+const PALETTE = ["#ff6b6b", "#4dabf7", "#51cf66", "#ffd43b", "#cc5de8", "#ff922b", "#20c997", "#f783ac"];
 const colorFor = (id: number) => PALETTE[id % PALETTE.length];
 
 // ── 내부 상태 타입 ────────────────────────────────────────────────────────────
@@ -288,7 +288,7 @@ export function PlazaCanvas() {
         case "game_correct": {
           const cid = msg.id, cname = msg.name;
           setGame((g) => (g ? { ...g, scores: msg.scores, guessed: [...g.guessed, cid] } : g));
-          setChatLog((log) => [...log.slice(-29), { id: cid, name: cname, text: "정답!", ts: Date.now() }]);
+          setChatLog((log) => [...log.slice(-29), { id: cid, name: cname, text: "✅ 정답!", ts: Date.now() }]);
           break;
         }
         case "game_round_end": {
@@ -302,7 +302,7 @@ export function PlazaCanvas() {
         }
         case "gold": {
           usePlazaStore.getState().setCurrency(msg.currency);
-          setChatLog((log) => [...log.slice(-29), { id: -1, name: "", text: `${msg.reason} +1000골드!`, ts: Date.now() }]);
+          setChatLog((log) => [...log.slice(-29), { id: -1, name: "💰", text: `${msg.reason} +1000골드!`, ts: Date.now() }]);
           break;
         }
         case "leave": {
@@ -557,19 +557,19 @@ export function PlazaCanvas() {
   return (
     <div className="plaza-wrap">
       <div className="plaza-bar">
-        <span className="plaza-title">광장</span>
+        <span className="plaza-title">🌳 광장</span>
         <span className={`plaza-dot ${status}`} />
         <span className="plaza-status">
           {status === "open" ? `접속 중 · ${count}명` : status === "connecting" ? "연결 중…" : "연결 끊김"}
         </span>
         <span className="plaza-hint">← → 이동 · Alt 점프 · ↓+Alt 내려가기 · Enter 채팅</span>
         <div className="plaza-tools">
-          <button type="button" className={`plaza-tool${panel === "shop" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "shop" ? null : "shop"))}>상점</button>
-          <button type="button" className={`plaza-tool${panel === "creator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "creator" ? null : "creator"))}>캐릭터 <kbd>C</kbd></button>
-          <button type="button" className={`plaza-tool${panel === "paint" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "paint" ? null : "paint"))}>그림퀴즈</button>
-          <button type="button" className={`plaza-tool${panel === "wheel" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "wheel" ? null : "wheel"))}>돌림판</button>
-          <button type="button" className={`plaza-tool${panel === "omok" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "omok" ? null : "omok"))}>오목</button>
-          <button type="button" className={`plaza-tool${panel === "gator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "gator" ? null : "gator"))}>악어이빨</button>
+          <button type="button" className={`plaza-tool${panel === "shop" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "shop" ? null : "shop"))}>🛒 상점</button>
+          <button type="button" className={`plaza-tool${panel === "creator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "creator" ? null : "creator"))}>🎨 캐릭터 <kbd>C</kbd></button>
+          <button type="button" className={`plaza-tool${panel === "paint" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "paint" ? null : "paint"))}>🎯 그림퀴즈</button>
+          <button type="button" className={`plaza-tool${panel === "wheel" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "wheel" ? null : "wheel"))}>🎡 돌림판</button>
+          <button type="button" className={`plaza-tool${panel === "omok" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "omok" ? null : "omok"))}>⚫ 오목</button>
+          <button type="button" className={`plaza-tool${panel === "gator" ? " on" : ""}`} onClick={() => setPanel((p) => (p === "gator" ? null : "gator"))}>🐊 악어이빨</button>
         </div>
       </div>
 

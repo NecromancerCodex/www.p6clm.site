@@ -3,7 +3,7 @@
  *
  * Backend: /api/v1/plaza/ws  (app root 마운트, plaza_endpoints.py)
  *
- * WebSocket 은 Next.js rewrite(/api/clm)·Vercel 프록시로 통과되지 않으므로
+ * ⚠ WebSocket 은 Next.js rewrite(/api/clm)·Vercel 프록시로 통과되지 않으므로
  *    브라우저가 백엔드 오리진에 **직접** 접속한다. clm_session 쿠키는
  *    .p6clm.site 도메인이라 ai.p6clm.site 서브도메인으로 자동 전달된다(구글 로그인과 동일).
  */

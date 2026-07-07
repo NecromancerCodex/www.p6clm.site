@@ -8,7 +8,7 @@ import type { Participant, ChatLine, GameView } from "./PlazaCanvas";
 import { AvatarThumb } from "./AvatarThumb";
 
 const BW = 640, BH = 420;
-const COLORS = ["var(--text)", "var(--red)", "#f08c00", "#f5c518", "#2f9e44", "#1971c2", "#7048e8", "#e64980", "var(--surface)"];
+const COLORS = ["#222222", "#e03131", "#f08c00", "#f5c518", "#2f9e44", "#1971c2", "#7048e8", "#e64980", "#ffffff"];
 const SIZES = [3, 6, 12, 22];
 const DIFFS = [
   { key: "easy", label: "이지" },
@@ -27,7 +27,7 @@ function PlayerCard({ p, game, bubble }: { p: Participant | null; game: GameView
       {bubble && <div className="plaza-pcard-bubble">{bubble}</div>}
       <AvatarThumb config={p.avatar} />
       <div className="plaza-pcard-info">
-        <span className="plaza-pcard-name">{isDrawer && ""}{p.me ? `${p.name}(나)` : p.name}</span>
+        <span className="plaza-pcard-name">{isDrawer && "✏️ "}{p.me ? `${p.name}(나)` : p.name}</span>
         {game && <span className="plaza-pcard-score">{score}점</span>}
       </div>
       {correct && <span className="plaza-pcard-badge">정답!</span>}
@@ -57,7 +57,7 @@ export function PaintBoard({
   const myId = participants.find((p) => p.me)?.id ?? -1;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const [color, setColor] = useState("var(--text)");
+  const [color, setColor] = useState("#222222");
   const [width, setWidth] = useState(6);
   const [eraser, setEraser] = useState(false);
   const [difficulty, setDifficulty] = useState("normal");
@@ -102,7 +102,7 @@ export function PaintBoard({
   };
   const clearBoard = () => {
     const ctx = ctxRef.current;
-    if (ctx) { ctx.fillStyle = "var(--surface)"; ctx.fillRect(0, 0, BW, BH); }
+    if (ctx) { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, BW, BH); }
   };
 
   useEffect(() => {
@@ -126,7 +126,7 @@ export function PaintBoard({
     const r = c.getBoundingClientRect();
     return [(e.clientX - r.left) * (BW / r.width), (e.clientY - r.top) * (BH / r.height)];
   };
-  const effColor = () => (eraserRef.current ? "var(--surface)" : colorRef.current);
+  const effColor = () => (eraserRef.current ? "#ffffff" : colorRef.current);
   const flush = () => {
     if (curPts.current.length >= 2) {
       send({ t: "draw", pts: curPts.current.slice(), c: effColor(), w: widthRef.current });
@@ -157,7 +157,7 @@ export function PaintBoard({
     <div className="plaza-board-backdrop" onClick={onClose}>
       <div className="plaza-room" onClick={(e) => e.stopPropagation()}>
         <div className="plaza-panel-head">
-          <span className="plaza-panel-title">그림퀴즈</span>
+          <span className="plaza-panel-title">🎯 그림퀴즈</span>
           {game ? (
             <span className="plaza-game-status">
               라운드 {game.round}/{game.total} · 출제자 <b>{drawerName}</b>
@@ -225,7 +225,7 @@ export function PaintBoard({
               {/* 라운드 종료 / 게임 오버 오버레이 */}
               {game?.over && (
                 <div className="plaza-game-overlay">
-                  <div className="plaza-game-overlay-title">게임 종료!</div>
+                  <div className="plaza-game-overlay-title">🏆 게임 종료!</div>
                   <ol className="plaza-rank">
                     {Object.entries(game.over).sort((a, b) => b[1] - a[1]).map(([id, sc]) => (
                       <li key={id}>{participants.find((p) => p.id === Number(id))?.name ?? "?"} — <b>{sc}점</b></li>
