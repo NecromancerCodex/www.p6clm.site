@@ -70,8 +70,8 @@ export function OmokRoom({
         const v = bd[x][y]; if (!v) continue;
         const cx = PAD + x * CELL, cy = PAD + y * CELL;
         const g = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, CELL / 2 - 1);
-        if (v === 1) { g.addColorStop(0, "#555"); g.addColorStop(1, "#000"); }
-        else { g.addColorStop(0, "var(--surface)"); g.addColorStop(1, "#bbb"); }
+        if (v === 1) { g.addColorStop(0, "var(--muted)"); g.addColorStop(1, "var(--text)"); }
+        else { g.addColorStop(0, "var(--surface)"); g.addColorStop(1, "var(--line-strong)"); }
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(cx, cy, CELL / 2 - 1.5, 0, Math.PI * 2); ctx.fill();
       }

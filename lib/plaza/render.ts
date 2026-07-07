@@ -203,7 +203,7 @@ function drawBubble(ctx: CanvasRenderingContext2D, cx: number, bottomY: number, 
   ctx.beginPath();
   ctx.moveTo(cx - 6, by + bh); ctx.lineTo(cx + 6, by + bh); ctx.lineTo(cx, by + bh + 8);
   ctx.closePath(); ctx.fillStyle = "rgba(255,255,255,0.97)"; ctx.fill();
-  ctx.fillStyle = "#222"; ctx.textAlign = "left";
+  ctx.fillStyle = "var(--text)"; ctx.textAlign = "left";
   lines.forEach((ln, i) => ctx.fillText(ln, bx + padX, by + padY + 13 + i * lineH));
   ctx.restore();
 }

@@ -8,7 +8,7 @@ import type { Participant, ChatLine, GameView } from "./PlazaCanvas";
 import { AvatarThumb } from "./AvatarThumb";
 
 const BW = 640, BH = 420;
-const COLORS = ["#222222", "#e03131", "#f08c00", "#f5c518", "#2f9e44", "#1971c2", "#7048e8", "#e64980", "var(--surface)"];
+const COLORS = ["var(--text)", "var(--red)", "#f08c00", "#f5c518", "#2f9e44", "#1971c2", "#7048e8", "#e64980", "var(--surface)"];
 const SIZES = [3, 6, 12, 22];
 const DIFFS = [
   { key: "easy", label: "이지" },
@@ -57,7 +57,7 @@ export function PaintBoard({
   const myId = participants.find((p) => p.me)?.id ?? -1;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const [color, setColor] = useState("#222222");
+  const [color, setColor] = useState("var(--text)");
   const [width, setWidth] = useState(6);
   const [eraser, setEraser] = useState(false);
   const [difficulty, setDifficulty] = useState("normal");

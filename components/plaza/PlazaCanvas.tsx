@@ -76,7 +76,7 @@ const FOOTHOLDS: Foothold[] = [
 // 슬라이스 재드로 방식은 1층에 반투명 벽/레이어 아티팩트를 만들어 제거함.
 
 // 캐릭터 색상 팔레트 — id 로 결정 (입장마다 일관)
-const PALETTE = ["var(--red)", "#4dabf7", "var(--green)", "var(--primary)", "#cc5de8", "#ff922b", "#20c997", "#f783ac"];
+const PALETTE = ["var(--red)", "var(--primary)", "var(--green)", "var(--primary)", "var(--primary)", "var(--primary)", "var(--green)", "var(--red)"];
 const colorFor = (id: number) => PALETTE[id % PALETTE.length];
 
 // ── 내부 상태 타입 ────────────────────────────────────────────────────────────

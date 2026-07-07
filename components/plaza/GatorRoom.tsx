@@ -46,7 +46,7 @@ function topRound(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
 function tooth(ctx: CanvasRenderingContext2D, cx: number, base: number, w: number, h: number, up: boolean, kind: "" | "pressed" | "trap") {
   const tip = up ? base - h : base + h;
   const g = ctx.createLinearGradient(0, up ? tip : base, 0, up ? base : tip);
-  if (kind === "trap") { g.addColorStop(0, "#ff9d9d"); g.addColorStop(1, "#ff3b3b"); }
+  if (kind === "trap") { g.addColorStop(0, "var(--red)"); g.addColorStop(1, "#ff3b3b"); }
   else if (kind === "pressed") { g.addColorStop(0, "#b9a89c"); g.addColorStop(1, "#8c7a6e"); }
   else { g.addColorStop(0, "var(--surface)"); g.addColorStop(1, "#ddd6c0"); }
   ctx.fillStyle = g;

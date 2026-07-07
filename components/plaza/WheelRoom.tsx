@@ -7,7 +7,7 @@ import type { ClientMsg, ServerMsg } from "../../lib/plaza/protocol";
 import type { Participant, ChatLine } from "./PlazaCanvas";
 import { AvatarThumb } from "./AvatarThumb";
 
-const SEG_COLORS = ["var(--red)", "#4dabf7", "var(--green)", "var(--primary)", "#cc5de8", "#ff922b", "#20c997", "#f783ac"];
+const SEG_COLORS = ["var(--red)", "var(--primary)", "var(--green)", "var(--primary)", "var(--primary)", "var(--primary)", "var(--green)", "var(--red)"];
 const WS = 320; // 휠 캔버스 크기
 
 /** 돌림판(룰렛) 룸 — 가운데 바늘이 돌다 한 명 지목. 그림퀴즈와 동일 룸 UI. */

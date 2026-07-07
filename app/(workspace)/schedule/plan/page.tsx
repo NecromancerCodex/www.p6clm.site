@@ -1021,7 +1021,7 @@ export default function SchedulePlanWizard() {
                               {b.filename}{b.sheet ? ` (${b.sheet})` : ""} — {b.items_matched ?? 0}개 항목
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
                                 {b.quantities && Object.entries(QLBL).filter(([k]) => (b.quantities?.[k] || 0) > 0).map(([k, lbl]) => (
-                                  <span key={k} style={{ background: "var(--primary-soft)", color: "#3730a3", borderRadius: 4, padding: "1px 6px" }}>{lbl} {Math.round(b.quantities![k]).toLocaleString()}</span>
+                                  <span key={k} style={{ background: "var(--primary-soft)", color: "var(--primary-deep)", borderRadius: 4, padding: "1px 6px" }}>{lbl} {Math.round(b.quantities![k]).toLocaleString()}</span>
                                 ))}
                                 {b.has_prices && b.total_cost ? <span style={{ background: "var(--green-soft)", color: "var(--green)", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
                                 {(() => {   // IFC 실측(NetVolume) ↔ 내역서 콘크리트 대조 — 모델·내역 정합 검증(있을 때만)
@@ -1735,7 +1735,7 @@ export default function SchedulePlanWizard() {
                   </div>
                 ))}
                 {boqBriefTxt && (
-                  <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 8, fontSize: 12, color: "#3730a3", whiteSpace: "pre-wrap" }}>
+                  <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 8, fontSize: 12, color: "var(--primary-deep)", whiteSpace: "pre-wrap" }}>
                     {boqBriefTxt}
                   </div>
                 )}

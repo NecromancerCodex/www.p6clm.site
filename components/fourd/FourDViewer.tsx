@@ -1291,7 +1291,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
         </div>
       )}
       {fly && (
-        <div style={{ fontSize: 11, color: "#93c5fd", marginTop: -4 }}>
+        <div style={{ fontSize: 11, color: "var(--primary)", marginTop: -4 }}>
           자유시점: W/A/S/D 이동 · Space·E 위 · Shift·Q 아래 · 마우스 드래그 시점 회전
         </div>
       )}

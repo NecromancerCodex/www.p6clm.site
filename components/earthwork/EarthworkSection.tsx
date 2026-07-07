@@ -84,7 +84,7 @@ export function EarthworkSection({ set, boreholes, ax, ay, bx, by, aLabel, bLabe
       {view.ticks.map((v) => (
         <g key={v}>
           <line x1={PL} y1={view.yS(v)} x2={PR} y2={view.yS(v)} stroke="#243042" strokeWidth={1} />
-          <text x={PL - 6} y={view.yS(v) + 3} fontSize={10} fill="#7b8aa0" textAnchor="end">{v.toFixed(0)}</text>
+          <text x={PL - 6} y={view.yS(v) + 3} fontSize={10} fill="var(--muted)" textAnchor="end">{v.toFixed(0)}</text>
         </g>
       ))}
       {/* 지층 밴드 */}
@@ -106,8 +106,8 @@ export function EarthworkSection({ set, boreholes, ax, ay, bx, by, aLabel, bLabe
       })}
       {/* 양 끝 라벨 + 축 */}
       <text x={PL} y={PB + 22} fontSize={11} fill="var(--line-strong)" textAnchor="start">{aLabel} ◀ 거리(m) ▶ {bLabel}</text>
-      <text x={PR} y={PB + 22} fontSize={11} fill="#7b8aa0" textAnchor="end">{view.L.toFixed(0)}m · 수직과장 ×{view.exag.toFixed(1)}</text>
-      <text x={14} y={PT + 4} fontSize={10} fill="#7b8aa0" transform={`rotate(-90 14 ${PT + 4})`} textAnchor="end">표고 EL(m)</text>
+      <text x={PR} y={PB + 22} fontSize={11} fill="var(--muted)" textAnchor="end">{view.L.toFixed(0)}m · 수직과장 ×{view.exag.toFixed(1)}</text>
+      <text x={14} y={PT + 4} fontSize={10} fill="var(--muted)" transform={`rotate(-90 14 ${PT + 4})`} textAnchor="end">표고 EL(m)</text>
     </svg>
   );
 }

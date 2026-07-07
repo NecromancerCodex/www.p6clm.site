@@ -46,7 +46,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             remarkPlugins={[remarkGfm]}
             components={{
               p: ({ children }) => (
-                <p style={{ margin: "0 0 0.7em", lineHeight: 1.7, color: "#1f2937" }}>{children}</p>
+                <p style={{ margin: "0 0 0.7em", lineHeight: 1.7, color: "var(--text)" }}>{children}</p>
               ),
               strong: ({ children }) => (
                 <strong style={{ fontWeight: 700, color: "var(--text)" }}>{children}</strong>
@@ -117,8 +117,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               blockquote: ({ children }) => (
                 <blockquote
                   style={{
-                    borderLeft: "3px solid #93c5fd",
-                    background: "rgba(219, 234, 254, 0.35)",
+                    borderLeft: "3px solid var(--primary)",
+                    background: "rgba(201, 163, 92, 0.35)",
                     padding: "0.5em 0.9em",
                     margin: "0.55em 0",
                     color: "var(--primary-deep)",
@@ -155,7 +155,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     fontSize: "0.98em",
                     fontWeight: 700,
                     margin: "0.55em 0 0.4em",
-                    color: "#0f3a66",
+                    color: "var(--primary-deep)",
                     display: "flex",
                     alignItems: "center",
                     gap: "0.35em",
@@ -224,7 +224,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     padding: "0.55em 0.75em",
                     textAlign: (style as React.CSSProperties | undefined)?.textAlign ?? "left",
                     fontWeight: 700,
-                    color: "#0f3a66",
+                    color: "var(--primary-deep)",
                     borderBottom: "2px solid var(--line-strong)",
                     whiteSpace: "nowrap",
                   }}
@@ -237,7 +237,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   style={{
                     padding: "0.5em 0.75em",
                     verticalAlign: "top",
-                    color: "#1f2937",
+                    color: "var(--text)",
                     textAlign: (style as React.CSSProperties | undefined)?.textAlign ?? "left",
                   }}
                 >

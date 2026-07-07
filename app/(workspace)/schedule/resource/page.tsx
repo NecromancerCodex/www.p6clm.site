@@ -23,7 +23,7 @@ const tdR: React.CSSProperties = { ...td, textAlign: "right", fontWeight: 600 };
 const opChip: React.CSSProperties = { background: "var(--primary-soft)", color: "var(--primary-deep)", borderRadius: 4, padding: "1px 6px", fontSize: 11, whiteSpace: "nowrap" };
 const eqChip: React.CSSProperties = { display: "inline-block", background: "var(--amber-soft)", color: "var(--primary-deep)", borderRadius: 4, padding: "1px 5px", fontSize: 10.5, marginRight: 4, marginBottom: 2 };
 const CARD: React.CSSProperties = {
-  background: "var(--surface)", border: "1px solid #e8ecf2", borderRadius: 14,
+  background: "var(--surface)", border: "1px solid var(--surface-muted)", borderRadius: 14,
   boxShadow: "0 1px 3px rgba(16,24,40,0.05)", padding: 16, marginBottom: 16,
 };
 
@@ -144,7 +144,7 @@ export default function ResourcePlanPage() {
                       <td style={td}><span style={opChip}>{r.op}</span></td>
                       <td style={{ ...td, fontWeight: 600, color: "var(--muted-strong)" }}>{r.name}</td>
                       <td style={{ ...td, color: "var(--muted)" }}>{[r.zone, r.storey].filter(Boolean).join(" / ") || "—"}</td>
-                      <td style={{ ...tdR, color: r.qty ? "#3730a3" : "var(--line-strong)" }}>
+                      <td style={{ ...tdR, color: r.qty ? "var(--primary-deep)" : "var(--line-strong)" }}>
                         {r.qty ? `${fmt(r.qty)} ${r.unit}` : "—"}
                       </td>
                       <td style={{ ...tdR, color: r.productivity ? "var(--muted-strong)" : "var(--line-strong)" }} title={r.daily ? `일작업량 ${r.daily} ${r.unit}/일` : ""}>
