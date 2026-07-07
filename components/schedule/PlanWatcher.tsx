@@ -27,7 +27,7 @@ export default function PlanWatcher() {
     // 탭이 백그라운드면 브라우저 알림 (권한 있을 때만 — 요청은 완료 시점에 한 번)
     if (typeof document !== "undefined" && document.hidden && "Notification" in window) {
       if (Notification.permission === "granted") {
-        new Notification("공정계획 위저드", { body: msg });
+        new Notification("공정표 빌더", { body: msg });
       } else if (Notification.permission === "default") {
         void Notification.requestPermission();
       }

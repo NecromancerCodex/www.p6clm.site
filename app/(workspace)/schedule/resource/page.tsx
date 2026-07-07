@@ -94,7 +94,7 @@ export default function ResourcePlanPage() {
       <div style={{ ...CARD, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--muted-strong)" }}>공정계획</span>
         <select className="wz-in" style={{ minWidth: 280 }} value={planId} onChange={(e) => setPlanId(e.target.value)}>
-          {plans.length === 0 && <option value="">생성된 공정계획 없음 — 공정계획 위저드에서 먼저 생성</option>}
+          {plans.length === 0 && <option value="">생성된 공정계획 없음 — 공정표 빌더에서 먼저 생성</option>}
           {plans.map((p) => (
             <option key={p.id} value={p.id}>{p.project_name} · {p.stage} · {dt(p.created)}</option>
           ))}

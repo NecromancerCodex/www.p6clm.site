@@ -1,13 +1,12 @@
 "use client";
 
 /**
- * 공정계획 위저드 — PM 4단계 + 휴먼인더루프 (md/strategy/pm_philosophy_4stages.md).
+ * 공정표 빌더 — PM 4단계 + 휴먼인더루프 (md/strategy/pm_philosophy_4stages.md).
  *
  *   [1 입력·스코프] → P2 생성 → [2 Gate A: 액티비티 검토·수정] → P3+P4
  *   → [3 Gate B: 관계·기간 검토·수정] → S1 CPM → [4 Gate C: 간트 확인·확정] → P6 XML
  *
  * AI = 초안 제안, PM = 각 게이트에서 컨펌·수정 (사람이 진실원천).
- * 원샷 데모는 /schedule/generate (PoC 보존). 디자인 언어는 generate 와 동일(styled-jsx·slate).
  */
 import { type FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -765,7 +764,7 @@ export default function SchedulePlanWizard() {
   return (
     <div style={{ padding: 20, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
-        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>공정계획 위저드</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>공정표 빌더</h1>
         <p style={{ fontSize: 13, color: "var(--muted)", margin: "4px 0 0" }}>
           <b>공정 플래닝</b>(WBS → 액티비티 정의 → 리스트 → 릴레이션 → 듀레이션) 이 끝나면 DB에 저장되고,
           <b> PM이 수정 또는 컨펌</b>하면 <b>공정 스케줄링</b>(베이스라인 생성)으로 넘어갑니다.
