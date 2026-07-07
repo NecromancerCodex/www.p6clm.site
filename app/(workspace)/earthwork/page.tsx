@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
 import { EarthworkSection } from "../../../components/earthwork/EarthworkSection";
 import { BoreholeTable } from "../../../components/earthwork/BoreholeTable";
+import { CadImportPanel } from "../../../components/earthwork/CadImportPanel";
 import {
   BOREHOLES, LAYERS, TERRAIN_PRESETS, buildGridModel, generateContours, layerVolumes, makeTerrainPreset,
   parseEarthworkCsv, polygonArea, prepare,
@@ -131,37 +132,48 @@ export default function EarthworkPage() {
     });
   }, []);
 
-  // CSV 업로드 → 그 데이터로 3D·물량·단면 전부 재구성.
-  const onCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (f) e.target.value = "";
-    if (!f) return;
-    const data = parseEarthworkCsv(await f.text());
+  // CSV 텍스트 → 3D·물량·단면 재구성 (파일 업로드 / CAD 추출 공용).
+  const applyCsvText = async (text: string, label: string) => {
+    const data = parseEarthworkCsv(text);
     const parsed = data.boreholes;
-    if (parsed.length < 2) {
-      alert("좌표(X,Y) 있는 시추공이 2개 이상 필요합니다. CSV 헤더/좌표 컬럼을 확인하세요.");
+    const nothing = parsed.length < 2 && !data.boundary.length && !data.piles.length && !data.walls.length && !data.terrain.length;
+    if (nothing) {
+      alert("유효한 데이터가 없습니다. CSV 헤더/좌표(X,Y 또는 X_cad) 또는 ##섹션을 확인하세요.");
       return;
     }
-    setBoreholes(parsed);
-    setSec(farthestPair(parsed));
     const newExtra = { terrain: data.terrain, boundary: data.boundary, piles: data.piles, walls: data.walls };
     setExtra(newExtra);
-    // 전체 모델 캐시 — 새로고침 복원용(extra 는 백엔드 미저장이라 localStorage 로 보존).
-    try { localStorage.setItem("earthwork-model", JSON.stringify({ boreholes: parsed, extra: newExtra })); } catch { /* 용량초과 무시 */ }
-    // 통합 CSV(##섹션)에서 추가로 들어온 데이터 요약
+    if (parsed.length >= 2) { setBoreholes(parsed); setSec(farthestPair(parsed)); }
+    const bhForCache = parsed.length >= 2 ? parsed : boreholes;
+    try { localStorage.setItem("earthwork-model", JSON.stringify({ boreholes: bhForCache, extra: newExtra })); } catch { /* 용량초과 무시 */ }
+
     const ex: string[] = [];
     if (data.terrain.length) ex.push(`지형 ${data.terrain.length}점`);
     if (data.boundary.length) ex.push(`경계 ${data.boundary.length}점`);
     if (data.piles.length) ex.push(`Pile ${data.piles.length}`);
     if (data.walls.length) ex.push(`흙막이 ${data.walls.length}`);
     const suffix = ex.length ? ` + ${ex.join(", ")}` : "";
+
+    if (parsed.length < 2) {
+      // CAD 추출 등 시추공 위치가 없거나 부족 — extra 만 반영, 지층 두께는 시추표 수동입력.
+      setSource(`${label}${suffix} · 시추공 지층 두께 입력 필요`);
+      return;
+    }
     // DB(네온) 저장 — 시추+extra 기존 교체(최신만, owner 개인화). 백엔드 미가동이면 화면만.
     try {
       const n = await saveEarthwork(parsed, newExtra);
-      setSource(`${f.name} (저장됨 ${n}공${suffix})`);
+      setSource(`${label} (저장됨 ${n}공${suffix})`);
     } catch {
-      setSource(`${f.name} (시추 ${parsed.length}공${suffix} · 저장 실패-화면만)`);
+      setSource(`${label} (시추 ${parsed.length}공${suffix} · 저장 실패-화면만)`);
     }
+  };
+
+  // CSV 업로드 → 그 데이터로 3D·물량·단면 전부 재구성.
+  const onCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) e.target.value = "";
+    if (!f) return;
+    await applyCsvText(await f.text(), f.name);
   };
 
   // 그룹 소계 + 총계
@@ -220,6 +232,9 @@ export default function EarthworkPage() {
             </span>
           )}
         </div>
+
+        {/* CAD(DXF) 멀티 임포트 → 의미기반 추출 → CSV 생성·적용 */}
+        <CadImportPanel onGenerated={applyCsvText} />
 
         {/* 프리셋 + 옵션 */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 14, paddingTop: 14, borderTop: "1px solid #f1f5f9" }}>
