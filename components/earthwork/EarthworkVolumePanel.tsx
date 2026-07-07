@@ -37,23 +37,23 @@ export function EarthworkVolumePanel() {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <h3 style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 15, fontWeight: 700, color: "#1e293b", marginBottom: 8 }}>
+      <h3 style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>
         <Mountain size={16} strokeWidth={1.8} /> 토공 물량 (지층별)
-        {count > 0 && <span style={{ color: "#94a3b8", fontWeight: 500, fontSize: 12 }}>· 시추 {count}공 기반</span>}
+        {count > 0 && <span style={{ color: "var(--muted)", fontWeight: 500, fontSize: 12 }}>· 시추 {count}공 기반</span>}
       </h3>
 
       {vols === null ? (
-        <div style={{ color: "#64748b", fontSize: 13 }}>불러오는 중…</div>
+        <div style={{ color: "var(--muted)", fontSize: 13 }}>불러오는 중…</div>
       ) : vols.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 14px" }}>
-          저장된 토공 데이터가 없습니다. <a href="/earthwork" style={{ color: "#2563eb", fontWeight: 600 }}>토공 / 지반</a> 페이지에서
+        <div style={{ fontSize: 13, color: "var(--muted)", background: "var(--surface-soft)", border: "1px solid var(--line)", borderRadius: 8, padding: "10px 14px" }}>
+          저장된 토공 데이터가 없습니다. <a href="/earthwork" style={{ color: "var(--primary)", fontWeight: 600 }}>토공 / 지반</a> 페이지에서
           시추 CSV를 올리고 <strong>DB 저장</strong>하면 여기 물량이 표시됩니다.
         </div>
       ) : (
-        <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8, maxWidth: 560 }}>
+        <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8, maxWidth: 560 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr style={{ background: "#f8fafc", color: "#475569" }}>
+              <tr style={{ background: "var(--surface-soft)", color: "var(--muted-strong)" }}>
                 <th style={th()}>구분</th>
                 <th style={th()}>지층</th>
                 <th style={th(true)}>물량 (m³)</th>
@@ -64,11 +64,11 @@ export function EarthworkVolumePanel() {
               {(["토사", "풍화", "암반"] as const).map((grp) => {
                 const rows = vols.filter((v) => v.group === grp);
                 return rows.map((v, i) => (
-                  <tr key={v.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                  <tr key={v.key} style={{ borderTop: "1px solid var(--surface-soft)" }}>
                     {i === 0 && (
-                      <td rowSpan={rows.length} style={{ ...td(), fontWeight: 700, color: "#334155", verticalAlign: "top", background: "#fbfcfe" }}>
+                      <td rowSpan={rows.length} style={{ ...td(), fontWeight: 700, color: "var(--muted-strong)", verticalAlign: "top", background: "var(--surface-soft)" }}>
                         {grp}
-                        <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>{fmt(groupTotal[grp])} m³</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>{fmt(groupTotal[grp])} m³</div>
                       </td>
                     )}
                     <td style={td()}>
@@ -80,7 +80,7 @@ export function EarthworkVolumePanel() {
                   </tr>
                 ));
               })}
-              <tr style={{ borderTop: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 700 }}>
+              <tr style={{ borderTop: "2px solid var(--line-strong)", background: "var(--surface-soft)", fontWeight: 700 }}>
                 <td style={td()} colSpan={2}>합계</td>
                 <td style={td(true)}>{fmt(grand)}</td>
                 <td style={td(true)}>100%</td>

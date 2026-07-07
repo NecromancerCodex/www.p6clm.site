@@ -480,7 +480,7 @@ export function ProgressDashboard() {
                     <RefreshCw size={13} className="progress-spin" strokeWidth={2} /> CAR 생성 중…
                   </>
                 ) : (
-                  <>✦ CAR 생성</>
+                  <>CAR 생성</>
                 )}
               </button>
             )}

@@ -54,43 +54,43 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
   };
 
   return (
-    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #f1f5f9" }}>
+    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--surface-soft)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <label style={{
           display: "inline-flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 10,
-          border: "1px solid #cbd5e1", background: "#fff", color: "#334155", fontSize: 13.5, fontWeight: 600, cursor: "pointer",
+          border: "1px solid var(--line-strong)", background: "var(--surface)", color: "var(--muted-strong)", fontSize: 13.5, fontWeight: 600, cursor: "pointer",
         }}>
           <FileUp size={15} strokeWidth={2.1} /> CAD(DXF) 가져오기
           <input type="file" accept=".dxf" multiple onChange={onPick} style={{ display: "none" }} />
         </label>
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>
+        <span style={{ fontSize: 11, color: "var(--muted)" }}>
           경계·pile·CIP·시추 여러 파일 한 번에 · <strong>레이어별</strong> 의미 지정 → CSV 생성
         </span>
         {files.length > 0 && (
-          <button type="button" onClick={() => { setFiles([]); setSel({}); }} style={{ marginLeft: "auto", fontSize: 11, color: "#94a3b8", background: "none", border: "none", cursor: "pointer" }}>전체 지우기</button>
+          <button type="button" onClick={() => { setFiles([]); setSel({}); }} style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>전체 지우기</button>
         )}
       </div>
 
-      {err && <div style={{ marginTop: 8, fontSize: 12, color: "#dc2626" }}>{err}</div>}
+      {err && <div style={{ marginTop: 8, fontSize: 12, color: "var(--red)" }}>{err}</div>}
 
       {layers.length > 0 && (
-        <div style={{ marginTop: 10, border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ display: "flex", gap: 8, padding: "6px 12px", background: "#f8fafc", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+        <div style={{ marginTop: 10, border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: 8, padding: "6px 12px", background: "var(--surface-soft)", fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>
             <span style={{ flex: 1 }}>레이어 (파일)</span>
             <span style={{ width: 130, textAlign: "right" }}>엔티티</span>
             <span style={{ width: 120 }}>의미</span>
           </div>
           {shown.map((l) => (
-            <div key={l.file + "|" + l.layer} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderTop: "1px solid #f1f5f9", fontSize: 12.5 }}>
+            <div key={l.file + "|" + l.layer} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderTop: "1px solid var(--surface-soft)", fontSize: 12.5 }}>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ color: "#334155", fontWeight: 600 }}>{l.layer || "(무명)"}</span>
-                <span style={{ color: "#94a3b8", fontSize: 11, marginLeft: 6 }}>{l.file}</span>
+                <span style={{ color: "var(--muted-strong)", fontWeight: 600 }}>{l.layer || "(무명)"}</span>
+                <span style={{ color: "var(--muted)", fontSize: 11, marginLeft: 6 }}>{l.file}</span>
               </span>
-              <span style={{ width: 130, textAlign: "right", fontSize: 10.5, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.types}</span>
+              <span style={{ width: 130, textAlign: "right", fontSize: 10.5, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.types}</span>
               <select
                 value={catOf(l.file, l.layer, l.suggested)}
                 onChange={(e) => setCat(l.file, l.layer, e.target.value as Category)}
-                style={{ width: 120, fontSize: 12, padding: "3px 6px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", color: "#334155" }}
+                style={{ width: 120, fontSize: 12, padding: "3px 6px", borderRadius: 6, border: "1px solid var(--line-strong)", background: "var(--surface)", color: "var(--muted-strong)" }}
               >
                 {CATS.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
               </select>
@@ -98,7 +98,7 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
           ))}
           {hiddenCount > 0 && (
             <button type="button" onClick={() => setShowAll((s) => !s)}
-              style={{ width: "100%", padding: "6px 12px", borderTop: "1px solid #f1f5f9", background: "#fafbfc", border: "none", cursor: "pointer", fontSize: 11.5, color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              style={{ width: "100%", padding: "6px 12px", borderTop: "1px solid var(--surface-soft)", background: "#fafbfc", border: "none", cursor: "pointer", fontSize: 11.5, color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
               <ChevronDown size={12} style={{ transform: showAll ? "rotate(180deg)" : "none" }} />
               {showAll ? "무시 레이어 접기" : `무시 레이어 ${hiddenCount}개 더보기`}
             </button>
@@ -109,24 +109,24 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
       {has && data && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
           <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {data.boreholes.length > 0 && <Tag label={`시추 ${data.boreholes.length}공`} c="#7c3aed" />}
-            {data.boundary.length > 0 && <Tag label={`경계 ${data.boundary.length}점`} c="#15803d" />}
-            {data.piles.length > 0 && <Tag label={`Pile ${data.piles.length}`} c="#b45309" />}
-            {data.walls.length > 0 && <Tag label={`흙막이 ${data.walls.length}`} c="#be123c" />}
-            {data.terrain.length > 0 && <Tag label={`지형 ${data.terrain.length}점`} c="#0e7490" />}
+            {data.boreholes.length > 0 && <Tag label={`시추 ${data.boreholes.length}공`} c="var(--primary)" />}
+            {data.boundary.length > 0 && <Tag label={`경계 ${data.boundary.length}점`} c="var(--green)" />}
+            {data.piles.length > 0 && <Tag label={`Pile ${data.piles.length}`} c="var(--primary-deep)" />}
+            {data.walls.length > 0 && <Tag label={`흙막이 ${data.walls.length}`} c="var(--red)" />}
+            {data.terrain.length > 0 && <Tag label={`지형 ${data.terrain.length}점`} c="var(--teal)" />}
           </span>
           <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-            <button type="button" onClick={download} style={btn("#fff", "#334155", "#cbd5e1")}>
+            <button type="button" onClick={download} style={btn("var(--surface)", "var(--muted-strong)", "var(--line-strong)")}>
               <Download size={14} /> CSV 다운로드
             </button>
-            <button type="button" onClick={apply} style={btn("linear-gradient(180deg,#3b82f6,#2563eb)", "#fff")}>
+            <button type="button" onClick={apply} style={btn("linear-gradient(180deg,var(--primary),var(--primary))", "var(--surface)")}>
               <ArrowRight size={14} /> CSV 생성 & 적용
             </button>
           </div>
         </div>
       )}
       {files.length > 0 && (
-        <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, marginBottom: 0 }}>
+        <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 8, marginBottom: 0 }}>
           ※ CAD엔 지층 두께가 없습니다 — 시추 위치·심도만 추출되고, <strong>지층 두께는 아래 시추공 편집표에서 입력</strong>하세요.
         </p>
       )}

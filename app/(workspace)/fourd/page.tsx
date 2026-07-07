@@ -91,7 +91,7 @@ interface ReportData {
   matched: number;
   unmatched: number;
   activityTotal: number;
-  // 🤖 정책(AI) 매칭으로 해결된 연결 — 문제 목록과 분리해 별도 표시
+  // 정책(AI) 매칭으로 해결된 연결 — 문제 목록과 분리해 별도 표시
   aiResolved: PolicyResolvedItem[];
   // 공정 활동 있는데 BIM 부재 없음 — 원인(A 재연결가능 / B 모델누락 / C 보류)별 그룹
   noBim: {
@@ -164,7 +164,7 @@ function Dropzone({
       style={{
         flex: 1,
         minHeight: 120,
-        border: `2px dashed ${over ? "#60a5fa" : has ? "#10b981" : "#cbd5e1"}`,
+        border: `2px dashed ${over ? "var(--primary)" : has ? "var(--green)" : "var(--line-strong)"}`,
         borderRadius: 10,
         display: "flex",
         flexDirection: "column",
@@ -172,16 +172,16 @@ function Dropzone({
         justifyContent: "center",
         gap: 6,
         cursor: "pointer",
-        background: over ? "#eff6ff" : has ? "#f0fdf4" : "#f8fafc",
+        background: over ? "var(--primary-soft)" : has ? "var(--green-soft)" : "var(--surface-soft)",
         padding: 16,
         textAlign: "center",
       }}
     >
       <strong>{label}</strong>
-      <span style={{ fontSize: 13, color: "#64748b" }}>
+      <span style={{ fontSize: 13, color: "var(--muted)" }}>
         {multiple
-          ? (files?.length ? `✓ ${files.map((f) => f.name).join(", ")} (${files.length}개)` : "토목·구조 등 여러 IFC 드래그앤드롭/선택")
-          : (file ? `✓ ${file.name}` : "드래그앤드롭 또는 클릭")}
+          ? (files?.length ? `${files.map((f) => f.name).join(", ")} (${files.length}개)` : "토목·구조 등 여러 IFC 드래그앤드롭/선택")
+          : (file ? `${file.name}` : "드래그앤드롭 또는 클릭")}
       </span>
       <input
         ref={inputRef}
@@ -489,7 +489,7 @@ export default function FourDPage() {
         let planIfcs = await loadPlanIfcs(planId);
         const serverList = await getPlanIfcsServer(planId);
         setServerIfcs(serverList);
-        // ★ ifcPersistedRef 는 S3 저장 여부 기준(IndexedDB 아님). 마법사 경유 plan 은 IndexedDB 만
+        // ifcPersistedRef 는 S3 저장 여부 기준(IndexedDB 아님). 마법사 경유 plan 은 IndexedDB 만
         //   있고 S3 엔 없으므로 false → 분석 후 run 이 S3 업로드(다른 기기 복원 가능).
         ifcPersistedRef.current = serverList.length > 0;
         if (!planIfcs.length) {
@@ -959,7 +959,7 @@ export default function FourDPage() {
     <div style={{ padding: 20, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <h1 style={{ margin: 0, fontSize: 20 }}>대시보드</h1>
-        <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
+        <p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>
           공정표(P6)와 BIM(IFC)을 올리면 공정 진행 상황을 시각화하고, 해당일 공사일보를 생성합니다.
         </p>
       </div>
@@ -970,28 +970,28 @@ export default function FourDPage() {
             <div
               style={{
                 display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-                padding: "12px 16px", borderRadius: 10, border: "1px solid #bfdbfe", background: "#eff6ff",
+                padding: "12px 16px", borderRadius: 10, border: "1px solid var(--primary-soft)", background: "var(--primary-soft)",
               }}
             >
-              <span style={{ fontSize: 20 }}>🗂️</span>
-              <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: "#1e3a8a" }}>
+              <span style={{ fontSize: 20 }}></span>
+              <div style={{ flex: 1, minWidth: 200, fontSize: 13, color: "var(--primary-deep)" }}>
                 <strong>최근 파일이 기억되어 있습니다</strong>
-                <div style={{ color: "#475569", marginTop: 2 }}>
+                <div style={{ color: "var(--muted-strong)", marginTop: 2 }}>
                   {cached.schedule.name} · {(cached.ifcs?.length ? cached.ifcs : [cached.ifc]).map((f) => f.name).join(", ")}
                 </div>
-                <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 1 }}>
+                <div style={{ color: "var(--muted)", fontSize: 11, marginTop: 1 }}>
                   {new Date(cached.savedAt).toLocaleString("ko-KR")} 저장 · 이 브라우저에만
                 </div>
               </div>
               <button
                 onClick={restoreCached}
-                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--primary)", color: "var(--surface)", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
               >
                 이어서 열기
               </button>
               <button
                 onClick={clearCached}
-                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", color: "#64748b", fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}
+                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--line-strong)", background: "var(--surface)", color: "var(--muted)", fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}
               >
                 지우기
               </button>
@@ -1007,9 +1007,9 @@ export default function FourDPage() {
           </div>
           {serverIfcs.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12, alignItems: "center" }}>
-              <span style={{ color: "#0369a1", fontWeight: 600 }}>☁ 플랜 저장 IFC:</span>
+              <span style={{ color: "var(--primary-deep)", fontWeight: 600 }}>플랜 저장 IFC:</span>
               {serverIfcs.map((m) => (
-                <span key={m.object_key} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "2px 8px", color: "#1d4ed8" }}>
+                <span key={m.object_key} style={{ background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 6, padding: "2px 8px", color: "var(--primary-deep)" }}>
                   {m.filename}{m.discipline ? ` · ${m.discipline}` : ""}
                   <button
                     onClick={async () => {
@@ -1021,7 +1021,7 @@ export default function FourDPage() {
                         setServerIfcs((p) => p.filter((x) => x.object_key !== m.object_key));
                       } catch (e) { alert("삭제 실패: " + (e instanceof Error ? e.message : String(e))); }
                     }}
-                    style={{ marginLeft: 6, border: "none", background: "none", color: "#dc2626", cursor: "pointer", fontWeight: 700 }}>×</button>
+                    style={{ marginLeft: 6, border: "none", background: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700 }}>×</button>
                 </span>
               ))}
             </div>
@@ -1029,10 +1029,10 @@ export default function FourDPage() {
           {ifcFiles.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
               {ifcFiles.map((f) => (
-                <span key={f.name} style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 8px", color: "#15803d" }}>
+                <span key={f.name} style={{ background: "var(--green-soft)", border: "1px solid var(--green-soft)", borderRadius: 6, padding: "2px 8px", color: "var(--green)" }}>
                   {f.name} ({Math.round(f.size / 1024 / 1024)}MB)
                   <button onClick={() => setIfcFiles((prev) => prev.filter((x) => x.name !== f.name))}
-                          style={{ marginLeft: 6, border: "none", background: "none", color: "#dc2626", cursor: "pointer", fontWeight: 700 }}>×</button>
+                          style={{ marginLeft: 6, border: "none", background: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700 }}>×</button>
                 </span>
               ))}
             </div>
@@ -1044,8 +1044,8 @@ export default function FourDPage() {
               padding: "12px 20px",
               borderRadius: 8,
               border: "none",
-              background: !scheduleFile || !ifcFiles.length || busy ? "#cbd5e1" : "#2563eb",
-              color: "#fff",
+              background: !scheduleFile || !ifcFiles.length || busy ? "var(--line-strong)" : "var(--primary)",
+              color: "var(--surface)",
               fontSize: 15,
               fontWeight: 600,
               cursor: !scheduleFile || !ifcFiles.length || busy ? "default" : "pointer",
@@ -1054,29 +1054,29 @@ export default function FourDPage() {
             {busy ? "분석 중…" : "분석 & 4D 생성"}
           </button>
           {ifcFiles.reduce((s, f) => s + f.size, 0) > 40 * 1024 * 1024 && (
-            <p style={{ color: "#d97706", fontSize: 13, margin: 0 }}>
-              ⚠ IFC 합계 {Math.round(ifcFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024)}MB — 브라우저 파싱·공정속성 분석에 시간·메모리 소요. (REV 파일이 zone 정확 매칭됩니다)
+            <p style={{ color: "var(--primary)", fontSize: 13, margin: 0 }}>
+              IFC 합계 {Math.round(ifcFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024)}MB — 브라우저 파싱·공정속성 분석에 시간·메모리 소요. (REV 파일이 zone 정확 매칭됩니다)
             </p>
           )}
           {progress && (
             <div>
-              <div style={{ height: 8, background: "#e2e8f0", borderRadius: 4, overflow: "hidden" }}>
-                <div style={{ width: `${Math.round(progress.p * 100)}%`, height: "100%", background: "#2563eb", transition: "width .3s" }} />
+              <div style={{ height: 8, background: "var(--line)", borderRadius: 4, overflow: "hidden" }}>
+                <div style={{ width: `${Math.round(progress.p * 100)}%`, height: "100%", background: "var(--primary)", transition: "width .3s" }} />
               </div>
-              <p style={{ fontSize: 13, color: "#64748b", margin: "6px 0 0" }}>{progress.msg}</p>
+              <p style={{ fontSize: 13, color: "var(--muted)", margin: "6px 0 0" }}>{progress.msg}</p>
             </div>
           )}
-          {error && <p style={{ color: "#dc2626", fontSize: 13 }}>오류: {error}</p>}
+          {error && <p style={{ color: "var(--red)", fontSize: 13 }}>오류: {error}</p>}
         </>
       )}
 
       {ready && (
         <>
-          <div style={{ fontSize: 13, color: "#475569" }}>
+          <div style={{ fontSize: 13, color: "var(--muted-strong)" }}>
             {ready.mode === "code" ? "구역 정확 매칭(공정PSet)" : "층 근사 매칭"} ·{" "}
             공정 {ready.taskCount.toLocaleString()}건 ·{" "}
             요소 {ready.summary.total.toLocaleString()}개 중{" "}
-            <strong style={{ color: "#10b981" }}>{ready.summary.matched.toLocaleString()}개 매칭</strong>{" "}
+            <strong style={{ color: "var(--green)" }}>{ready.summary.matched.toLocaleString()}개 매칭</strong>{" "}
             ({Math.round((ready.summary.matched / Math.max(ready.summary.total, 1)) * 100)}%)
             <button
               onClick={() => {
@@ -1084,16 +1084,16 @@ export default function FourDPage() {
                 setScheduleFile(null);
                 setIfcFiles([]);
               }}
-              style={{ marginLeft: 12, fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer" }}
+              style={{ marginLeft: 12, fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--line-strong)", background: "var(--surface)", cursor: "pointer" }}
             >
               새로 분석
             </button>
           </div>
           {serverIfcs.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12, alignItems: "center" }}>
-              <span style={{ color: "#0369a1", fontWeight: 600 }}>☁ 플랜 저장 IFC:</span>
+              <span style={{ color: "var(--primary-deep)", fontWeight: 600 }}>플랜 저장 IFC:</span>
               {serverIfcs.map((m) => (
-                <span key={m.object_key} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "2px 8px", color: "#1d4ed8" }}>
+                <span key={m.object_key} style={{ background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 6, padding: "2px 8px", color: "var(--primary-deep)" }}>
                   {m.filename}{m.discipline ? ` · ${m.discipline}` : ""}
                   <button
                     onClick={async () => {
@@ -1105,7 +1105,7 @@ export default function FourDPage() {
                         setServerIfcs((p) => p.filter((x) => x.object_key !== m.object_key));
                       } catch (e) { alert("삭제 실패: " + (e instanceof Error ? e.message : String(e))); }
                     }}
-                    style={{ marginLeft: 6, border: "none", background: "none", color: "#dc2626", cursor: "pointer", fontWeight: 700 }}>×</button>
+                    style={{ marginLeft: 6, border: "none", background: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700 }}>×</button>
                 </span>
               ))}
             </div>
@@ -1119,16 +1119,16 @@ export default function FourDPage() {
                   padding: "8px 14px",
                   borderRadius: 8,
                   border: "none",
-                  background: policyBusy ? "#cbd5e1" : "#7c3aed",
-                  color: "#fff",
+                  background: policyBusy ? "var(--line-strong)" : "var(--primary)",
+                  color: "var(--surface)",
                   fontWeight: 600,
                   cursor: policyBusy ? "default" : "pointer",
                 }}
               >
-                {policyBusy ? `AI 분석 중… ${policyProg}` : "🤖 정책기반 AI 매칭 (미매칭 채우기)"}
+                {policyBusy ? `AI 분석 중… ${policyProg}` : "정책기반 AI 매칭 (미매칭 채우기)"}
               </button>
               {ready.policyCount > 0 && (
-                <span style={{ color: promoted ? "#16a34a" : "#7c3aed" }}>
+                <span style={{ color: promoted ? "var(--green)" : "var(--primary)" }}>
                   +{ready.policyCount.toLocaleString()}개 {promoted ? "공정표 편입(확정)" : "정책 매칭(추정) — 검토 후 편입"}
                 </span>
               )}
@@ -1149,12 +1149,12 @@ export default function FourDPage() {
                     setPromoted(true);
                   }}
                   style={{
-                    padding: "8px 14px", borderRadius: 8, border: "1px solid #16a34a",
-                    background: "#16a34a", color: "#fff", fontWeight: 600, cursor: "pointer",
+                    padding: "8px 14px", borderRadius: 8, border: "1px solid var(--green)",
+                    background: "var(--green)", color: "var(--surface)", fontWeight: 600, cursor: "pointer",
                   }}
                   title="AI가 추정한 워크유닛 배정을 검토 후 공정표에 정식 편입 — 보라(추정) → 초록(확정)"
                 >
-                  ✅ 공정표에 편입 (확정 {ready.policyCount.toLocaleString()}개)
+                  공정표에 편입 (확정 {ready.policyCount.toLocaleString()}개)
                 </button>
               )}
               <button
@@ -1162,14 +1162,14 @@ export default function FourDPage() {
                 style={{
                   padding: "8px 14px",
                   borderRadius: 8,
-                  border: "1px solid #0ea5e9",
-                  background: "#0ea5e9",
-                  color: "#fff",
+                  border: "1px solid var(--primary)",
+                  background: "var(--primary)",
+                  color: "var(--surface)",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
               >
-                📋 시뮬레이션 보고서
+                시뮬레이션 보고서
               </button>
               <button
                 onClick={saveWorkPackages}
@@ -1177,18 +1177,18 @@ export default function FourDPage() {
                 style={{
                   padding: "8px 14px",
                   borderRadius: 8,
-                  border: "1px solid #7c3aed",
-                  background: wpSaving === "done" ? "#059669" : "#7c3aed",
-                  color: "#fff",
+                  border: "1px solid var(--primary)",
+                  background: wpSaving === "done" ? "var(--green)" : "var(--primary)",
+                  color: "var(--surface)",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
               >
-                {wpSaving === "saving" ? "💾 저장 중…" : wpSaving === "done" ? "✓ 진도율·PMIS-X 저장됨" : wpSaving === "error" ? "⚠ 저장 실패 — 재시도" : "💾 진도율·PMIS-X 저장"}
+                {wpSaving === "saving" ? "저장 중…" : wpSaving === "done" ? "진도율·PMIS-X 저장됨" : wpSaving === "error" ? "저장 실패 — 재시도" : "진도율·PMIS-X 저장"}
               </button>
             </div>
           )}
-          <details style={{ fontSize: 12, color: "#64748b" }}>
+          <details style={{ fontSize: 12, color: "var(--muted)" }}>
             <summary style={{ cursor: "pointer" }}>진단</summary>
             <div style={{ marginTop: 6, lineHeight: 1.7, fontFamily: "monospace" }}>
               <div>공정 PSet 보유 요소: {ready.diag.procCount.toLocaleString()} / {ready.summary.total.toLocaleString()}</div>
@@ -1227,10 +1227,10 @@ export default function FourDPage() {
 
       {dailyErr && (
         <div
-          style={{ position: "fixed", bottom: 16, right: 16, zIndex: 3000, background: "#fee2e2", color: "#991b1b", padding: "10px 14px", borderRadius: 8, fontSize: 13, boxShadow: "0 4px 12px rgba(0,0,0,.15)" }}
+          style={{ position: "fixed", bottom: 16, right: 16, zIndex: 3000, background: "var(--red-soft)", color: "var(--red)", padding: "10px 14px", borderRadius: 8, fontSize: 13, boxShadow: "0 4px 12px rgba(0,0,0,.15)" }}
           onClick={() => setDailyErr(null)}
         >
-          ⚠ 공사일보 생성 실패: {dailyErr} (클릭하여 닫기)
+          공사일보 생성 실패: {dailyErr} (클릭하여 닫기)
         </div>
       )}
       {dailyPlan && (
@@ -1284,34 +1284,34 @@ function DailyPlanModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 12, padding: 20, maxWidth: 640, width: "100%", maxHeight: "85vh", overflow: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
+        style={{ background: "var(--surface)", borderRadius: 12, padding: 20, maxWidth: 640, width: "100%", maxHeight: "85vh", overflow: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>📄 공사일보 작성 — {plan.iso}</h2>
-          <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>닫기</button>
+          <h2 style={{ margin: 0, fontSize: 18 }}>공사일보 작성 — {plan.iso}</h2>
+          <button onClick={onClose} style={{ border: "none", background: "var(--surface-soft)", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>닫기</button>
         </div>
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: "#64748b" }}>
+        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--muted)" }}>
           해당일 작업 목록입니다. <strong>완료한 업무에 체크</strong>하세요. 체크 안 한 항목은 진행중으로 기록됩니다.
           (선택은 공정 진도율에도 반영)
         </p>
 
         {plan.items.length === 0 ? (
-          <div style={{ padding: 16, background: "#f8fafc", borderRadius: 8, color: "#475569", fontSize: 14 }}>
+          <div style={{ padding: 16, background: "var(--surface-soft)", borderRadius: 8, color: "var(--muted-strong)", fontSize: 14 }}>
             이 날짜에 계획상 진행되는 공정이 없습니다.
           </div>
         ) : (
-          <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}>
             {plan.items.map((it) => (
               <label
                 key={it.code}
-                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderTop: "1px solid #f1f5f9", cursor: "pointer", background: it.done ? "#f0fdf4" : "#fff" }}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderTop: "1px solid var(--surface-soft)", cursor: "pointer", background: it.done ? "var(--green-soft)" : "var(--surface)" }}
               >
-                <input type="checkbox" checked={it.done} onChange={() => onToggle(it.code)} style={{ width: 17, height: 17, accentColor: "#10b981" }} />
+                <input type="checkbox" checked={it.done} onChange={() => onToggle(it.code)} style={{ width: 17, height: 17, accentColor: "var(--green)" }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, color: "#1e293b" }}>{it.name}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{it.code} · {it.period}</div>
+                  <div style={{ fontSize: 13, color: "var(--text)" }}>{it.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>{it.code} · {it.period}</div>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: it.done ? "#10b981" : "#0891b2" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: it.done ? "var(--green)" : "var(--teal)" }}>
                   {it.done ? "완료" : "진행중"}
                 </span>
               </label>
@@ -1320,25 +1320,25 @@ function DailyPlanModal({
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
-          <span style={{ fontSize: 13, color: "#475569" }}>지연사유</span>
+          <span style={{ fontSize: 13, color: "var(--muted-strong)" }}>지연사유</span>
           <select
             value={plan.delayReason}
             onChange={(e) => onDelayReason(e.target.value)}
-            style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 13 }}
+            style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid var(--line-strong)", fontSize: 13 }}
           >
             {DELAY_OPTIONS.map((o) => (
               <option key={o.v} value={o.v}>{o.label}</option>
             ))}
           </select>
-          <span style={{ fontSize: 11, color: "#94a3b8" }}>(주간·월간 보고서 지연원인 집계에 사용)</span>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>(주간·월간 보고서 지연원인 집계에 사용)</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
-          <span style={{ fontSize: 13, color: "#475569" }}>완료 {doneCount} / 전체 {plan.items.length}</span>
+          <span style={{ fontSize: 13, color: "var(--muted-strong)" }}>완료 {doneCount} / 전체 {plan.items.length}</span>
           <button
             onClick={onGenerate}
             disabled={busy}
-            style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: busy ? "#94a3b8" : "#2563eb", color: "#fff", fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer" }}
+            style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: busy ? "var(--muted)" : "var(--primary)", color: "var(--surface)", fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer" }}
           >
             {busy ? "생성 중…" : "공사일보 생성"}
           </button>
@@ -1357,13 +1357,13 @@ function DailyReportModal({ doc, onClose }: { doc: ScheduleReportDoc; onClose: (
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 12, padding: 20, maxWidth: 880, width: "100%", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
+        style={{ background: "var(--surface)", borderRadius: 12, padding: 20, maxWidth: 880, width: "100%", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2 style={{ margin: 0, fontSize: 18 }}>
-            📄 공사일보 — {doc.reference_date}
+            공사일보 — {doc.reference_date}
           </h2>
-          <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+          <button onClick={onClose} style={{ border: "none", background: "var(--surface-soft)", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
             닫기
           </button>
         </div>
@@ -1381,7 +1381,7 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
         {title} ({items.length})
       </div>
       {items.length === 0 ? (
-        <div style={{ color: "#10b981", fontSize: 13 }}>✓ {empty}</div>
+        <div style={{ color: "var(--green)", fontSize: 13 }}>{empty}</div>
       ) : (
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6, maxHeight: 160, overflow: "auto" }}>
           {items.map((s, i) => (
@@ -1398,18 +1398,18 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", borderRadius: 12, padding: 24, maxWidth: 720, width: "100%", maxHeight: "85vh", overflow: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
+        style={{ background: "var(--surface)", borderRadius: 12, padding: 24, maxWidth: 720, width: "100%", maxHeight: "85vh", overflow: "auto", boxShadow: "0 10px 40px rgba(0,0,0,0.3)" }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>📋 4D 시뮬레이션 진단 보고서</h2>
-          <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>4D 시뮬레이션 진단 보고서</h2>
+          <button onClick={onClose} style={{ border: "none", background: "var(--surface-soft)", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>
             닫기
           </button>
         </div>
-        <div style={{ fontSize: 13, color: "#475569", marginBottom: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8 }}>
-          요소 {report.total.toLocaleString()}개 중 <strong style={{ color: "#10b981" }}>{report.matched.toLocaleString()}개 매칭 ({rate}%)</strong> · 공정활동 {report.activityTotal}종 · 미매칭 {report.unmatched.toLocaleString()}개
+        <div style={{ fontSize: 13, color: "var(--muted-strong)", marginBottom: 10, padding: "8px 12px", background: "var(--surface-soft)", borderRadius: 8 }}>
+          요소 {report.total.toLocaleString()}개 중 <strong style={{ color: "var(--green)" }}>{report.matched.toLocaleString()}개 매칭 ({rate}%)</strong> · 공정활동 {report.activityTotal}종 · 미매칭 {report.unmatched.toLocaleString()}개
           {report.aiResolved.length > 0 && (
-            <> · <strong style={{ color: "#7c3aed" }}>AI 해결 {report.aiResolved.reduce((s, r) => s + r.count, 0).toLocaleString()}개</strong></>
+            <> · <strong style={{ color: "var(--primary)" }}>AI 해결 {report.aiResolved.reduce((s, r) => s + r.count, 0).toLocaleString()}개</strong></>
           )}
         </div>
 
@@ -1422,27 +1422,27 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
             { ok: report.seqViolations.length === 0, g: "순서 정상", b: `순서위반 ${report.seqViolations.length}` },
             { ok: report.clashes4d.length === 0, g: "Clash 없음", b: `Clash ${report.clashes4d.length}` },
           ].map((c, i) => (
-            <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: c.ok ? "#ecfdf5" : "#fff7ed", color: c.ok ? "#059669" : "#c2410c", border: `1px solid ${c.ok ? "#a7f3d0" : "#fed7aa"}` }}>
-              {c.ok ? "✅ " : "⚠️ "}{c.ok ? c.g : c.b}
+            <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: c.ok ? "var(--green-soft)" : "var(--surface)7ed", color: c.ok ? "var(--green)" : "#c2410c", border: `1px solid ${c.ok ? "var(--green-soft)" : "#fed7aa"}` }}>
+              {c.ok ? "" : ""}{c.ok ? c.g : c.b}
             </span>
           ))}
         </div>
 
         {/* 구역별 층 커버리지 갭 — BIM 특성 경고 (전이층/보이드 vs 모델 누락) */}
         {report.zoneGaps.length > 0 && (
-          <div style={{ marginBottom: 16, padding: "10px 12px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8 }}>
-            <div style={{ fontWeight: 700, color: "#b45309", marginBottom: 6 }}>
-              ⚠️ 구역별 층 커버리지 — 중간층 누락 감지 ({report.zoneGaps.length}구역)
+          <div style={{ marginBottom: 16, padding: "10px 12px", background: "var(--amber-soft)", border: "1px solid var(--amber-soft)", borderRadius: 8 }}>
+            <div style={{ fontWeight: 700, color: "var(--primary-deep)", marginBottom: 6 }}>
+              구역별 층 커버리지 — 중간층 누락 감지 ({report.zoneGaps.length}구역)
             </div>
-            <div style={{ fontSize: 12, color: "#92400e", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: "var(--primary-deep)", marginBottom: 8 }}>
               타워 구역이 중간 지상층을 건너뜁니다. <strong>BIM 모델의 의도된 형상</strong>(타워-포디움 전이층·보이드 등)이거나 <strong>모델 누락</strong>(부재 미작성)입니다.
               스케줄은 BIM 그대로 반영하므로 <strong>버그가 아닙니다</strong> — 의도된 형상인지 BIM에서 확인하세요.
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
               {report.zoneGaps.map((g, i) => (
                 <li key={i}>
-                  <strong>{g.zone}구역</strong>: {g.floorMin}~{g.floorMax}F 중 <strong style={{ color: "#b45309" }}>{g.gaps.join("·")}F 없음</strong>{" "}
-                  <span style={{ color: "#a16207" }}>(전이층/보이드 또는 모델 누락 — 확인 요망)</span>
+                  <strong>{g.zone}구역</strong>: {g.floorMin}~{g.floorMax}F 중 <strong style={{ color: "var(--primary-deep)" }}>{g.gaps.join("·")}F 없음</strong>{" "}
+                  <span style={{ color: "var(--primary-deep)" }}>(전이층/보이드 또는 모델 누락 — 확인 요망)</span>
                 </li>
               ))}
             </ul>
@@ -1450,19 +1450,19 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
         )}
 
         {report.aiResolved.length > 0 && (
-          <div style={{ marginBottom: 16, padding: "10px 12px", background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 8 }}>
-            <div style={{ fontWeight: 700, color: "#7c3aed", marginBottom: 6 }}>
-              🤖 AI 매칭으로 해결됨 ({report.aiResolved.reduce((s, r) => s + r.count, 0).toLocaleString()}개 · {report.aiResolved.length}건)
+          <div style={{ marginBottom: 16, padding: "10px 12px", background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 8 }}>
+            <div style={{ fontWeight: 700, color: "var(--primary)", marginBottom: 6 }}>
+              AI 매칭으로 해결됨 ({report.aiResolved.reduce((s, r) => s + r.count, 0).toLocaleString()}개 · {report.aiResolved.length}건)
             </div>
             <div style={{ fontSize: 12, color: "#6b21a8", marginBottom: 8 }}>
               아래는 규칙으로 못 잡았지만 정책(AI) 매칭이 공정활동에 연결한 부재입니다. (아래 ①②는 이를 제외한 <strong>미해결</strong>만 표시)
             </div>
-            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, lineHeight: 1.7, color: "#475569", maxHeight: 160, overflow: "auto" }}>
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, lineHeight: 1.7, color: "var(--muted-strong)", maxHeight: 160, overflow: "auto" }}>
               {report.aiResolved.map((r, i) => (
                 <li key={i}>
                   <strong>{r.group_label}</strong> → {r.activity_name}{" "}
-                  <span style={{ color: "#7c3aed" }}>({r.count.toLocaleString()}개, 확신 {Math.round(r.confidence * 100)}%)</span>
-                  {r.reason ? <div style={{ color: "#94a3b8" }}>· {r.reason}</div> : null}
+                  <span style={{ color: "var(--primary)" }}>({r.count.toLocaleString()}개, 확신 {Math.round(r.confidence * 100)}%)</span>
+                  {r.reason ? <div style={{ color: "var(--muted)" }}>· {r.reason}</div> : null}
                 </li>
               ))}
             </ul>
@@ -1470,20 +1470,20 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
         )}
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, color: "#dc2626", marginBottom: 6 }}>
-            ① BIM 있는데 공정 없음 — <span style={{ color: "#dc2626" }}>미해결</span> 원인별 분석 ({report.unmatched.toLocaleString()})
+          <div style={{ fontWeight: 700, color: "var(--red)", marginBottom: 6 }}>
+            ① BIM 있는데 공정 없음 — <span style={{ color: "var(--red)" }}>미해결</span> 원인별 분석 ({report.unmatched.toLocaleString()})
           </div>
           {report.noSchedule.length === 0 ? (
-            <div style={{ color: "#10b981", fontSize: 13 }}>✓ 모든 부재가 공정에 연결됨</div>
+            <div style={{ color: "var(--green)", fontSize: 13 }}>모든 부재가 공정에 연결됨</div>
           ) : (
             report.noSchedule.map((cg) => (
               <div key={cg.cause} style={{ borderLeft: `3px solid ${cg.color}`, paddingLeft: 10, marginBottom: 10 }}>
                 <div style={{ fontWeight: 600, color: cg.color, fontSize: 13 }}>
                   [{cg.cause}] {cg.title} — {cg.total.toLocaleString()}개
                 </div>
-                <div style={{ fontSize: 12, color: "#475569", margin: "2px 0" }}>· 왜: {cg.explain}</div>
-                <div style={{ fontSize: 12, color: "#0f766e", margin: "2px 0" }}>· 권장: {cg.recommend}</div>
-                <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.5, color: "#64748b", maxHeight: 90, overflow: "auto" }}>
+                <div style={{ fontSize: 12, color: "var(--muted-strong)", margin: "2px 0" }}>· 왜: {cg.explain}</div>
+                <div style={{ fontSize: 12, color: "var(--teal)", margin: "2px 0" }}>· 권장: {cg.recommend}</div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.5, color: "var(--muted)", maxHeight: 90, overflow: "auto" }}>
                   {cg.items.map((it, i) => (
                     <li key={i}>
                       {it.label} — {it.count.toLocaleString()}개
@@ -1496,20 +1496,20 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontWeight: 700, color: "#ea580c", marginBottom: 6 }}>
-            ② 공정 있는데 BIM 없음 — <span style={{ color: "#ea580c" }}>미해결</span> 원인별 분석 ({report.noBim.reduce((s, g) => s + g.total, 0).toLocaleString()})
+          <div style={{ fontWeight: 700, color: "var(--red)", marginBottom: 6 }}>
+            ② 공정 있는데 BIM 없음 — <span style={{ color: "var(--red)" }}>미해결</span> 원인별 분석 ({report.noBim.reduce((s, g) => s + g.total, 0).toLocaleString()})
           </div>
           {report.noBim.length === 0 ? (
-            <div style={{ color: "#10b981", fontSize: 13 }}>✓ 모든 공정활동에 BIM 부재 연결됨</div>
+            <div style={{ color: "var(--green)", fontSize: 13 }}>모든 공정활동에 BIM 부재 연결됨</div>
           ) : (
             report.noBim.map((cg) => (
               <div key={cg.cause} style={{ borderLeft: `3px solid ${cg.color}`, paddingLeft: 10, marginBottom: 10 }}>
                 <div style={{ fontWeight: 600, color: cg.color, fontSize: 13 }}>
                   [{cg.cause}] {cg.title} — {cg.total.toLocaleString()}건
                 </div>
-                <div style={{ fontSize: 12, color: "#475569", margin: "2px 0" }}>· 왜: {cg.explain}</div>
-                <div style={{ fontSize: 12, color: "#0f766e", margin: "2px 0" }}>· 권장: {cg.recommend}</div>
-                <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.5, color: "#64748b", maxHeight: 90, overflow: "auto" }}>
+                <div style={{ fontSize: 12, color: "var(--muted-strong)", margin: "2px 0" }}>· 왜: {cg.explain}</div>
+                <div style={{ fontSize: 12, color: "var(--teal)", margin: "2px 0" }}>· 권장: {cg.recommend}</div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.5, color: "var(--muted)", maxHeight: 90, overflow: "auto" }}>
                   {cg.items.map((s, i) => (
                     <li key={i}>{s}</li>
                   ))}
@@ -1519,21 +1519,21 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
           )}
         </div>
 
-        <Section title="③ 타임라인 순서 위반 (아래→위, 공종 순서)" color="#d97706"
+        <Section title="③ 타임라인 순서 위반 (아래→위, 공종 순서)" color="var(--primary)"
           empty="공정 순서 정합 — 층·공종 순서 정상"
           items={report.seqViolations} />
         {report.seqViolations.length > 0 && (
-          <div style={{ fontSize: 11, color: "#94a3b8", margin: "-8px 0 16px" }}>
+          <div style={{ fontSize: 11, color: "var(--muted)", margin: "-8px 0 16px" }}>
             · 왜: 같은 구역·공종에서 위층이 아래층보다 먼저 시작하면 통상 시공순서(아래→위)에 어긋납니다.<br />
             · 권장: 병렬시공/조닝 의도면 정상입니다. 아니라면 선후행(TASKPRED) 연결을 재검토하세요.
           </div>
         )}
 
-        <Section title="④ 4D Clash (같은 공간·동시 작업 중첩)" color="#7c3aed"
+        <Section title="④ 4D Clash (같은 공간·동시 작업 중첩)" color="var(--primary)"
           empty="동일 공간 작업기간 중첩 없음"
           items={report.clashes4d} />
 
-        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, borderTop: "1px solid #e2e8f0", paddingTop: 8 }}>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
           ※ 3D Clash(형상 겹침)는 형상 간섭 계산이 필요해 별도 — 추후 추가. 본 보고서는 공정표↔BIM 정합·시간축 기준.
         </div>
       </div>

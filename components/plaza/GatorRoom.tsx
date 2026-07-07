@@ -48,7 +48,7 @@ function tooth(ctx: CanvasRenderingContext2D, cx: number, base: number, w: numbe
   const g = ctx.createLinearGradient(0, up ? tip : base, 0, up ? base : tip);
   if (kind === "trap") { g.addColorStop(0, "#ff9d9d"); g.addColorStop(1, "#ff3b3b"); }
   else if (kind === "pressed") { g.addColorStop(0, "#b9a89c"); g.addColorStop(1, "#8c7a6e"); }
-  else { g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#ddd6c0"); }
+  else { g.addColorStop(0, "var(--surface)"); g.addColorStop(1, "#ddd6c0"); }
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.moveTo(cx - w / 2, base);
@@ -68,7 +68,7 @@ function eye(ctx: CanvasRenderingContext2D, ex: number, ey: number, green: Canva
   ctx.beginPath(); ctx.arc(ex, ey + 2, 15, 0, Math.PI * 2); ctx.fill();      // 흰자
   ctx.fillStyle = "#1a2230";
   ctx.beginPath(); ctx.arc(ex + 3, ey + 4, 7, 0, Math.PI * 2); ctx.fill();   // 눈동자
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = "var(--surface)";
   ctx.beginPath(); ctx.arc(ex, ey, 3, 0, Math.PI * 2); ctx.fill();           // 하이라이트
   // 윗눈꺼풀
   ctx.fillStyle = green;
@@ -85,7 +85,7 @@ function recentBubble(chatLog: ChatLine[], id: number, nowMs: number): string | 
   return undefined;
 }
 
-/** 참가자 카드 — 좌석(🐊)·차례·물림 상태 표시. */
+/** 참가자 카드 — 좌석()·차례·물림 상태 표시. */
 function GatorCard({ p, st, bubble }: { p: Participant | null; st: GatorState | null; bubble?: string }) {
   if (!p) return <div className="plaza-pcard plaza-pcard--empty">비어 있음</div>;
   const seated = !!st?.players?.includes(p.id);
@@ -96,9 +96,9 @@ function GatorCard({ p, st, bubble }: { p: Participant | null; st: GatorState | 
       {bubble && <div className="plaza-pcard-bubble">{bubble}</div>}
       <AvatarThumb config={p.avatar} />
       <div className="plaza-pcard-info">
-        <span className="plaza-pcard-name">{seated ? "🐊 " : ""}{p.me ? `${p.name}(나)` : p.name}</span>
+        <span className="plaza-pcard-name">{seated ? "" : ""}{p.me ? `${p.name}(나)` : p.name}</span>
       </div>
-      {isLoser ? <span className="plaza-pcard-badge loser">물림 💥</span>
+      {isLoser ? <span className="plaza-pcard-badge loser">물림 </span>
         : isTurn ? <span className="plaza-pcard-badge">차례</span> : null}
     </div>
   );
@@ -189,8 +189,8 @@ export function GatorRoom({
       const h = TOOTH_H * (i % 2 === 0 ? 1 : 0.88);        // 길이 살짝 교차
       tooth(ctx, g.cx, LGUM_Y - 2, TOOTH_W, h, true, kind);
       if (kind === "trap") {
-        ctx.font = "16px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "#fff";
-        ctx.fillText("💥", g.cx, LGUM_Y - 26);
+        ctx.font = "16px system-ui"; ctx.textAlign = "center"; ctx.fillStyle = "var(--surface)";
+        ctx.fillText("", g.cx, LGUM_Y - 26);
       }
     }
 
@@ -265,14 +265,14 @@ export function GatorRoom({
   };
 
   const nameOf = (pid: number | null) =>
-    pid == null ? "?" : pid === 0 ? "🤖 AI" : (participants.find((p) => p.id === pid)?.name ?? "?");
+    pid == null ? "?" : pid === 0 ? "AI" : (participants.find((p) => p.id === pid)?.name ?? "?");
 
   const statusText = () => {
     if (!st) return "불러오는 중…";
     if (st.status === "waiting") return "참가하여 시작하세요 (2명 이상)";
     if (st.status === "done") {
-      return st.loser === myId ? "앗! 당신이 물렸어요 😖"
-        : `${nameOf(st.loser)} 물림! 😆 (다른 사람 생존)`;
+      return st.loser === myId ? "앗! 당신이 물렸어요 "
+        : `${nameOf(st.loser)} 물림! (다른 사람 생존)`;
     }
     return `${nameOf(st.turn)} 차례${myTurn ? " — 당신!" : ""}`;
   };
@@ -286,8 +286,8 @@ export function GatorRoom({
     <div className="plaza-board-backdrop" onClick={onClose}>
       <div className="plaza-room" onClick={(e) => e.stopPropagation()}>
         <div className="plaza-panel-head">
-          <span className="plaza-panel-title">🐊 악어이빨</span>
-          <span className="plaza-game-status">{statusText()}{st?.vsAI ? " · 🤖 AI 대결" : ""}</span>
+          <span className="plaza-panel-title">악어이빨</span>
+          <span className="plaza-game-status">{statusText()}{st?.vsAI ? " · AI 대결" : ""}</span>
           <button type="button" className="plaza-panel-x" onClick={onClose} aria-label="닫기"><X size={16} /></button>
         </div>
 
@@ -298,14 +298,14 @@ export function GatorRoom({
             <div className="plaza-gator-canvaswrap">
               <canvas ref={canvasRef} width={CW} height={CH} className="plaza-gator-canvas"
                 onPointerDown={press} style={{ cursor: myTurn ? "pointer" : "default" }} />
-              {myTurn && <div className="plaza-gator-hint">이빨 하나를 눌러요… 🤞</div>}
+              {myTurn && <div className="plaza-gator-hint">이빨 하나를 눌러요… </div>}
               {showOver && st?.status === "done" && (
                 <div className="plaza-game-overlay">
                   <div className="plaza-game-overlay-title">
-                    {st.loser === myId ? "💥 앗! 물렸다!" : <>💥 <b>{nameOf(st.loser)}</b> 물림!</>}
+                    {st.loser === myId ? "앗! 물렸다!" : <><b>{nameOf(st.loser)}</b> 물림!</>}
                   </div>
                   <div className="plaza-game-overlay-sub">
-                    {st.loser === myId ? "다음엔 운이 따르길…" : "나머지는 모두 생존 😎"}
+                    {st.loser === myId ? "다음엔 운이 따르길…" : "나머지는 모두 생존 "}
                   </div>
                 </div>
               )}
@@ -339,7 +339,7 @@ export function GatorRoom({
                   <LogOut size={14} /> 나가기
                 </button>
               )}
-              {!seated && st?.status === "playing" && <span className="plaza-omok-spec">👀 관전 중 — 채팅으로 응원!</span>}
+              {!seated && st?.status === "playing" && <span className="plaza-omok-spec">관전 중 — 채팅으로 응원!</span>}
             </div>
 
             <div className="plaza-room-chat">

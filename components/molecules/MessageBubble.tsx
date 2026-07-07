@@ -49,13 +49,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 <p style={{ margin: "0 0 0.7em", lineHeight: 1.7, color: "#1f2937" }}>{children}</p>
               ),
               strong: ({ children }) => (
-                <strong style={{ fontWeight: 700, color: "#0f172a" }}>{children}</strong>
+                <strong style={{ fontWeight: 700, color: "var(--text)" }}>{children}</strong>
               ),
               em: ({ children }) => (
-                <em style={{ fontStyle: "italic", color: "#374151" }}>{children}</em>
+                <em style={{ fontStyle: "italic", color: "var(--muted-strong)" }}>{children}</em>
               ),
               del: ({ children }) => (
-                <del style={{ color: "#9ca3af", textDecoration: "line-through" }}>{children}</del>
+                <del style={{ color: "var(--muted)", textDecoration: "line-through" }}>{children}</del>
               ),
               ul: ({ children }) => (
                 <ul style={{ paddingLeft: "1.4em", margin: "0.35em 0 0.75em" }}>{children}</ul>
@@ -71,7 +71,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "#2563eb", textDecoration: "underline", textUnderlineOffset: "2px" }}
+                  style={{ color: "var(--primary)", textDecoration: "underline", textUnderlineOffset: "2px" }}
                 >
                   {children}
                 </a>
@@ -82,8 +82,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   return (
                     <code
                       style={{
-                        background: "rgba(15, 23, 42, 0.06)",
-                        color: "#0f172a",
+                        background: "rgba(0, 0, 0, 0.06)",
+                        color: "var(--text)",
                         borderRadius: 4,
                         padding: "1px 6px",
                         fontSize: "0.88em",
@@ -100,8 +100,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               pre: ({ children }) => (
                 <pre
                   style={{
-                    background: "#0f172a",
-                    color: "#e2e8f0",
+                    background: "var(--text)",
+                    color: "var(--line)",
                     padding: "0.85em 1em",
                     borderRadius: 8,
                     fontSize: "0.85em",
@@ -121,7 +121,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     background: "rgba(219, 234, 254, 0.35)",
                     padding: "0.5em 0.9em",
                     margin: "0.55em 0",
-                    color: "#1e3a8a",
+                    color: "var(--primary-deep)",
                     borderRadius: "0 6px 6px 0",
                   }}
                 >
@@ -133,7 +133,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   style={{
                     margin: "1em 0 0.9em",
                     borderTop: "none",
-                    borderBottom: "1px dashed #cbd5e1",
+                    borderBottom: "1px dashed var(--line-strong)",
                   }}
                 />
               ),
@@ -143,7 +143,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     fontSize: "1.05em",
                     fontWeight: 700,
                     margin: "0.3em 0 0.55em",
-                    color: "#0f172a",
+                    color: "var(--text)",
                   }}
                 >
                   {children}
@@ -170,7 +170,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     fontSize: "0.92em",
                     fontWeight: 700,
                     margin: "0.55em 0 0.3em",
-                    color: "#1d4ed8",
+                    color: "var(--primary-deep)",
                   }}
                 >
                   {children}
@@ -182,7 +182,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     fontSize: "0.88em",
                     fontWeight: 600,
                     margin: "0.45em 0 0.25em",
-                    color: "#334155",
+                    color: "var(--muted-strong)",
                   }}
                 >
                   {children}
@@ -195,8 +195,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     overflowX: "auto",
                     margin: "0.7em 0 0.9em",
                     borderRadius: 8,
-                    border: "1px solid #e2e8f0",
-                    background: "#ffffff",
+                    border: "1px solid var(--line)",
+                    background: "var(--surface)",
                   }}
                 >
                   <table
@@ -212,11 +212,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 </div>
               ),
               thead: ({ children }) => (
-                <thead style={{ background: "#f1f5f9", color: "#0f172a" }}>{children}</thead>
+                <thead style={{ background: "var(--surface-soft)", color: "var(--text)" }}>{children}</thead>
               ),
               tbody: ({ children }) => <tbody>{children}</tbody>,
               tr: ({ children }) => (
-                <tr style={{ borderBottom: "1px solid #e2e8f0" }}>{children}</tr>
+                <tr style={{ borderBottom: "1px solid var(--line)" }}>{children}</tr>
               ),
               th: ({ children, style }) => (
                 <th
@@ -225,7 +225,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     textAlign: (style as React.CSSProperties | undefined)?.textAlign ?? "left",
                     fontWeight: 700,
                     color: "#0f3a66",
-                    borderBottom: "2px solid #cbd5e1",
+                    borderBottom: "2px solid var(--line-strong)",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -251,7 +251,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     type="checkbox"
                     checked={!!checked}
                     readOnly
-                    style={{ marginRight: 6, accentColor: "#2563eb" }}
+                    style={{ marginRight: 6, accentColor: "var(--primary)" }}
                   />
                 ) : null,
             }}

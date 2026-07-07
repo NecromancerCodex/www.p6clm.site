@@ -47,20 +47,20 @@ export function BoreholeTable({ boreholes, onApply, onSave }: Props) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>
-          시추공 데이터 편집 <span style={{ color: "#94a3b8", fontWeight: 500 }}>({rows.length})</span>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)" }}>
+          시추공 데이터 편집 <span style={{ color: "var(--muted)", fontWeight: 500 }}>({rows.length})</span>
         </h3>
-        <button type="button" onClick={addRow} style={btn("#fff", "#334155", "#cbd5e1")}>+ 행 추가</button>
-        <button type="button" onClick={apply} style={btn("#2563eb", "#fff")}>적용 (3D·물량 갱신)</button>
-        <button type="button" onClick={save} disabled={busy} style={btn(busy ? "#94a3b8" : "#16a34a", "#fff")}>
-          {busy ? "저장 중…" : "💾 DB 저장"}
+        <button type="button" onClick={addRow} style={btn("var(--surface)", "var(--muted-strong)", "var(--line-strong)")}>+ 행 추가</button>
+        <button type="button" onClick={apply} style={btn("var(--primary)", "var(--surface)")}>적용 (3D·물량 갱신)</button>
+        <button type="button" onClick={save} disabled={busy} style={btn(busy ? "var(--muted)" : "var(--green)", "var(--surface)")}>
+          {busy ? "저장 중…" : "DB 저장"}
         </button>
       </div>
 
-      <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
+      <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
         <table style={{ borderCollapse: "collapse", fontSize: 12.5, whiteSpace: "nowrap" }}>
           <thead>
-            <tr style={{ background: "#f8fafc", color: "#475569" }}>
+            <tr style={{ background: "var(--surface-soft)", color: "var(--muted-strong)" }}>
               <Th>공번</Th><Th>X</Th><Th>Y</Th><Th>지표고</Th><Th>심도</Th><Th>지하수</Th>
               {LAYERS.map((l) => <Th key={l.key}>{l.label}</Th>)}
               <Th w={40} />
@@ -68,7 +68,7 @@ export function BoreholeTable({ boreholes, onApply, onSave }: Props) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} style={{ borderTop: "1px solid #f1f5f9" }}>
+              <tr key={i} style={{ borderTop: "1px solid var(--surface-soft)" }}>
                 <Td><Txt v={r.id} w={66} onCh={(x) => setCell(i, "id", x)} /></Td>
                 <Td><Num v={r.x} w={84} onCh={(x) => setCell(i, "x", x)} /></Td>
                 <Td><Num v={r.y} w={84} onCh={(x) => setCell(i, "y", x)} /></Td>
@@ -79,14 +79,14 @@ export function BoreholeTable({ boreholes, onApply, onSave }: Props) {
                   <Td key={l.key}><Num v={r.t[l.key] ?? 0} onCh={(x) => setLayer(i, l.key, x)} /></Td>
                 ))}
                 <td style={{ padding: "2px 4px", textAlign: "center" }}>
-                  <button type="button" onClick={() => delRow(i)} title="삭제" style={delBtn}>✕</button>
+                  <button type="button" onClick={() => delRow(i)} title="삭제" style={delBtn}></button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 6 }}>
+      <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>
         좌표(X,Y) 없는 행은 3D에서 제외됩니다. 편집 후 <strong>적용</strong>으로 갱신, <strong>DB 저장</strong>으로 영속.
       </p>
     </div>
@@ -113,7 +113,7 @@ function Num({ v, w, onCh }: { v: number; w?: number; onCh: (v: number) => void 
   );
 }
 function inp(w: number): React.CSSProperties {
-  return { width: w, padding: "4px 6px", border: "1px solid #e2e8f0", borderRadius: 5, fontSize: 12.5, background: "#fff" };
+  return { width: w, padding: "4px 6px", border: "1px solid var(--line)", borderRadius: 5, fontSize: 12.5, background: "var(--surface)" };
 }
 function btn(bg: string, color: string, border?: string): React.CSSProperties {
   return {
@@ -122,5 +122,5 @@ function btn(bg: string, color: string, border?: string): React.CSSProperties {
   };
 }
 const delBtn: React.CSSProperties = {
-  border: "none", background: "transparent", color: "#cbd5e1", cursor: "pointer", fontSize: 13, fontWeight: 700,
+  border: "none", background: "transparent", color: "var(--line-strong)", cursor: "pointer", fontSize: 13, fontWeight: 700,
 };

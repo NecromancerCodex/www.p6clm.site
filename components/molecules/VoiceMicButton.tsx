@@ -102,7 +102,7 @@ export function VoiceMicButton() {
       const merged = curInput ? `${curInput.replace(/\s+$/, "")} ${t}`.trim() : t;
       setInput(merged);
       resetTranscript();
-      setStatusLine("✓ 인식 완료 — 전송");
+      setStatusLine("인식 완료 — 전송");
       scheduleClear(1600);
       // sendMessage 에 merged 직접 전달 — store snapshot race 우회 (모바일 환경에서
       // setInput 직후 sendMessage 가 옛 input 을 읽어 silent return 되는 케이스 방지).

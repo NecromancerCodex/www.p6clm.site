@@ -49,7 +49,7 @@ export function classifyUnmatched(
     return {
       cause: "C1",
       title: "층(storey) 매칭 실패 — 표기 불일치",
-      color: "#64748b",
+      color: "var(--muted)",
       explain: "BIM 부재의 층 이름을 공정표 층과 매칭하지 못했습니다 (예: BIM은 'Level 2', 공정표는 '02'/'2층' 등 표기가 다름).",
       recommend: "BIM 층 이름과 공정표 층 표기를 같은 형식으로 맞추세요. (자동생성 공정표는 BIM 층을 그대로 쓰므로 보통 일치)",
     };
@@ -59,7 +59,7 @@ export function classifyUnmatched(
     return {
       cause: "C1",
       title: "zone 태그 없음 (비구조·단일동·대상 외)",
-      color: "#64748b",
+      color: "var(--muted)",
       explain: "구역(zone) 태그가 없는 부재입니다 (단일동이라 구역 분할이 없거나, 데이텀·비구조 요소, 또는 BIM 태그 누락).",
       recommend: "단일동이면 층(storey)만으로 매칭됩니다 — 그래도 미매칭이면 층 표기 불일치 또는 공정표에 해당 층 활동이 없는지 확인하세요.",
     };
@@ -77,7 +77,7 @@ export function classifyUnmatched(
       return {
         cause: "C3",
         title: "zone 스킴 불일치",
-        color: "#0891b2",
+        color: "var(--teal)",
         explain: `BIM은 '${p[1]}' 구역으로 태그됐으나, 공정표의 같은 공종·층 활동은 '${others.join(", ")}' 구역명으로 코딩돼 있어 자동 매칭이 안 됩니다 (미시공이 아니라 이름 매핑 문제).`,
         recommend: aiAttempted
           ? `AI 매칭으로도 미해결 — '${p[1]}'↔'${others.join("/")}' 구역 스킴을 수동 매핑하거나 공정표 구역 중복(통합↔분리)을 정리하세요.`
@@ -87,7 +87,7 @@ export function classifyUnmatched(
     return {
       cause: "C2",
       title: "공정표에 해당 활동 없음",
-      color: "#0d9488",
+      color: "var(--teal)",
       explain: `이 위치·공종(${st}층)에 대응하는 공정 활동이 스케줄에 존재하지 않습니다 (예: PT층 모듈, 지붕 코어).`,
       recommend: "공정 설계상 의도된 것이면 정상입니다. 실제 시공 대상이면 공정표에 활동 추가를 검토하세요.",
     };
@@ -97,7 +97,7 @@ export function classifyUnmatched(
   return {
     cause: "C4",
     title: "원인 미상 (AI 검토 대상)",
-    color: "#9333ea",
+    color: "var(--primary)",
     explain: "규칙으로 원인을 특정하지 못했습니다.",
     recommend: "AI 보조 분석 대상입니다 (다음 단계에서 설명).",
   };
@@ -144,7 +144,7 @@ export function classifyNoBim(
     return {
       cause: "B",
       title: "BIM 모델 누락 / 미시공",
-      color: "#ea580c",
+      color: "var(--red)",
       explain: `${storey}층·${op} 위치에 BIM 부재가 실제로 없습니다 (모델 미작성 또는 아직 미시공).`,
       recommend: "BIM 모델에서 누락됐는지, 아니면 시공 전 단계인지 확인하세요 (지어내지 않음).",
     };
@@ -153,7 +153,7 @@ export function classifyNoBim(
   return {
     cause: "A",
     title: "구역 불일치 (재연결 가능)",
-    color: "#0891b2",
+    color: "var(--teal)",
     explain: `${storey}층에 BIM 부재는 있으나, 공정 구역명('${zone}')과 BIM 구역명${others.length ? `('${others.join(", ")}')` : ""}이 달라 자동 연결이 안 됩니다 (미시공 아님, 이름 매핑 문제).`,
     recommend: aiAttempted
       ? "AI 매칭으로도 미해결 — 구역명 수동 매핑 또는 공정표 구역 중복(통합 'AB' ↔ 분리 'ZA/ZB') 정리가 필요합니다. (단, 통합활동은 분리활동과 중복일 수 있음)"

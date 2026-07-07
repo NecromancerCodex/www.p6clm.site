@@ -46,7 +46,7 @@ function LoginInner() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-logo">
-          <span className="login-logo-mark">⛏</span>
+          <span className="login-logo-mark"></span>
           <strong>p6 CLM</strong>
           <span className="login-sub">건설 현장 AI</span>
         </div>

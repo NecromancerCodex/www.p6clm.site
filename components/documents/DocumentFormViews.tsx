@@ -70,7 +70,7 @@ export function NcrFormView({
           <div className="dag-steps-log">
             {stepsLog.map((s, i) => (
               <span key={i} className="dag-step-badge">
-                ✓ {s}
+                {s}
               </span>
             ))}
           </div>
@@ -82,7 +82,7 @@ export function NcrFormView({
             텍스트 복사
           </button>
           <button type="button" className="dag-copy-btn" onClick={() => window.print()}>
-            🖨️ 인쇄
+            인쇄
           </button>
           {onReset ? (
             <button type="button" className="dag-reset-btn" onClick={onReset}>
@@ -179,7 +179,7 @@ export function NcrFormView({
                 <span
                   className={`ncr-checkbox${ncr.disposition.includes(opt) ? " is-checked" : ""}`}
                 >
-                  {ncr.disposition.includes(opt) ? "☑" : "□"}
+                  {ncr.disposition.includes(opt) ? "" : "□"}
                 </span>
                 {opt}
               </label>
@@ -297,7 +297,7 @@ export function SirFormView({
           <div className="dag-steps-log">
             {stepsLog.map((s, i) => (
               <span key={i} className="dag-step-badge">
-                ✓ {s}
+                {s}
               </span>
             ))}
           </div>
@@ -309,7 +309,7 @@ export function SirFormView({
             텍스트 복사
           </button>
           <button type="button" className="dag-copy-btn" onClick={() => window.print()}>
-            🖨️ 인쇄
+            인쇄
           </button>
           {onReset ? (
             <button type="button" className="dag-reset-btn" onClick={onReset}>
@@ -357,7 +357,7 @@ export function SirFormView({
           </table>
           {sir.yolo_detections_summary !== "자동 탐지 결과 없음 — 이미지 육안 분석 기반" && (
             <div className="sir-yolo-box">
-              <span className="sir-yolo-label">🤖 AI 탐지</span>
+              <span className="sir-yolo-label">AI 탐지</span>
               <span className="sir-yolo-text">{sir.yolo_detections_summary}</span>
             </div>
           )}
@@ -413,11 +413,11 @@ export function SirFormView({
           <div className="sir-photo-guidance"><EditCell value={sir.photo_guidance} editable={!!editable} onChange={(v) => setField("photo_guidance", v)} multiline /></div>
           <div className="sir-photo-grid">
             <div className="sir-photo-box">
-              <div className="sir-photo-label">📷 현황 사진 (Before)</div>
+              <div className="sir-photo-label">현황 사진 (Before)</div>
               <div className="sir-photo-placeholder">지적 사항 촬영 사진 첨부</div>
             </div>
             <div className="sir-photo-box">
-              <div className="sir-photo-label">✅ 조치 완료 사진 (After)</div>
+              <div className="sir-photo-label">조치 완료 사진 (After)</div>
               <div className="sir-photo-placeholder">조치 완료 후 확인 사진 첨부</div>
             </div>
           </div>
@@ -574,7 +574,7 @@ export function ScheduleFormView({
           <div className="dag-steps-log">
             {stepsLog.map((s, i) => (
               <span key={i} className="dag-step-badge">
-                ✓ {s}
+                {s}
               </span>
             ))}
           </div>
@@ -586,7 +586,7 @@ export function ScheduleFormView({
             텍스트 복사
           </button>
           <button type="button" className="dag-copy-btn" onClick={() => window.print()}>
-            🖨️ 인쇄
+            인쇄
           </button>
           {onReset ? (
             <button type="button" className="dag-reset-btn" onClick={onReset}>
@@ -722,9 +722,9 @@ export function ScheduleFormView({
                       {actualBased ? (
                         <td
                           className="sir-pf-cell"
-                          style={{ color: t.status === "done" ? "#10b981" : t.status === "active" ? "#0891b2" : "#94a3b8", fontWeight: 600 }}
+                          style={{ color: t.status === "done" ? "var(--green)" : t.status === "active" ? "var(--teal)" : "var(--muted)", fontWeight: 600 }}
                         >
-                          {t.status === "done" ? "✅ 완료" : t.status === "active" ? "🔵 진행중" : "⬜ 대기"}
+                          {t.status === "done" ? "완료" : t.status === "active" ? "진행중" : "대기"}
                         </td>
                       ) : simulated ? (
                         <td className="sir-pf-cell">
@@ -734,7 +734,7 @@ export function ScheduleFormView({
                         </td>
                       ) : (
                         <td className={`sir-pf-cell ${showCrit(t.is_critical) ? "sir-pf-fail" : "sir-pf-na"}`}>
-                          {showCrit(t.is_critical) ? "⚠ 임계" : "일반"}
+                          {showCrit(t.is_critical) ? "임계" : "일반"}
                         </td>
                       )}
                     </tr>
@@ -758,7 +758,7 @@ export function ScheduleFormView({
 
             {doc.integrity_warnings.length > 0 && (
               <div className="sch-warn-box">
-                <div className="sch-warn-title">⚠ 데이터 정합성 경고</div>
+                <div className="sch-warn-title">데이터 정합성 경고</div>
                 <ul className="sch-warn-list">
                   {doc.integrity_warnings.map((w, i) => (
                     <li key={i}>{w}</li>
@@ -787,12 +787,12 @@ export function ScheduleFormView({
                         <td>
                           {u.planned_start}
                           {" "}
-                          <span style={{ color: u.days_until < 0 ? "#b91c1c" : "#64748b" }}>
+                          <span style={{ color: u.days_until < 0 ? "var(--red)" : "var(--muted)" }}>
                             ({u.days_until < 0 ? `${-u.days_until}일 경과` : `D-${u.days_until}`})
                           </span>
                         </td>
                         <td className={`sir-pf-cell ${showCrit(u.is_critical) ? "sir-pf-fail" : "sir-pf-na"}`}>
-                          {showCrit(u.is_critical) ? "⚠ 임계" : "착수 예정"}
+                          {showCrit(u.is_critical) ? "임계" : "착수 예정"}
                         </td>
                       </tr>
                     ))}
@@ -850,7 +850,7 @@ export function ScheduleFormView({
                     <td className="sir-target-cell">{d.name}</td>
                     <td>{d.wbs_path || "-"}</td>
                     <td className={`sir-pf-cell ${showCrit(d.is_critical) ? "sir-pf-fail" : "sir-pf-na"}`}>
-                      {showCrit(d.is_critical) ? "⚠ 임계" : "지연"}
+                      {showCrit(d.is_critical) ? "임계" : "지연"}
                     </td>
                     <td>{d.delay_days}일</td>
                     <td className="sir-findings-cell">
@@ -1001,14 +1001,14 @@ function FormTopBar({ stepsLog = [], onReset }: { stepsLog?: string[]; onReset?:
       {stepsLog.length > 0 ? (
         <div className="dag-steps-log">
           {stepsLog.map((s, i) => (
-            <span key={i} className="dag-step-badge">✓ {s}</span>
+            <span key={i} className="dag-step-badge">{s}</span>
           ))}
         </div>
       ) : (
         <div className="dag-steps-log" />
       )}
       <div className="ncr-actions">
-        <button type="button" className="dag-copy-btn" onClick={() => window.print()}>🖨️ 인쇄</button>
+        <button type="button" className="dag-copy-btn" onClick={() => window.print()}>인쇄</button>
         {onReset ? (
           <button type="button" className="dag-reset-btn" onClick={onReset}>다시 선택</button>
         ) : null}
@@ -1702,7 +1702,7 @@ function SignaturePad({
     c.setPointerCapture(e.pointerId);
     const ctx = c.getContext("2d"); if (!ctx) return;
     const r = c.getBoundingClientRect();
-    ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.strokeStyle = "#0f172a";
+    ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.strokeStyle = "var(--text)";
     ctx.beginPath();
     ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
     drawingRef.current = true;
@@ -1799,7 +1799,7 @@ function PhotoCell({
         <div className="photo-cell-controls">
           <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={onFile} />
           <button type="button" className="photo-cell-btn" onClick={() => ref.current?.click()}>
-            {isImg ? "📷 사진 교체" : "📷 사진 첨부"}
+            {isImg ? "사진 교체" : "사진 첨부"}
           </button>
           {isImg && (
             <button type="button" className="photo-cell-btn photo-cell-btn--danger" onClick={() => onChange("")}>
@@ -2136,16 +2136,16 @@ export function RiskAssessFormView({
         {stepsLog.length > 0 ? (
           <div className="dag-steps-log">
             {stepsLog.map((s, i) => (
-              <span key={i} className="dag-step-badge">✓ {s}</span>
+              <span key={i} className="dag-step-badge">{s}</span>
             ))}
           </div>
         ) : (
           <div className="dag-steps-log" />
         )}
         <div className="ncr-actions">
-          <button type="button" className="dag-copy-btn ra-export-btn" onClick={downloadCsv}>📊 엑셀(CSV)</button>
+          <button type="button" className="dag-copy-btn ra-export-btn" onClick={downloadCsv}>엑셀(CSV)</button>
           <button type="button" className="dag-copy-btn" onClick={copyAsText}>텍스트 복사</button>
-          <button type="button" className="dag-copy-btn" onClick={() => window.print()}>🖨️ 인쇄</button>
+          <button type="button" className="dag-copy-btn" onClick={() => window.print()}>인쇄</button>
           {onReset ? (
             <button type="button" className="dag-reset-btn" onClick={onReset}>다시 선택</button>
           ) : null}

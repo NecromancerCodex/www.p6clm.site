@@ -47,10 +47,10 @@ export default function PlanWatcher() {
         if (stage === "logic_ready" && lastNotified.current !== key) {
           lastNotified.current = key;
           const n = (p.payload.activities_user ?? p.payload.activities ?? []).length;
-          notify("ok", `✅ 공정 플래닝 완료 — 액티비티 ${n}개 검토가 준비됐습니다`, planId);
+          notify("ok", `공정 플래닝 완료 — 액티비티 ${n}개 검토가 준비됐습니다`, planId);
         } else if (stage === "error" && lastNotified.current !== key) {
           lastNotified.current = key;
-          notify("err", "⚠️ 공정 플래닝 실패 — 확인이 필요합니다", planId);
+          notify("err", "공정 플래닝 실패 — 확인이 필요합니다", planId);
         } else if (stage === "done") {
           doneSeen.current.add(planId);   // 감시만 종료 — 체크포인트는 '새 계획 시작' 전까지 유지(복원용)
         }
@@ -74,18 +74,18 @@ export default function PlanWatcher() {
       }}>
         {toast.kind === "ok" ? "검토하러 가기 →" : "확인하기 →"}
       </button>
-      <button className="pw-x" aria-label="닫기" onClick={() => setToast(null)}>✕</button>
+      <button className="pw-x" aria-label="닫기" onClick={() => setToast(null)}></button>
       <style jsx>{`
         .pw-toast { position: fixed; bottom: 24px; right: 24px; z-index: 4000; display: flex; align-items: center;
                     gap: 12px; max-width: 420px; padding: 14px 16px; border-radius: 12px; font-size: 13.5px;
-                    background: #fff; color: #1e293b; border: 1px solid #bbf7d0;
+                    background: var(--surface); color: var(--text); border: 1px solid var(--green-soft);
                     box-shadow: 0 8px 30px rgba(2, 6, 23, .18); animation: pw-in .25s ease-out; }
-        .pw-toast.err { border-color: #fecaca; }
+        .pw-toast.err { border-color: var(--red-soft); }
         @keyframes pw-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
-        .pw-go { flex-shrink: 0; padding: 7px 13px; background: #16a34a; color: #fff; border: none;
+        .pw-go { flex-shrink: 0; padding: 7px 13px; background: var(--green); color: var(--surface); border: none;
                  border-radius: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-        .pw-toast.err .pw-go { background: #dc2626; }
-        .pw-x { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 13px; flex-shrink: 0; }
+        .pw-toast.err .pw-go { background: var(--red); }
+        .pw-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; flex-shrink: 0; }
       `}</style>
     </div>
   );

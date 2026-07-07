@@ -29,13 +29,13 @@ const GanttChart = GanttChartRaw as unknown as FC<{ tasks: GanttTask[]; height?:
 // 넣은 공종만 공정표에 반영(구독형) — 단일이면 그 공종, 복수면 병합(2·3단계).
 const DISCIPLINES: { key: string; label: string; icon: string; active: boolean; hint: string }[] = [
   // 종합 = REV 같은 전 공종 1파일 → PSet Trade + IFC 타입으로 토목/구조/건축 자동 분리 후 순서대로 생성.
-  { key: "종합", label: "종합", icon: "🗂️", active: true, hint: "전 공종 1파일(REV 등) — 자동 분리" },
-  { key: "토목", label: "토목", icon: "🏗️", active: true, hint: "굴착·흙막이" },
-  { key: "구조", label: "구조", icon: "🏢", active: true, hint: "골조" },
-  { key: "건축", label: "건축", icon: "🧱", active: true, hint: "마감(조적·창호·타일·도장…)" },
-  { key: "MEP", label: "MEP", icon: "🔧", active: true, hint: "기계·소방·전기·통신(설비)" },
-  { key: "조경", label: "조경", icon: "🌳", active: true, hint: "식재·포장·시설물" },
-  { key: "가설", label: "가설", icon: "🚧", active: true, hint: "비계·동바리·펜스(오버레이)" },
+  { key: "종합", label: "종합", icon: "", active: true, hint: "전 공종 1파일(REV 등) — 자동 분리" },
+  { key: "토목", label: "토목", icon: "", active: true, hint: "굴착·흙막이" },
+  { key: "구조", label: "구조", icon: "", active: true, hint: "골조" },
+  { key: "건축", label: "건축", icon: "", active: true, hint: "마감(조적·창호·타일·도장…)" },
+  { key: "MEP", label: "MEP", icon: "", active: true, hint: "기계·소방·전기·통신(설비)" },
+  { key: "조경", label: "조경", icon: "", active: true, hint: "식재·포장·시설물" },
+  { key: "가설", label: "가설", icon: "", active: true, hint: "비계·동바리·펜스(오버레이)" },
 ];
 
 // 슬롯 검증 — 업로드 파일의 공종 분포(서버 discipline_summary, 흙막이 보정 후)가 슬롯과 맞는지.
@@ -46,13 +46,13 @@ function validateSlot(slot: string, summary?: { discipline: string; count: numbe
   if (slot === "종합") { // 종합 = 전 공종 허용 → 경고 X. 구성만 정보로 안내.
     if (!summary?.length) return null;
     const top = [...summary].filter((d) => SCHEDULABLE.includes(d.discipline)).sort((a, b) => b.count - a.count);
-    return top.length ? `ℹ️ 종합 — ${top.map((d) => `${d.discipline} ${d.count.toLocaleString()}`).join(" · ")} (자동 분리)` : null;
+    return top.length ? `ℹ종합 — ${top.map((d) => `${d.discipline} ${d.count.toLocaleString()}`).join(" · ")} (자동 분리)` : null;
   }
   if (!summary || !summary.length) return null; // 클라 파싱 폴백 등 — 분포 없음 → 검증 생략
   const m: Record<string, number> = {};
   for (const d of summary) m[d.discipline] = d.count;
   const schedTotal = SCHEDULABLE.reduce((s, k) => s + (m[k] || 0), 0) + (m["가설"] || 0);
-  if (schedTotal === 0) return `⚠️ ${slot} 공정 부재가 없습니다 — 슬롯이 맞나요?`;
+  if (schedTotal === 0) return `${slot} 공정 부재가 없습니다 — 슬롯이 맞나요?`;
   // 무PSet 정상 오분류 보정 — 슬롯별 '호환' 공종. 흙막이 기둥→구조, 마감 벽/슬래브→구조, 버팀보/거푸집→가설.
   // (검증으로 확인: 무PSet 토목/건축은 분류기가 구조로 봄 → 슬롯이 진실이므로 호환으로 처리)
   const COMPAT: Record<string, string[]> = {
@@ -68,12 +68,12 @@ function validateSlot(slot: string, summary?: { discipline: string; count: numbe
   if (badN >= schedTotal * 0.3) {
     let dom = slot, domN = slotN;
     for (const k of SCHEDULABLE) if ((m[k] || 0) > domN) { dom = k; domN = m[k] || 0; }
-    return `⚠️ ${dom} 부재가 많습니다 (${slot} 슬롯) — 파일/슬롯을 확인하세요`;
+    return `${dom} 부재가 많습니다 (${slot} 슬롯) — 파일/슬롯을 확인하세요`;
   }
   // 슬롯 공종이 직접은 적지만 무PSet상 구조/가설로 분류된 경우 — 경고 아닌 안내(슬롯 기준 정상 처리).
   const compatN = compat.reduce((s, k) => s + (m[k] || 0), 0);
   if (slotN < compatN * 0.5 && compat.includes("구조")) {
-    return `ℹ️ 무PSet 파일 — 일부가 구조로 분류되나 ${slot} 슬롯 기준으로 처리됩니다`;
+    return `ℹ무PSet 파일 — 일부가 구조로 분류되나 ${slot} 슬롯 기준으로 처리됩니다`;
   }
   return null;
 }
@@ -550,7 +550,7 @@ export default function SchedulePlanWizard() {
         const dropMsg = Object.entries(droppedCnt).map(([d, n]) => `${d} ${n.toLocaleString()}부재 제외(슬롯 미선언 — 필요 시 ${d} 슬롯에 IFC 추가)`).join(" · ");
         const baseWarn = validateSlot(disc, r.discipline_summary);
         setSlots((s) => ({ ...s, [disc]: { name: file.name, count: r.element_count, wp: r.work_units.length,
-          warn: [baseWarn, dropMsg ? `⚠️ ${dropMsg}` : null].filter(Boolean).join("  ") || null, ai: r.ai_classified } }));
+          warn: [baseWarn, dropMsg ? `${dropMsg}` : null].filter(Boolean).join("  ") || null, ai: r.ai_classified } }));
         if (disc === "구조" || !inferSrc) inferSrc = r; // 구조유형 추론은 구조 파일 우선
       }
       setWorkUnits(allWu); setZones([...zoneSet]); setStoreys([...storeySet]); setCivilQty(cq);
@@ -766,7 +766,7 @@ export default function SchedulePlanWizard() {
     <div style={{ padding: 20, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>공정계획 위저드</h1>
-        <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: "4px 0 0" }}>
           <b>공정 플래닝</b>(WBS → 액티비티 정의 → 리스트 → 릴레이션 → 듀레이션) 이 끝나면 DB에 저장되고,
           <b> PM이 수정 또는 컨펌</b>하면 <b>공정 스케줄링</b>(베이스라인 생성)으로 넘어갑니다.
         </p>
@@ -775,13 +775,13 @@ export default function SchedulePlanWizard() {
       {/* 대단계 인디케이터 — 공정 플래닝 / 공정 스케줄링 */}
       <div className="wz-steps">
         <div className={`wz-step big ${step === 1 ? "on" : step > 1 ? "done" : ""}`}>
-          <span className="wz-step-badge">{step > 1 ? "✓" : "1"}</span>
+          <span className="wz-step-badge">{step > 1 ? "" : "1"}</span>
           <span style={{ flex: 1 }}>
             <b>공정 플래닝</b>
             <span className="wz-substeps">
               {PLAN_SUBS.map((t, i) => (
                 <span key={t} className={`wz-substep ${step >= 1 && i < subs ? "done" : step === 1 && i === subs ? "on" : ""}`}>
-                  {step >= 1 && i < subs ? "✓" : `${i + 1}.`}{t}
+                  {step >= 1 && i < subs ? "" : `${i + 1}.`}{t}
                 </span>
               ))}
             </span>
@@ -789,7 +789,7 @@ export default function SchedulePlanWizard() {
           <span className="wz-step-arrow">›</span>
         </div>
         <div className={`wz-step big ${stage === "done" ? "done" : step === 2 ? "on" : ""}`}>
-          <span className="wz-step-badge">{stage === "done" ? "✓" : "2"}</span>
+          <span className="wz-step-badge">{stage === "done" ? "" : "2"}</span>
           <span>
             <b>공정 스케줄링</b>
             <small>{stage === "done" ? "베이스라인 확정 완료" : "플래닝 기반 공정표 베이스라인 생성"}</small>
@@ -798,7 +798,7 @@ export default function SchedulePlanWizard() {
       </div>
 
       {err && (
-        <div style={{ border: "1px solid #fecaca", background: "#fef2f2", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#b91c1c", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <div style={{ border: "1px solid var(--red-soft)", background: "var(--red-soft)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--red)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <span>{err}</span>
           {stage === "error" && (
             <button className="wz-btn ghost" style={{ flexShrink: 0 }} onClick={() => {
@@ -815,14 +815,14 @@ export default function SchedulePlanWizard() {
           <div className="wz-stream-head">
             <span className="wz-dot" />
             <b>공정 플래닝 진행 중</b>
-            <span style={{ color: "#6366f1" }}>{plan?.progress ?? "AI 작업 중…"}</span>
+            <span style={{ color: "var(--primary)" }}>{plan?.progress ?? "AI 작업 중…"}</span>
             <button type="button"
               onClick={async () => {
                 if (!planId || !confirm("생성을 취소할까요?")) return;
                 try { await cancelPlan(planId); } catch { /* 이미 종료된 경우 무시 */ }
               }}
-              style={{ marginLeft: "auto", padding: "3px 12px", borderRadius: 7, border: "1px solid #fca5a5",
-                       background: "#fef2f2", color: "#b91c1c", fontSize: 12, cursor: "pointer" }}>
+              style={{ marginLeft: "auto", padding: "3px 12px", borderRadius: 7, border: "1px solid var(--red)",
+                       background: "var(--red-soft)", color: "var(--red)", fontSize: 12, cursor: "pointer" }}>
               ⏹ 취소
             </button>
           </div>
@@ -842,11 +842,11 @@ export default function SchedulePlanWizard() {
         <>
           <div className="wz-card">
             <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
-              📦 BIM(IFC) 업로드 — 공종별 멀티 임포트
+              BIM(IFC) 업로드 — 공종별 멀티 임포트
             </div>
-            <p style={{ fontSize: 12, color: "#64748b", margin: "0 0 10px" }}>
+            <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 10px" }}>
               넣은 공종만 공정표에 반영됩니다 (예: 구조만 → 구조 공정표 / 토목+구조 → 합쳐서 1개). 시공 순서대로 자동 연결.
-              <span style={{ color: "#2563eb", fontWeight: 600 }}> · 카드에 IFC·내역서를 드래그앤드롭하거나 클릭 업로드.</span>
+              <span style={{ color: "var(--primary)", fontWeight: 600 }}> · 카드에 IFC·내역서를 드래그앤드롭하거나 클릭 업로드.</span>
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {DISCIPLINES.map((d, i) => {
@@ -854,14 +854,14 @@ export default function SchedulePlanWizard() {
                 if (!d.active) {
                   return (
                     <div key={d.key} title="공정 엔진 준비 중 (Phase D)"
-                      style={{ border: "1px dashed #cbd5e1", borderRadius: 8, padding: "10px 12px",
-                               background: "#f8fafc", color: "#94a3b8", cursor: "not-allowed", position: "relative" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>🔒 {d.icon} {d.label}</div>
+                      style={{ border: "1px dashed var(--line-strong)", borderRadius: 8, padding: "10px 12px",
+                               background: "var(--surface-soft)", color: "var(--muted)", cursor: "not-allowed", position: "relative" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{d.icon} {d.label}</div>
                       <div style={{ fontSize: 11, marginTop: 2 }}>준비 중 · {d.hint}</div>
                     </div>
                   );
                 }
-                const pr: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#475569", gap: 6 };
+                const pr: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "var(--muted-strong)", gap: 6 };
                 const isStruct = d.key === "구조" || d.key === "종합";  // 종합=구조 자원 공유(골조 지배)
                 return (
                   <div key={d.key}
@@ -877,22 +877,22 @@ export default function SchedulePlanWizard() {
                          else if (n.endsWith(".csv") || n.endsWith(".xlsx") || n.endsWith(".xlsm") || n.endsWith(".xls")) void handleBoqUpload(d.key, f);
                          else setErr("IFC(.ifc) 또는 내역서(.csv/.xlsx/.xls) 파일만 가능합니다");
                        }}
-                       style={{ border: `1px ${dragOver === d.key ? "dashed" : "solid"} ${dragOver === d.key ? "#2563eb" : filled ? "#bbf7d0" : "#dbeafe"}`,
-                                borderLeft: `4px solid ${filled ? "#16a34a" : "#3b82f6"}`, borderRadius: 10, padding: "14px 16px",
-                                background: dragOver === d.key ? "#eff6ff" : "#fff", boxShadow: "0 1px 4px rgba(15,23,42,0.06)", transition: "background .1s" }}>
+                       style={{ border: `1px ${dragOver === d.key ? "dashed" : "solid"} ${dragOver === d.key ? "var(--primary)" : filled ? "var(--green-soft)" : "var(--primary-soft)"}`,
+                                borderLeft: `4px solid ${filled ? "var(--green)" : "var(--primary)"}`, borderRadius: 10, padding: "14px 16px",
+                                background: dragOver === d.key ? "var(--primary-soft)" : "var(--surface)", boxShadow: "0 1px 4px rgba(0, 0, 0,0.06)", transition: "background .1s" }}>
                     {dragOver === d.key && (
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#2563eb", marginBottom: 4 }}>📥 여기에 놓기 — IFC(.ifc) 또는 내역서(.csv/.xlsx/.xls)</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "var(--primary)", marginBottom: 4 }}>여기에 놓기 — IFC(.ifc) 또는 내역서(.csv/.xlsx/.xls)</div>
                     )}
                     <label title={`${d.label} IFC 업로드 — ${d.hint}`} style={{ display: "block", cursor: bimBusy ? "wait" : "pointer" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: filled ? "#15803d" : "#1d4ed8" }}>
-                        {filled ? "✓" : `${i + 1}.`} {d.icon} {d.label}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: filled ? "var(--green)" : "var(--primary-deep)" }}>
+                        {filled ? "" : `${i + 1}.`} {d.icon} {d.label}
                       </div>
-                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {filled ? (filled.count ? `${filled.count.toLocaleString()}부재 → ${filled.wp} WP` : `${filled.name} · 생성 시 분석`) : `업로드 · ${d.hint}`}
-                        {filled?.ai ? <span style={{ color: "#7c3aed" }}> · 🤖 AI추정 {filled.ai.toLocaleString()}</span> : null}
+                        {filled?.ai ? <span style={{ color: "var(--primary)" }}> · AI추정 {filled.ai.toLocaleString()}</span> : null}
                       </div>
                       {filled?.warn && (
-                        <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.3, whiteSpace: "normal", color: filled.warn.startsWith("⚠️") ? "#b91c1c" : "#0369a1" }}>
+                        <div style={{ fontSize: 10, marginTop: 3, lineHeight: 1.3, whiteSpace: "normal", color: filled.warn.startsWith("") ? "var(--red)" : "var(--primary-deep)" }}>
                           {filled.warn}
                         </div>
                       )}
@@ -900,7 +900,7 @@ export default function SchedulePlanWizard() {
                              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onBim(f, d.key); }} />
                     </label>
                     {/* 공종별 입력(규격 통일) — 공통 6필드 + 공종 전용 파라미터를 한 박스에 */}
-                    <div style={{ marginTop: 10, padding: "10px 12px", background: "#f8fafc", border: "1px solid #eef2f7", borderRadius: 8, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center" }}>
+                    <div style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface-soft)", border: "1px solid var(--surface-soft)", borderRadius: 8, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center" }}>
                       <label style={pr} title="WBS 개수 — 비우면 BIM 자동(구역×층 정밀). 토목=굴착 단계 수 / 구조=상세수준(구역 수보다 작게 넣으면 구역 통합→층 단위로 활동 수↓, 공기 유지)">WBS개수
                         <input type="number" min={1} className="wz-in" style={{ width: 64, padding: "2px 4px" }} placeholder="자동"
                                value={discSet[d.key]?.wbs ?? ""} onChange={(e) => setDS(d.key, { wbs: e.target.value })} /></label>
@@ -929,7 +929,7 @@ export default function SchedulePlanWizard() {
                         <label style={pr} title="셀당 목표 사이클(일) — 초과 시 투입조 자동 증가(초대형 층 93일 방지). 비우면 15일">목표사이클
                           <input type="number" min={5} className="wz-in" style={{ width: 58, padding: "2px 4px" }} placeholder="15"
                                  value={discSet["구조"]?.cell_days ?? ""} onChange={(e) => setDS("구조", { cell_days: e.target.value })} /></label>
-                        <span style={{ fontSize: 11, color: "#94a3b8" }}>골조 투입조(조·비우면 자동):</span>
+                        <span style={{ fontSize: 11, color: "var(--muted)" }}>골조 투입조(조·비우면 자동):</span>
                         <label style={pr} title="철근 배근 투입조 (현엔 8조). 비우면 자동 스케일">철근
                           <input type="number" min={1} className="wz-in" style={{ width: 46, padding: "2px 4px" }} placeholder="자동"
                                  value={discSet["구조"]?.crewRb ?? ""} onChange={(e) => setDS("구조", { crewRb: e.target.value })} /></label>
@@ -972,7 +972,7 @@ export default function SchedulePlanWizard() {
                           </select></label>
                       </>)}
                       {d.key === "가설" && (
-                        <span style={{ fontSize: 10.5, color: "#64748b" }}>오버레이 — 공정표 설치·해체 2줄, 4D는 층 따라</span>
+                        <span style={{ fontSize: 10.5, color: "var(--muted)" }}>오버레이 — 공정표 설치·해체 2줄, 4D는 층 따라</span>
                       )}
                     </div>
                     {weatherStation && (() => {
@@ -986,11 +986,11 @@ export default function SchedulePlanWizard() {
                       ];
                       return (
                         <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center",
-                                      padding: "6px 8px", background: "#f0f9ff", border: "1px solid #e0f2fe", borderRadius: 6 }}
+                                      padding: "6px 8px", background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 6 }}
                              title="기상 작업불능 임계 — 비우면 공종 자동(프리셋). 입력하면 그 값으로 가동률 재계산.">
-                          <span style={{ fontSize: 10.5, color: "#0369a1", fontWeight: 600 }}>기상 임계(비우면 자동)</span>
+                          <span style={{ fontSize: 10.5, color: "var(--primary-deep)", fontWeight: 600 }}>기상 임계(비우면 자동)</span>
                           {tf.map((t) => (
-                            <label key={t.k} style={{ fontSize: 10.5, color: "#475569", display: "inline-flex", flexDirection: "column", gap: 1 }}>
+                            <label key={t.k} style={{ fontSize: 10.5, color: "var(--muted-strong)", display: "inline-flex", flexDirection: "column", gap: 1 }}>
                               {t.lbl}
                               <input className="wz-in" type="number" step="0.1" style={{ width: 58, padding: "2px 4px", fontSize: 11 }}
                                      placeholder={t.ph} value={discSet[d.key]?.[t.k] ?? ""}
@@ -1009,22 +1009,22 @@ export default function SchedulePlanWizard() {
                       const QLBL: Record<string, string> = { concrete_m3: "콘크리트㎥", formwork_m2: "거푸집㎡", rebar_ton: "철근t", excavation_m3: "굴착㎥", backfill_m3: "되메우기㎥" };
                       const qsum = b?.quantities ? Object.entries(b.quantities).filter(([k]) => k !== "total_cost").reduce((s, [, v]) => s + (v || 0), 0) : 0;
                       return (
-                        <div style={{ marginTop: 6, padding: "6px 8px", background: "#fafafa", border: "1px dashed #d4d4d8", borderRadius: 6 }}>
+                        <div style={{ marginTop: 6, padding: "6px 8px", background: "var(--surface-soft)", border: "1px dashed #d4d4d8", borderRadius: 6 }}>
                           <label style={{ fontSize: 11, color: "#52525b", fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                            📄 내역서 업로드 (.csv/.xlsx/.xls) — 물량 보완(IFC 누락 대비)
+                            내역서 업로드 (.csv/.xlsx/.xls) — 물량 보완(IFC 누락 대비)
                             <input type="file" accept=".csv,.xlsx,.xlsm,.xls" style={{ display: "none" }}
                                    onChange={(e) => { void handleBoqUpload(d.key, e.target.files?.[0]); e.currentTarget.value = ""; }} />
                           </label>
-                          {b?.loading && <span style={{ fontSize: 11, color: "#6b7280", marginLeft: 6 }}>분석 중…</span>}
-                          {b?.error && <div style={{ fontSize: 11, color: "#dc2626", marginTop: 3 }}>⚠️ {b.error}</div>}
+                          {b?.loading && <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 6 }}>분석 중…</span>}
+                          {b?.error && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 3 }}>{b.error}</div>}
                           {b && !b.loading && !b.error && (
                             <div style={{ marginTop: 4, fontSize: 11, color: "#3f3f46" }}>
-                              ✓ {b.filename}{b.sheet ? ` (${b.sheet})` : ""} — {b.items_matched ?? 0}개 항목
+                              {b.filename}{b.sheet ? ` (${b.sheet})` : ""} — {b.items_matched ?? 0}개 항목
                               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
                                 {b.quantities && Object.entries(QLBL).filter(([k]) => (b.quantities?.[k] || 0) > 0).map(([k, lbl]) => (
-                                  <span key={k} style={{ background: "#e0e7ff", color: "#3730a3", borderRadius: 4, padding: "1px 6px" }}>{lbl} {Math.round(b.quantities![k]).toLocaleString()}</span>
+                                  <span key={k} style={{ background: "var(--primary-soft)", color: "#3730a3", borderRadius: 4, padding: "1px 6px" }}>{lbl} {Math.round(b.quantities![k]).toLocaleString()}</span>
                                 ))}
-                                {b.has_prices && b.total_cost ? <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
+                                {b.has_prices && b.total_cost ? <span style={{ background: "var(--green-soft)", color: "var(--green)", borderRadius: 4, padding: "1px 6px" }}>원가 {(b.total_cost / 1e8).toFixed(1)}억</span> : null}
                                 {(() => {   // IFC 실측(NetVolume) ↔ 내역서 콘크리트 대조 — 모델·내역 정합 검증(있을 때만)
                                   const ifcVol = workUnits.filter((w) => (w.discipline || "") === d.key).reduce((s, w) => s + (w.volume_m3 || 0), 0);
                                   const boqConc = b.quantities?.concrete_m3 || 0;
@@ -1032,19 +1032,19 @@ export default function SchedulePlanWizard() {
                                   const pct = Math.round(100 * Math.min(ifcVol, boqConc) / Math.max(ifcVol, boqConc));
                                   const ok = pct >= 95;
                                   return (
-                                    <span style={{ background: ok ? "#dcfce7" : "#fef3c7", color: ok ? "#166534" : "#92400e", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}
+                                    <span style={{ background: ok ? "var(--green-soft)" : "var(--amber-soft)", color: ok ? "var(--green)" : "var(--primary-deep)", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}
                                           title={`IFC 실측(NetVolume) ${Math.round(ifcVol).toLocaleString()}㎥ vs 내역서 콘크리트 ${Math.round(boqConc).toLocaleString()}㎥ — 모델·내역 정합 검증`}>
-                                      {ok ? "✓" : "⚠"} IFC 실측 {pct}% 일치
+                                      {ok ? "" : ""} IFC 실측 {pct}% 일치
                                     </span>
                                   );
                                 })()}
                               </div>
                               {discEquip[d.key] && Object.keys(discEquip[d.key]).length > 0 && (
-                                <div style={{ marginTop: 5, padding: "6px 8px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6 }}>
-                                  <span style={{ fontSize: 10.5, color: "#92400e", fontWeight: 600 }}>🚜 자원 계획 — 작업조·장비 (내역서 자동, 수정 가능)</span>
+                                <div style={{ marginTop: 5, padding: "6px 8px", background: "var(--amber-soft)", border: "1px solid var(--amber-soft)", borderRadius: 6 }}>
+                                  <span style={{ fontSize: 10.5, color: "var(--primary-deep)", fontWeight: 600 }}>자원 계획 — 작업조·장비 (내역서 자동, 수정 가능)</span>
                                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
                                     {Object.entries(discEquip[d.key]!).filter(([name]) => equipAllowed(d.key, name)).map(([name, cnt]) => (
-                                      <label key={name} style={{ fontSize: 11, color: "#78716c", display: "inline-flex", alignItems: "center", gap: 3 }}
+                                      <label key={name} style={{ fontSize: 11, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 3 }}
                                              title={name === "작업조" ? ((d.key === "구조" || d.key === "종합") ? "동시에 골조를 진행할 구역 수(병렬 한도 — 공기 지배). 아래 '인력'은 이 수 × 1구역 작업조 구성으로 자동 산출되는 파생값" : "이 공종 작업조 수(기간 driver)") : `${name} 대수`}>
                                         {equipLabel(d.key, name)}
                                         <input type="number" min={0} className="wz-in" style={{ width: 46, padding: "2px 4px", fontSize: 11 }}
@@ -1055,8 +1055,8 @@ export default function SchedulePlanWizard() {
                                     ))}
                                   </div>
                                   {d.key === "토목" && (
-                                    <label style={{ fontSize: 11, color: "#78716c", display: "flex", alignItems: "center", gap: 4, marginTop: 5 }}>
-                                      ⛏️ 굴착 백호 규격
+                                    <label style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 4, marginTop: 5 }}>
+                                      굴착 백호 규격
                                       <select className="wz-in" style={{ width: 158, padding: "2px 4px", fontSize: 11 }}
                                               value={excavSize} onChange={(e) => setExcavSize(e.target.value)}
                                               title="굴착 조당 생산성을 장비 규격으로 결정(온톨로지 Equipment). 소형(0.4㎥)일수록 느리고, 대형(2.3㎥)일수록 빠름. 미선택=중형 1.0㎥.">
@@ -1068,7 +1068,7 @@ export default function SchedulePlanWizard() {
                                         <option value="백호 1.4㎥">백호 1.4㎥ — ~750㎥/일</option>
                                         <option value="백호 2.3㎥">백호 2.3㎥ — 대형 ~900㎥/일</option>
                                       </select>
-                                      <span style={{ color: "#a16207" }}>토사 기준 · 암반은 지층 보정 자동</span>
+                                      <span style={{ color: "var(--primary-deep)" }}>토사 기준 · 암반은 지층 보정 자동</span>
                                     </label>
                                   )}
                                   {(() => {
@@ -1076,19 +1076,19 @@ export default function SchedulePlanWizard() {
                                     const jobs = Object.keys(labor);
                                     if (!jobs.length) return null;
                                     return (
-                                      <div style={{ marginTop: 5, fontSize: 10.5, color: "#78716c", borderTop: "1px dashed #fde68a", paddingTop: 4 }}>
-                                        👷 <b>투입 인력(자동 산출)</b>: {jobs.map((j) => `${j} ${labor[j]}명`).join(" · ")}
-                                        <span style={{ color: "#a16207" }}> — 동시구역 × 1구역 작업조 구성으로 계산(입력값 아님, 동시구역·장비 수정 시 갱신)</span>
+                                      <div style={{ marginTop: 5, fontSize: 10.5, color: "var(--muted)", borderTop: "1px dashed var(--amber-soft)", paddingTop: 4 }}>
+                                        <b>투입 인력(자동 산출)</b>: {jobs.map((j) => `${j} ${labor[j]}명`).join(" · ")}
+                                        <span style={{ color: "var(--primary-deep)" }}> — 동시구역 × 1구역 작업조 구성으로 계산(입력값 아님, 동시구역·장비 수정 시 갱신)</span>
                                       </div>
                                     );
                                   })()}
                                 </div>
                               )}
-                              {qsum === 0 && <div style={{ fontSize: 10.5, color: "#a16207", marginTop: 2 }}>물량 미검출 — 평탄 공/산출내역서(CSV) 권장 (원가집계 문서엔 물량 표 없음)</div>}
+                              {qsum === 0 && <div style={{ fontSize: 10.5, color: "var(--primary-deep)", marginTop: 2 }}>물량 미검출 — 평탄 공/산출내역서(CSV) 권장 (원가집계 문서엔 물량 표 없음)</div>}
                               {qsum > 0 && (
-                                <div style={{ marginTop: 4, fontSize: 10.5, color: "#166534" }}
+                                <div style={{ marginTop: 4, fontSize: 10.5, color: "var(--green)" }}
                                      title="내역서 물량으로 해당 공정 기간 자동 보정(factor=내역서물량÷BIM물량). IFC와 같으면 1.0=무변화, 누락 시 보완. 생성 후 BIM 대비 비교 표시.">
-                                  ✅ 내역서 물량으로 기간 자동 보정 (IFC 누락 보완 · 생성 후 비교 표시)
+                                  내역서 물량으로 기간 자동 보정 (IFC 누락 보완 · 생성 후 비교 표시)
                                 </div>
                               )}
                             </div>
@@ -1100,56 +1100,56 @@ export default function SchedulePlanWizard() {
                 );
               })}
             </div>
-            {bimBusy && <p style={{ fontSize: 12, color: "#2563eb", margin: "8px 0 0" }}>BIM 분석 중…</p>}
+            {bimBusy && <p style={{ fontSize: 12, color: "var(--primary)", margin: "8px 0 0" }}>BIM 분석 중…</p>}
             {(() => {
               // 슬롯 파일들이 다른 프로젝트인지 검출 — 다르면 합치면 안 됨(좌표·층 어긋남, 공정표 엉킴).
               const keys = [...new Set(Object.values(slots).map((s) => projectKey(s.name)).filter(Boolean))];
               if (keys.length <= 1) return null;
               return (
-                <p style={{ fontSize: 12, color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", margin: "8px 0 0" }}>
-                  ⚠️ <b>다른 프로젝트 파일이 섞인 것 같습니다</b> — {Object.entries(slots).map(([k, v]) => `${k}(${v.name})`).join(" · ")}
+                <p style={{ fontSize: 12, color: "var(--red)", background: "var(--red-soft)", border: "1px solid var(--red-soft)", borderRadius: 8, padding: "8px 12px", margin: "8px 0 0" }}>
+                  <b>다른 프로젝트 파일이 섞인 것 같습니다</b> — {Object.entries(slots).map(([k, v]) => `${k}(${v.name})`).join(" · ")}
                   <br />좌표·층 체계가 달라 공정표·4D가 어긋납니다. <b>같은 프로젝트 파일인지 확인</b>하세요.
                 </p>
               );
             })()}
             {Object.keys(slots).length > 1 && (
-              <p style={{ fontSize: 12, color: "#15803d", margin: "8px 0 0" }}>
-                🔗 복수 공종 병합 — {Object.keys(slots).join(" + ")}을(를) 시공순서로 연결해 1개 공정표로 생성합니다.
+              <p style={{ fontSize: 12, color: "var(--green)", margin: "8px 0 0" }}>
+                복수 공종 병합 — {Object.keys(slots).join(" + ")}을(를) 시공순서로 연결해 1개 공정표로 생성합니다.
               </p>
             )}
-            {inferReason && <p style={{ fontSize: 12, color: "#7c3aed", margin: "8px 0 0" }}>🤖 AI 판정: {inferReason}</p>}
+            {inferReason && <p style={{ fontSize: 12, color: "var(--primary)", margin: "8px 0 0" }}>AI 판정: {inferReason}</p>}
             {workUnits.length > 0 && (() => {
               const hasB = storeys.some((s) => /^B|지하|^PT|PIT/i.test(s));
               const rec = recommendForm(structureType, hasB);
               return (
-                <div style={{ marginTop: 10, background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, padding: "10px 14px" }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "#7c3aed", marginBottom: 6 }}>
-                    🔎 분석 결과 — 플래닝 전 검토 (자동 판정값, 아래에서 수정 가능)
+                <div style={{ marginTop: 10, background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--primary)", marginBottom: 6 }}>
+                    분석 결과 — 플래닝 전 검토 (자동 판정값, 아래에서 수정 가능)
                   </div>
-                  <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.75 }}>
+                  <div style={{ fontSize: 12, color: "var(--muted-strong)", lineHeight: 1.75 }}>
                     {(slots["구조"] || slots["종합"]) && structureType && (
-                      <div>· 🏢 <b>{slots["종합"] ? "OSC" : "구조"}</b> {structureType}
+                      <div>· <b>{slots["종합"] ? "OSC" : "구조"}</b> {structureType}
                         {!slots["종합"] && <> · 거푸집 {rec.formwork}</>} · 시공전략 {rec.strategy}
-                        <span style={{ color: "#94a3b8" }}> (BIM 판정)</span></div>
+                        <span style={{ color: "var(--muted)" }}> (BIM 판정)</span></div>
                     )}
                     {(slots["토목"] || (civilQty && (civilQty.footprint_m2 || civilQty.depth_m))) && (
-                      <div>· 🏗️ <b>토목</b> {civilQty?.footprint_m2 && civilQty?.depth_m
+                      <div>· <b>토목</b> {civilQty?.footprint_m2 && civilQty?.depth_m
                         ? <>굴착 약 <b>{Math.round(civilQty.footprint_m2 * civilQty.depth_m).toLocaleString()}㎥</b> (흙막이 {civilQty.depth_m}m) · 권장 장비 {excavFleet}세트</>
-                        : "흙막이·굴착"} <span style={{ color: "#94a3b8" }}>(지반 시추 저장 시 굴착 물량 지질모델로 자동 정밀화)</span></div>
+                        : "흙막이·굴착"} <span style={{ color: "var(--muted)" }}>(지반 시추 저장 시 굴착 물량 지질모델로 자동 정밀화)</span></div>
                     )}
                     {(slots["건축"] || slots["MEP"] || slots["조경"]) && (
-                      <div>· 🏛️ <b>{[slots["건축"] && "건축", slots["MEP"] && "MEP", slots["조경"] && "조경"].filter(Boolean).join("·")}</b> <span style={{ color: "#94a3b8" }}>(내역서 있으면 마감·설비 시퀀스 생성)</span></div>
+                      <div>· <b>{[slots["건축"] && "건축", slots["MEP"] && "MEP", slots["조경"] && "조경"].filter(Boolean).join("·")}</b> <span style={{ color: "var(--muted)" }}>(내역서 있으면 마감·설비 시퀀스 생성)</span></div>
                     )}
                     <div style={{ marginTop: 4 }}>· <b>가동률(공정별 자동 적용)</b> — 공기 = 공수 ÷ 가동률
                       {weatherStation && weatherLoading
-                        ? <span style={{ color: "#b45309", fontSize: 11, marginLeft: 4 }}>· {weatherStation} 실측 계산 중…</span>
+                        ? <span style={{ color: "var(--primary-deep)", fontSize: 11, marginLeft: 4 }}>· {weatherStation} 실측 계산 중…</span>
                         : weatherStation && weatherRates
-                        ? <span style={{ color: "#15803d", fontSize: 11, marginLeft: 4 }}>· {weatherStation} 실측(ASOS 최근 5년)</span>
-                        : <span style={{ color: "#94a3b8", fontSize: 11, marginLeft: 4 }}>· 프리셋(기상지역 선택 시 실측 재계산)</span>}:</div>
+                        ? <span style={{ color: "var(--green)", fontSize: 11, marginLeft: 4 }}>· {weatherStation} 실측(ASOS 최근 5년)</span>
+                        : <span style={{ color: "var(--muted)", fontSize: 11, marginLeft: 4 }}>· 프리셋(기상지역 선택 시 실측 재계산)</span>}:</div>
                     {weatherStation && weatherLoading ? (
                       // 실측 계산 중 — 프리셋(68% 등) 노출 금지(오해→플래닝 방지). 값 대신 안내.
-                      <div style={{ marginTop: 3, fontSize: 11.5, color: "#b45309", display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="wz-spin" style={{ width: 11, height: 11, border: "2px solid #fcd34d", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
+                      <div style={{ marginTop: 3, fontSize: 11.5, color: "var(--primary-deep)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span className="wz-spin" style={{ width: 11, height: 11, border: "2px solid var(--primary)", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} />
                         {weatherStation} 최근 5년 기상 실측으로 공종별 가동률 계산 중… (잠시 후 표시)
                         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
                       </div>
@@ -1159,8 +1159,8 @@ export default function SchedulePlanWizard() {
                         const v = (weatherStation && weatherRates && weatherRates[u.cat] != null) ? weatherRates[u.cat] : u.val;
                         return (
                           <span key={u.cat} title={u.note}
-                                style={{ background: "#fff", border: `1px solid ${weatherStation && weatherRates ? "#a7f3d0" : "#e9d5ff"}`, borderRadius: 6, padding: "2px 8px", fontSize: 11.5,
-                                         color: v <= 0.7 ? "#b91c1c" : v >= 0.92 ? "#15803d" : "#475569" }}>
+                                style={{ background: "var(--surface)", border: `1px solid ${weatherStation && weatherRates ? "var(--green-soft)" : "var(--primary-soft)"}`, borderRadius: 6, padding: "2px 8px", fontSize: 11.5,
+                                         color: v <= 0.7 ? "var(--red)" : v >= 0.92 ? "var(--green)" : "var(--muted-strong)" }}>
                             {u.cat} <b>{Math.round(v * 100)}%</b>
                           </span>
                         );
@@ -1173,7 +1173,7 @@ export default function SchedulePlanWizard() {
                         <option value="">미선택 (프리셋)</option>
                         {WEATHER_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
-                      <span style={{ color: weatherStation ? "#0369a1" : "#94a3b8", fontSize: 11 }}>
+                      <span style={{ color: weatherStation ? "var(--primary-deep)" : "var(--muted)", fontSize: 11 }}>
                         {weatherStation ? `→ ${weatherStation} 최근 5년 실측 기상으로 가동률 정밀 재산정(생성 시)` : "→ 선택 시 위 프리셋을 실측 기상으로 정밀화"}
                       </span>
                     </div>
@@ -1181,8 +1181,8 @@ export default function SchedulePlanWizard() {
                       · <b>연면적</b>
                       <input className="wz-in" type="number" style={{ width: 130, padding: "2px 5px", fontSize: 11.5 }} value={gfa} onChange={(e) => setGfa(e.target.value)}
                              placeholder="㎡ (선택)" title="연면적 — 건축·MEP 기간 정밀화(부재수 대신 물량 기반)" />
-                      <span style={{ color: "#94a3b8", fontSize: 11 }}>건축·MEP 기간 정밀화</span>
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: weatherStation ? "#94a3b8" : "#475569", marginLeft: 10, opacity: weatherStation ? 0.6 : 1 }}
+                      <span style={{ color: "var(--muted)", fontSize: 11 }}>건축·MEP 기간 정밀화</span>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: weatherStation ? "var(--muted)" : "var(--muted-strong)", marginLeft: 10, opacity: weatherStation ? 0.6 : 1 }}
                              title={weatherStation
                                ? `${weatherStation} 실측 가동률에 계절 손실이 이미 반영됨 → 중복(이중계산) 방지 위해 자동 비활성화`
                                : "동절기(12·1·2월)·우기(7·8월) 기상 중단일 자동 제외 — 프리셋 가동률에 계절 버퍼 추가"}>
@@ -1193,13 +1193,13 @@ export default function SchedulePlanWizard() {
                     </div>
                     <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       · <b>공사기간 프레임</b>
-                      <span style={{ color: "#64748b", fontSize: 11.5 }}>준비기간</span>
+                      <span style={{ color: "var(--muted)", fontSize: 11.5 }}>준비기간</span>
                       <input className="wz-in" type="number" style={{ width: 70, padding: "2px 5px", fontSize: 11.5 }} value={prepDays} onChange={(e) => setPrepDays(e.target.value)}
                              placeholder="일" min={0} max={180} title="①준비기간 — 착공 전 가설사무소·측량·인허가(통상 30~60일). 국토부 고시 제2021-1080호: 공사기간=준비+작업+비작업+정리" />
-                      <span style={{ color: "#64748b", fontSize: 11.5 }}>정리기간</span>
+                      <span style={{ color: "var(--muted)", fontSize: 11.5 }}>정리기간</span>
                       <input className="wz-in" type="number" style={{ width: 70, padding: "2px 5px", fontSize: 11.5 }} value={closeoutDays} onChange={(e) => setCloseoutDays(e.target.value)}
                              placeholder="일" min={0} max={90} title="④정리기간 — 준공 검사·청소·시설물 인계(통상 15~30일)" />
-                      <span style={{ color: "#94a3b8", fontSize: 11 }}>국토부 고시 산정기준(준비+본공사+정리) — 비우면 미반영</span>
+                      <span style={{ color: "var(--muted)", fontSize: 11 }}>국토부 고시 산정기준(준비+본공사+정리) — 비우면 미반영</span>
                     </div>
                     <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                       · <b>WBS 구조</b>
@@ -1214,11 +1214,11 @@ export default function SchedulePlanWizard() {
                         {wbsCustomLabel && <option value={wbsStructure}>커스텀: {wbsCustomLabel}</option>}
                       </select>
                       <button onClick={onRecommendWbs} disabled={wbsRecBusy}
-                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, border: "1px solid #c4b5fd", background: "#f5f3ff", color: "#7c3aed", cursor: wbsRecBusy ? "default" : "pointer" }}
+                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--primary)", background: "var(--primary-soft)", color: "var(--primary)", cursor: wbsRecBusy ? "default" : "pointer" }}
                         title="프로젝트 맥락(구역·층·공종)으로 WBS 구조를 AI 추천">
-                        {wbsRecBusy ? "추천 중…" : "🤖 WBS 재추천"}
+                        {wbsRecBusy ? "추천 중…" : "WBS 재추천"}
                       </button>
-                      <span style={{ color: "#94a3b8", fontSize: 11 }}>관리 방식만 다름 — 날짜·물량 불변(직교)</span>
+                      <span style={{ color: "var(--muted)", fontSize: 11 }}>관리 방식만 다름 — 날짜·물량 불변(직교)</span>
                       {/* 자연어 WBS — "공종 중심으로", "층별 다음 공종별로" 등 직접 서술 → 키 순서 변환 */}
                       <div style={{ flexBasis: "100%", display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
                         <input className="wz-in" value={wbsText} onChange={(e) => setWbsText(e.target.value)}
@@ -1226,24 +1226,24 @@ export default function SchedulePlanWizard() {
                           placeholder='예: "공종 중심으로", "층별 다음 공종별로 묶어줘"'
                           style={{ flex: 1, padding: "3px 8px", fontSize: 11.5 }} />
                         <button onClick={onWbsFromText} disabled={wbsRecBusy || !wbsText.trim()}
-                          style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid #a7f3d0", background: "#ecfdf5", color: "#059669", cursor: (wbsRecBusy || !wbsText.trim()) ? "default" : "pointer" }}>
-                          💬 WBS 생성
+                          style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, border: "1px solid var(--green-soft)", background: "var(--green-soft)", color: "var(--green)", cursor: (wbsRecBusy || !wbsText.trim()) ? "default" : "pointer" }}>
+                          WBS 생성
                         </button>
                       </div>
-                      {wbsCustomLabel && <div style={{ flexBasis: "100%", color: "#059669", fontSize: 11, marginTop: 2 }}>🗂 커스텀 WBS: {wbsCustomLabel}</div>}
-                      {wbsReason && <div style={{ flexBasis: "100%", color: "#7c3aed", fontSize: 11, marginTop: 2 }}>🤖 {wbsReason}</div>}
+                      {wbsCustomLabel && <div style={{ flexBasis: "100%", color: "var(--green)", fontSize: 11, marginTop: 2 }}>커스텀 WBS: {wbsCustomLabel}</div>}
+                      {wbsReason && <div style={{ flexBasis: "100%", color: "var(--primary)", fontSize: 11, marginTop: 2 }}>{wbsReason}</div>}
                       {wbsPreview.length > 0 && (
-                        <div style={{ flexBasis: "100%", marginTop: 4, padding: "6px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, fontSize: 11, maxHeight: 170, overflowY: "auto" }}>
-                          <div style={{ color: "#475569", fontWeight: 600, marginBottom: 3 }}>🗂 WBS 미리보기 (선택 구조 — work_units 기준, 날짜 무관)</div>
+                        <div style={{ flexBasis: "100%", marginTop: 4, padding: "6px 10px", background: "var(--surface-soft)", border: "1px solid var(--line)", borderRadius: 6, fontSize: 11, maxHeight: 170, overflowY: "auto" }}>
+                          <div style={{ color: "var(--muted-strong)", fontWeight: 600, marginBottom: 3 }}>WBS 미리보기 (선택 구조 — work_units 기준, 날짜 무관)</div>
                           {wbsPreview.map((n, i) => (
-                            <div key={i} style={{ paddingLeft: n.depth * 14, color: n.depth === 0 ? "#1e293b" : "#64748b", lineHeight: 1.6 }}>
-                              {n.depth > 0 ? "└ " : "📁 "}{n.label}{n.count > 0 ? ` (${n.count})` : ""}
+                            <div key={i} style={{ paddingLeft: n.depth * 14, color: n.depth === 0 ? "var(--text)" : "var(--muted)", lineHeight: 1.6 }}>
+                              {n.depth > 0 ? "└ " : ""}{n.label}{n.count > 0 ? ` (${n.count})` : ""}
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
-                    <div style={{ marginTop: 5, color: "#94a3b8", fontSize: 11 }}>
+                    <div style={{ marginTop: 5, color: "var(--muted)", fontSize: 11 }}>
                       ↓ 아래 공종 카드에서 가동률·거푸집·시공전략 수정 가능. <b>착공일·마감일</b>만 직접 입력하세요(사업 결정).
                     </div>
                   </div>
@@ -1256,14 +1256,14 @@ export default function SchedulePlanWizard() {
             <Field label="① 무엇을 — 건물유형 (비우면 생성 시 AI 자동 추천)">
               <input className="wz-in" value={buildingType} onChange={(e) => setBuildingType(e.target.value)} placeholder="비워두면 AI 가 추천 (예: 모듈러 공동주택)" />
               <input className="wz-in" style={{ marginTop: 6 }} value={scope} onChange={(e) => setScope(e.target.value)} placeholder="범위 (예: 골조까지 / 마감 포함)" />
-              <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 11, color: "var(--muted)", margin: "6px 0 0", lineHeight: 1.5 }}>
                 ⓘ 연면적·기상지역·계절은 <b>분석 결과 카드</b>에서, 착공일·목표공기·가동률·근무·시공전략은 각 <b>공종 카드</b>에서 설정 · 공휴일 자동 제외
               </p>
             </Field>
             {slots["토목"] && civilQty && (
               <Field label="④ 토목 물량 (BIM 자동 도출)">
-                <p style={{ fontSize: 11, color: "#0369a1", margin: 0 }}>
-                  🏗️ 굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
+                <p style={{ fontSize: 11, color: "var(--primary-deep)", margin: 0 }}>
+                  굴착깊이 {civilQty.depth_m}m · footprint {(civilQty.footprint_m2 ?? 0).toLocaleString()}㎡
                   · 굴착체적 ≈ {Math.round((civilQty.footprint_m2 ?? 0) * (civilQty.depth_m ?? 0)).toLocaleString()}㎥
                   · 흙막이 {(civilQty.pile_count ?? 0).toLocaleString()}공/둘레 {civilQty.perimeter_m}m
                   <br />→ 물량 기반 <b>권장 장비 {excavFleet}세트</b>(굴착기+덤프) 기준 ·
@@ -1303,29 +1303,29 @@ export default function SchedulePlanWizard() {
                     <option value="전체">전체</option><option value="토목">토목</option><option value="구조">구조</option>
                     <option value="건축">건축</option><option value="MEP">MEP</option><option value="조경">조경</option>
                   </select>
-                  <button type="button" className="wz-chip" onClick={() => setMilestones((ms) => ms.filter((_, j) => j !== i))}>✕</button>
+                  <button type="button" className="wz-chip" onClick={() => setMilestones((ms) => ms.filter((_, j) => j !== i))}></button>
                 </div>
               ))}
               <button type="button" className="wz-chip"
                       onClick={() => setMilestones((ms) => [...ms, { name: "", target_date: "", gates: "전체", kind: "permit" }])}>
                 + 직접 추가
               </button>
-              <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
+              <p style={{ fontSize: 11, color: "var(--muted)", margin: "6px 0 0" }}>
                 ⓘ 게이트 공종은 해당 날짜 이후에만 착수합니다 (예: 굴토심의 통과일 이전엔 토목 굴착 불가). 장납기 자재(수배전반 12~18개월·철골 9~12개월·엘리베이터·커튼월)는 <b>현장반입일</b>로 입력하세요.
               </p>
             </Field>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end", gap: 10 }}>
               {Object.keys(slots).length > 0 && (
-                <span style={{ fontSize: 12, color: "#475569" }}>
+                <span style={{ fontSize: 12, color: "var(--muted-strong)" }}>
                   {workUnits.length > 0
-                    ? <>📦 워크패키지 <b>{workUnits.length}</b> · 구역 {zones.length} · 층 {storeys.length}</>
-                    : <>📂 {Object.keys(slots).join("+")} 업로드됨 · [분석] 누르세요</>}
+                    ? <>워크패키지 <b>{workUnits.length}</b> · 구역 {zones.length} · 층 {storeys.length}</>
+                    : <>{Object.keys(slots).join("+")} 업로드됨 · [분석] 누르세요</>}
                 </span>
               )}
               {workUnits.length === 0 ? (
                 <button className="wz-btn" disabled={!Object.keys(slots).length || bimBusy} onClick={() => void onAnalyze()}
                         title="업로드한 IFC 를 분석해 공종·구조유형 판정 + 건물유형을 추천합니다">
-                  {bimBusy ? "분석 중…" : "📊 분석 — 공종·구조 판정 & 건물유형 추천"}
+                  {bimBusy ? "분석 중…" : "분석 — 공종·구조 판정 & 건물유형 추천"}
                 </button>
               ) : (
                 <button className="wz-btn" disabled={!startDate || busy} onClick={() => void onStart()}>
@@ -1339,18 +1339,18 @@ export default function SchedulePlanWizard() {
 
       {/* WBS 요약 (P1 산출) */}
       {scopeWbs && step >= 1 && (
-        <details className="wz-card" style={{ background: "#f8fafc" }} open={step === 1 && running}>
-          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#334155" }}>
+        <details className="wz-card" style={{ background: "var(--surface-soft)" }} open={step === 1 && running}>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 700, color: "var(--muted-strong)" }}>
             P1 스코프 — WBS · 워크패키지 {scopeWbs.package_count} · 구역 {new Set(scopeWbs.zones.map((z) => String(z).replace(/[-_ ]?\d+$/, ""))).size}
             {new Set(scopeWbs.zones.map((z) => String(z).replace(/[-_ ]?\d+$/, ""))).size < scopeWbs.zones.length
-              && <span style={{ color: "#94a3b8", fontWeight: 400 }}> (타설구획 {scopeWbs.zones.length} — 스케줄은 구역 단위 집계)</span>}
+              && <span style={{ color: "var(--muted)", fontWeight: 400 }}> (타설구획 {scopeWbs.zones.length} — 스케줄은 구역 단위 집계)</span>}
           </summary>
-          <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 6, fontSize: 12, color: "#475569" }}>
+          <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 6, fontSize: 12, color: "var(--muted-strong)" }}>
             {scopeWbs.wbs.map((z) => (
-              <div key={z.zone} style={{ border: "1px solid #f1f5f9", borderRadius: 8, padding: "6px 10px" }}>
-                <b style={{ color: "#1e293b" }}>{z.zone}</b>
-                <span style={{ color: "#94a3b8" }}> · {z.storeys.length}개 층</span>
-                <div style={{ marginTop: 2, color: "#64748b" }}>
+              <div key={z.zone} style={{ border: "1px solid var(--surface-soft)", borderRadius: 8, padding: "6px 10px" }}>
+                <b style={{ color: "var(--text)" }}>{z.zone}</b>
+                <span style={{ color: "var(--muted)" }}> · {z.storeys.length}개 층</span>
+                <div style={{ marginTop: 2, color: "var(--muted)" }}>
                   {z.storeys[0]?.storey} ~ {z.storeys[z.storeys.length - 1]?.storey}
                   {" — "}{[...new Set(z.storeys.flatMap((s) => s.discs))].join(" · ")}
                 </div>
@@ -1369,13 +1369,13 @@ export default function SchedulePlanWizard() {
               <b style={{ fontSize: 14 }}> 액티비티 {acts.length}개 — 검토 후 스케줄링으로</b>
               {plan?.payload.strategy && (
                 <span style={{ marginLeft: 8, fontSize: 11.5, padding: "3px 10px", borderRadius: 12,
-                               background: plan.payload.strategy === "top_down" ? "#fce7f3" : "#e0f2fe",
-                               color: plan.payload.strategy === "top_down" ? "#be185d" : "#0369a1", fontWeight: 700 }}>
+                               background: plan.payload.strategy === "top_down" ? "var(--red-soft)" : "var(--primary-soft)",
+                               color: plan.payload.strategy === "top_down" ? "#be185d" : "var(--primary-deep)", fontWeight: 700 }}>
                   {plan.payload.strategy === "top_down" ? "역타 (지하·지상 병행)" : plan.payload.strategy === "bottom_up_phased" ? "순타·단계 (구역별 연속)" : "순타·일괄 (전 구역 지하 먼저)"}
                 </span>
               )}
-              {dirty && <em style={{ fontSize: 12, color: "#d97706", marginLeft: 8 }}>수정됨 · 미저장</em>}
-              <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
+              {dirty && <em style={{ fontSize: 12, color: "var(--primary)", marginLeft: 8 }}>수정됨 · 미저장</em>}
+              <p style={{ fontSize: 12, color: "var(--muted)", margin: "4px 0 0" }}>
                 WBS → 액티비티 정의 → 리스트 → 릴레이션 → 듀레이션까지 완료됐습니다.
                 활동명·기간·선행을 직접 수정하거나 삭제한 뒤 <b>컨펌하면 공정표 베이스라인을 생성</b>합니다.
               </p>
@@ -1387,7 +1387,7 @@ export default function SchedulePlanWizard() {
           </div>
           {plan?.payload.rationale && (
             <details className="wz-rat" open>
-              <summary>🧠 AI 판단 근거 — 왜 이렇게 계획했는가</summary>
+              <summary>AI 판단 근거 — 왜 이렇게 계획했는가</summary>
               <div className="wz-rat-body">
                 {plan.payload.rationale.define && (
                   <p><b>액티비티 분해</b> — {plan.payload.rationale.define}</p>
@@ -1407,8 +1407,8 @@ export default function SchedulePlanWizard() {
                 <tr>
                   <th style={{ textAlign: "left" }}>활동명</th><th>구역</th><th>층</th><th>공종</th>
                   <th style={{ width: 80 }}>기간(일)</th>
-                  <th style={{ width: 56 }} title="필요 타워크레인 (양중작업) — SGS 자원 평준화 입력">🏗️</th>
-                  <th style={{ width: 56 }} title="필요 작업조 — SGS 자원 평준화 입력">👷</th>
+                  <th style={{ width: 56 }} title="필요 타워크레인 (양중작업) — SGS 자원 평준화 입력"></th>
+                  <th style={{ width: 56 }} title="필요 작업조 — SGS 자원 평준화 입력"></th>
                   <th style={{ textAlign: "left", width: "22%" }} title="선행 활동 code (쉼표 구분). 아래 배지 = 관계타입 FS/SS/FF/SF + lag(일). 온톨로지 에이전틱 릴레이션이 판정.">선행 · 관계(FS/SS/FF+lag)</th><th />
                 </tr>
               </thead>
@@ -1439,10 +1439,10 @@ export default function SchedulePlanWizard() {
                                editAct(i, { predecessors: codes.map((c) => prev.find((p) => p.code === c) ?? { code: c, type: "FS", lag_days: 0 }) });
                              }} />
                       {(a.predecessors ?? []).some((p) => p.type !== "FS" || (p.lag_days ?? 0) !== 0) && (
-                        <div style={{ fontSize: 10, color: "#64748b", marginTop: 3, lineHeight: 1.4 }}>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 3, lineHeight: 1.4 }}>
                           {(a.predecessors ?? []).map((p) => (
                             <span key={p.code} style={{ marginRight: 6 }}>
-                              <b style={{ color: p.type === "FS" ? "#94a3b8" : p.type === "SS" ? "#2563eb" : p.type === "FF" ? "#7c3aed" : "#0891b2" }}>{p.type}</b>
+                              <b style={{ color: p.type === "FS" ? "var(--muted)" : p.type === "SS" ? "var(--primary)" : p.type === "FF" ? "var(--primary)" : "var(--teal)" }}>{p.type}</b>
                               {(p.lag_days ?? 0) !== 0 ? `+${p.lag_days}` : ""}
                             </span>
                           ))}
@@ -1463,11 +1463,11 @@ export default function SchedulePlanWizard() {
         <div className="wz-card">
           <div className="wz-gate-head">
             <div>
-              <span className="wz-gate-badge" style={stage === "done" ? { background: "#dcfce7", color: "#15803d" } : undefined}>
-                {stage === "done" ? "✅ 베이스라인 확정" : "⏸ 공정 스케줄링"}
+              <span className="wz-gate-badge" style={stage === "done" ? { background: "var(--green-soft)", color: "var(--green)" } : undefined}>
+                {stage === "done" ? "베이스라인 확정" : "⏸ 공정 스케줄링"}
               </span>
               <b style={{ fontSize: 14 }}> {stage === "done" ? "공정표 베이스라인이 확정되었습니다" : "공정표 베이스라인 — 최종 검토"}</b>
-              <p style={{ fontSize: 12, color: "#64748b", margin: "4px 0 0" }}>
+              <p style={{ fontSize: 12, color: "var(--muted)", margin: "4px 0 0" }}>
                 플래닝 기반으로 CPM 날짜를 계산한 베이스라인입니다. {stage === "scheduled" ? "간트를 검토하고 확정하세요." : "P6 XML 을 다운로드해 Primavera 에서 사용하세요."}
               </p>
             </div>
@@ -1485,12 +1485,12 @@ export default function SchedulePlanWizard() {
                 <button className="wz-btn ghost" disabled={basisBusy}
                   title="물량÷생산성÷투입조÷가동율 = Calendar Day 산정근거 표"
                   onClick={() => { setBasisBusy(true); void getBasis(planId).then(setBasis).finally(() => setBasisBusy(false)); }}>
-                  {basisBusy ? "산정근거 불러오는 중…" : "📋 공정계획서(산정근거)"}
+                  {basisBusy ? "산정근거 불러오는 중…" : "공정계획서(산정근거)"}
                 </button>
               )}
               {planId && (
                 <a className="wz-btn" style={{ textDecoration: "none" }} href={`/fourd?plan=${planId}`}
-                   title="업로드한 IFC(공종 태그째) + 이 공정표로 통합 4D 시뮬레이션">🧊 4D로 보기</a>
+                   title="업로드한 IFC(공종 태그째) + 이 공정표로 통합 4D 시뮬레이션">4D로 보기</a>
               )}
               {stage === "done" && (
                 <button className="wz-btn" onClick={() => {
@@ -1509,64 +1509,64 @@ export default function SchedulePlanWizard() {
                 · 준공 {String((plan.payload.schedule as Record<string, unknown>).end_date ?? "-")}.
                 {Array.isArray((plan.payload.schedule as Record<string, unknown>).warnings) &&
                   ((plan.payload.schedule as Record<string, unknown>).warnings as string[]).length > 0 && (
-                  <span className="wz-rat-stat"> ⚠ 보정 {((plan.payload.schedule as Record<string, unknown>).warnings as string[]).length}건 (순환·기간상한 등)</span>
+                  <span className="wz-rat-stat"> 보정 {((plan.payload.schedule as Record<string, unknown>).warnings as string[]).length}건 (순환·기간상한 등)</span>
                 )}
               </p>
             </div>
           )}
           {/* ── 고성능 AI 공정 검토 — 시공순서 모순 탐지(검토만) → 사람이 수정 버튼 ── */}
           {plan?.payload.schedule && (
-            <div style={{ border: "1px solid #c7d2fe", background: "#eef2ff", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+            <div style={{ border: "1px solid var(--primary-soft)", background: "var(--primary-soft)", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <b style={{ fontSize: 13, color: "#4338ca" }}>🧠 AI 공정 검토</b>
-                <span style={{ fontSize: 11.5, color: "#6366f1" }}>고성능 AI가 시공순서 모순(되메·단계역전·양생전타설 등)을 검토합니다 — 자동수정 X, 검토 후 사람이 결정</span>
+                <b style={{ fontSize: 13, color: "var(--primary-deep)" }}>AI 공정 검토</b>
+                <span style={{ fontSize: 11.5, color: "var(--primary)" }}>고성능 AI가 시공순서 모순(되메·단계역전·양생전타설 등)을 검토합니다 — 자동수정 X, 검토 후 사람이 결정</span>
                 <button className="wz-btn" disabled={auditBusy} style={{ fontSize: 12, marginLeft: "auto" }}
                   onClick={() => { setAuditBusy(true); setAuditFixMsg(null); void planAudit(planId!).then((r) => setAudit(r.findings || [])).finally(() => setAuditBusy(false)); }}>
-                  {auditBusy ? "검토 중…" : "🔍 AI 검토 실행"}
+                  {auditBusy ? "검토 중…" : "AI 검토 실행"}
                 </button>
               </div>
-              {audit && audit.length === 0 && <div style={{ marginTop: 6, color: "#059669", fontSize: 12 }}>✅ 시공순서 모순이 발견되지 않았습니다.</div>}
+              {audit && audit.length === 0 && <div style={{ marginTop: 6, color: "var(--green)", fontSize: 12 }}>시공순서 모순이 발견되지 않았습니다.</div>}
               {audit && audit.length > 0 && (
                 <div style={{ marginTop: 8 }}>
-                  <div style={{ color: "#991b1b", fontWeight: 600, fontSize: 12.5, marginBottom: 4 }}>⚠️ 모순 {audit.length}건 발견 — 수정할까요? (근거 확인 후 결정)</div>
+                  <div style={{ color: "var(--red)", fontWeight: 600, fontSize: 12.5, marginBottom: 4 }}>모순 {audit.length}건 발견 — 수정할까요? (근거 확인 후 결정)</div>
                   {audit.map((f, i) => (
-                    <div key={i} style={{ background: "#fff", border: "1px solid #e0e7ff", borderRadius: 8, padding: "7px 10px", marginBottom: 5, fontSize: 12 }}>
-                      <div><b style={{ color: f.severity === "high" ? "#991b1b" : "#92400e" }}>{f.severity === "high" ? "🔴" : "🟡"} {f.title}</b></div>
-                      {f.names && f.names.length > 0 && <div style={{ color: "#64748b", fontSize: 11, marginTop: 1 }}>관련: {f.names.join(" · ")}</div>}
+                    <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--primary-soft)", borderRadius: 8, padding: "7px 10px", marginBottom: 5, fontSize: 12 }}>
+                      <div><b style={{ color: f.severity === "high" ? "var(--red)" : "var(--primary-deep)" }}>{f.severity === "high" ? "" : ""} {f.title}</b></div>
+                      {f.names && f.names.length > 0 && <div style={{ color: "var(--muted)", fontSize: 11, marginTop: 1 }}>관련: {f.names.join(" · ")}</div>}
                       <div style={{ marginTop: 2 }}><b>근거:</b> {f.reason}</div>
-                      <div style={{ color: "#475569", marginTop: 1 }}><b>수정 방향:</b> {f.fix}</div>
+                      <div style={{ color: "var(--muted-strong)", marginTop: 1 }}><b>수정 방향:</b> {f.fix}</div>
                     </div>
                   ))}
-                  <button className="wz-btn" disabled={auditFixBusy} style={{ fontSize: 12.5, background: "#4338ca", color: "#fff", marginTop: 2 }}
+                  <button className="wz-btn" disabled={auditFixBusy} style={{ fontSize: 12.5, background: "var(--primary-deep)", color: "var(--surface)", marginTop: 2 }}
                     onClick={() => {
                       if (!confirm(`AI가 ${audit.length}건의 모순을 수정하고 재스케줄합니다. 진행할까요?`)) return;
                       setAuditFixBusy(true);
                       void planAuditFix(planId!).then((r) => {
-                        setAuditFixMsg(r.fixed ? `✅ ${r.fixed}건 수정·재스케줄 완료. ${r.summary || ""}` : (r.summary || "수정할 모순이 없습니다."));
+                        setAuditFixMsg(r.fixed ? `${r.fixed}건 수정·재스케줄 완료. ${r.summary || ""}` : (r.summary || "수정할 모순이 없습니다."));
                         setAudit(null);
                         void getPlan(planId!).then(setPlan);   // 갱신된 베이스라인 반영
                       }).finally(() => setAuditFixBusy(false));
                     }}>
-                    {auditFixBusy ? "AI 수정·재스케줄 중…" : `✏️ AI로 ${audit.length}건 수정 + 재스케줄`}
+                    {auditFixBusy ? "AI 수정·재스케줄 중…" : `AI로 ${audit.length}건 수정 + 재스케줄`}
                   </button>
                 </div>
               )}
-              {auditFixMsg && <div style={{ marginTop: 6, color: "#4338ca", fontSize: 12 }}>{auditFixMsg}</div>}
+              {auditFixMsg && <div style={{ marginTop: 6, color: "var(--primary-deep)", fontSize: 12 }}>{auditFixMsg}</div>}
             </div>
           )}
           {(() => {
             const lod = (plan?.payload.schedule as Record<string, unknown> | undefined)?.lod as
               | { level: string; label: string; zones: number; storeys: number; note: string } | undefined;
             if (!lod) return null;
-            const c = lod.level === "zone" ? { bg: "#dcfce7", bd: "#86efac", fg: "#15803d", icon: "🎯" }
-              : lod.level === "floor" ? { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📐" }
-              : { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" };
+            const c = lod.level === "zone" ? { bg: "var(--green-soft)", bd: "var(--green)", fg: "var(--green)", icon: "" }
+              : lod.level === "floor" ? { bg: "var(--amber-soft)", bd: "var(--amber-soft)", fg: "var(--primary-deep)", icon: "" }
+              : { bg: "var(--red-soft)", bd: "var(--red-soft)", fg: "var(--red)", icon: "" };
             return (
               <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "8px 14px", fontSize: 12.5, color: c.fg, marginBottom: 10 }}>
                 {c.icon} <b>상세수준: {lod.label}</b>
                 {lod.zones > 0 && <span> · 구역 {lod.zones}</span>}
                 {lod.storeys > 0 && <span> · 층 {lod.storeys}</span>}
-                <br /><span style={{ color: "#78716c" }}>{lod.note}</span>
+                <br /><span style={{ color: "var(--muted)" }}>{lod.note}</span>
               </div>
             );
           })()}
@@ -1583,13 +1583,13 @@ export default function SchedulePlanWizard() {
                   p50_date?: string; p80_date?: string; buffer_to_p80?: number; verdict?: string; note?: string } | undefined;
             const adq = sched?.adequacy as { summary?: string; over?: string[] } | undefined;
             if (!conf?.crew && !pert) return null;
-            const c = conf?.grade === "적정" ? { bg: "#ecfdf5", bd: "#a7f3d0", fg: "#059669", icon: "✅" }
-              : conf?.grade === "과소" ? { bg: "#fef2f2", bd: "#fecaca", fg: "#991b1b", icon: "⚠️" }
-              : conf?.grade === "과다" ? { bg: "#fffbeb", bd: "#fde68a", fg: "#92400e", icon: "📉" }
-              : { bg: "#f8fafc", bd: "#e2e8f0", fg: "#475569", icon: "📊" };
+            const c = conf?.grade === "적정" ? { bg: "var(--green-soft)", bd: "var(--green-soft)", fg: "var(--green)", icon: "" }
+              : conf?.grade === "과소" ? { bg: "var(--red-soft)", bd: "var(--red-soft)", fg: "var(--red)", icon: "" }
+              : conf?.grade === "과다" ? { bg: "var(--amber-soft)", bd: "var(--amber-soft)", fg: "var(--primary-deep)", icon: "" }
+              : { bg: "var(--surface-soft)", bd: "var(--line)", fg: "var(--muted-strong)", icon: "" };
             const chip = (txt: string, tone: "labor" | "equip") => (
               <span key={txt} style={{ display: "inline-block", padding: "1px 7px", borderRadius: 6, marginRight: 4, marginBottom: 3,
-                fontSize: 11.5, background: tone === "labor" ? "#eef2ff" : "#fff7ed", color: tone === "labor" ? "#4338ca" : "#9a3412" }}>{txt}</span>
+                fontSize: 11.5, background: tone === "labor" ? "var(--primary-soft)" : "var(--surface)7ed", color: tone === "labor" ? "var(--primary-deep)" : "var(--red)" }}>{txt}</span>
             );
             // 표준 대비 어긋난 공법 — 구체 근거(공법·배수) 표시. 출처명(쿠팡/CPE)·중복은 제거.
             const _seen = new Set<string>();
@@ -1600,18 +1600,18 @@ export default function SchedulePlanWizard() {
             const pertBand = pert && pert.pess_days > pert.opt_days ? (() => {
               const span = pert.pess_days - pert.opt_days;
               const pos = (d: number) => Math.max(0, Math.min(100, ((d - pert.opt_days) / span) * 100));
-              const vc = pert.verdict === "공격적" ? "#dc2626" : pert.verdict === "여유" ? "#d97706" : "#059669";
+              const vc = pert.verdict === "공격적" ? "var(--red)" : pert.verdict === "여유" ? "var(--primary)" : "var(--green)";
               return (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #e2e8f0" }}>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed var(--line)" }}>
                   <div style={{ fontSize: 12 }}>
-                    <b style={{ color: "#334155" }}>📈 공기 신뢰도 (삼점추정 P50/P80)</b>
+                    <b style={{ color: "var(--muted-strong)" }}>공기 신뢰도 (삼점추정 P50/P80)</b>
                     <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 6, fontSize: 11, background: `${vc}18`, color: vc, fontWeight: 600 }}>{pert.verdict}</span>
-                    {pert.note && <span style={{ color: "#64748b", marginLeft: 6, fontSize: 11.5 }}>{pert.note}</span>}
+                    {pert.note && <span style={{ color: "var(--muted)", marginLeft: 6, fontSize: 11.5 }}>{pert.note}</span>}
                   </div>
                   <div style={{ position: "relative", height: 26, margin: "10px 2px 2px" }}>
                     <div style={{ position: "absolute", top: 11, left: 0, right: 0, height: 5, borderRadius: 3,
-                      background: "linear-gradient(90deg,#a7f3d0 0%,#fde68a 60%,#fecaca 100%)" }} />
-                    {([["P50", pert.p50_days, "#0369a1"], ["P80", pert.p80_days, "#7c3aed"]] as [string, number, string][]).map(([lb, d, col]) => (
+                      background: "linear-gradient(90deg,var(--green-soft) 0%,var(--amber-soft) 60%,var(--red-soft) 100%)" }} />
+                    {([["P50", pert.p50_days, "var(--primary-deep)"], ["P80", pert.p80_days, "var(--primary)"]] as [string, number, string][]).map(([lb, d, col]) => (
                       <div key={lb} style={{ position: "absolute", left: `${pos(d)}%`, top: 0, transform: "translateX(-50%)", textAlign: "center" }}>
                         <div style={{ fontSize: 9.5, color: col, fontWeight: 700, whiteSpace: "nowrap" }}>{lb} {d}일</div>
                         <div style={{ width: 2, height: 12, background: col, margin: "0 auto" }} />
@@ -1622,13 +1622,13 @@ export default function SchedulePlanWizard() {
                       <div style={{ fontSize: 9.5, color: vc, fontWeight: 700, whiteSpace: "nowrap" }}>계획 {pert.planned_days}일</div>
                     </div>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94a3b8", margin: "0 2px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)", margin: "0 2px" }}>
                     <span>낙관 {pert.opt_days}일</span><span>비관 {pert.pess_days}일</span>
                   </div>
-                  <div style={{ marginTop: 5, fontSize: 11.5, color: "#475569" }}>
-                    P80 준공 <b>{pert.p80_date}</b>{(pert.buffer_to_p80 ?? 0) > 0 && <> · 80% 달성엔 버퍼 <b style={{ color: "#7c3aed" }}>+{pert.buffer_to_p80}일</b> 권장</>}
+                  <div style={{ marginTop: 5, fontSize: 11.5, color: "var(--muted-strong)" }}>
+                    P80 준공 <b>{pert.p80_date}</b>{(pert.buffer_to_p80 ?? 0) > 0 && <> · 80% 달성엔 버퍼 <b style={{ color: "var(--primary)" }}>+{pert.buffer_to_p80}일</b> 권장</>}
                   </div>
-                  {adq?.summary && <div style={{ marginTop: 4, fontSize: 11, color: (adq.over?.length ?? 0) > 0 ? "#b45309" : "#64748b" }}>🗂 {adq.summary}
+                  {adq?.summary && <div style={{ marginTop: 4, fontSize: 11, color: (adq.over?.length ?? 0) > 0 ? "var(--primary-deep)" : "var(--muted)" }}>{adq.summary}
                     {(adq.over ?? []).includes("FM") && !["알폼", "시스템폼", "갱폼"].includes(formwork) && (
                       <button type="button" disabled={busy}
                         onClick={async () => {
@@ -1638,9 +1638,9 @@ export default function SchedulePlanWizard() {
                           catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
                           finally { setBusy(false); }
                         }}
-                        style={{ marginLeft: 8, padding: "1px 9px", borderRadius: 6, border: "1px solid #c4b5fd",
-                                 background: "#f5f3ff", color: "#6d28d9", fontSize: 10.5, cursor: "pointer" }}>
-                        ⚡ 알폼 적용 + 재계산
+                        style={{ marginLeft: 8, padding: "1px 9px", borderRadius: 6, border: "1px solid var(--primary)",
+                                 background: "var(--primary-soft)", color: "var(--primary-deep)", fontSize: 10.5, cursor: "pointer" }}>
+                        알폼 적용 + 재계산
                       </button>
                     )}
                   </div>}
@@ -1650,20 +1650,20 @@ export default function SchedulePlanWizard() {
             return (
               <div style={{ border: `1px solid ${c.bd}`, background: c.bg, borderRadius: 10, padding: "11px 14px", fontSize: 12.5, marginBottom: 10 }}>
                 <div><b style={{ color: c.fg, fontSize: 13.5 }}>{c.icon} 공기 검증{conf?.grade ? ` · ${conf.grade}` : ""}</b>
-                  {conf?.note && <span style={{ color: "#475569" }}> — {conf.note}</span>}</div>
+                  {conf?.note && <span style={{ color: "var(--muted-strong)" }}> — {conf.note}</span>}</div>
                 {conf?.crew && (
                 <div style={{ marginTop: 7 }}>
-                  <span style={{ color: "#94a3b8", fontSize: 11, marginRight: 4 }}>인력</span>
+                  <span style={{ color: "var(--muted)", fontSize: 11, marginRight: 4 }}>인력</span>
                   {Object.entries(conf.crew).map(([j, v]) => chip(`${j} ${v.peak}`, "labor"))}
                   {conf.equipment && Object.keys(conf.equipment).length > 0 && (
-                    <><span style={{ color: "#94a3b8", fontSize: 11, margin: "0 4px 0 8px" }}>장비</span>
+                    <><span style={{ color: "var(--muted)", fontSize: 11, margin: "0 4px 0 8px" }}>장비</span>
                       {Object.entries(conf.equipment).map(([e, v]) => chip(`${e} ${v.peak}`, "equip"))}</>
                   )}
                 </div>
                 )}
                 {offenders.length > 0 && (
-                  <div style={{ marginTop: 6, color: "#b45309", fontSize: 11.5 }}>
-                    ⚠️ {offenders.map((it) => `${it.method} 표준 대비 ${it.verdict}${it.ratio ? ` ${it.ratio}배` : ""}`).join(" · ")} — 투입 장비·작업조 가정 확인 권장
+                  <div style={{ marginTop: 6, color: "var(--primary-deep)", fontSize: 11.5 }}>
+                    {offenders.map((it) => `${it.method} 표준 대비 ${it.verdict}${it.ratio ? ` ${it.ratio}배` : ""}`).join(" · ")} — 투입 장비·작업조 가정 확인 권장
                   </div>
                 )}
                 {pertBand}
@@ -1673,20 +1673,20 @@ export default function SchedulePlanWizard() {
           {(() => {
             const risks = (plan?.payload.schedule as Record<string, unknown> | undefined)?.risks as ScheduleRisk[] | undefined;
             if (!risks || !risks.length) return null;
-            const col = (s: string) => s === "high" ? { fg: "#991b1b", icon: "🔴" } : s === "medium" ? { fg: "#92400e", icon: "🟡" } : { fg: "#475569", icon: "⚪" };
+            const col = (s: string) => s === "high" ? { fg: "var(--red)", icon: "" } : s === "medium" ? { fg: "var(--primary-deep)", icon: "" } : { fg: "var(--muted-strong)", icon: "" };
             return (
-              <div style={{ border: "1px solid #fecaca", background: "#fff7f7", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+              <div style={{ border: "1px solid var(--red-soft)", background: "var(--surface)7f7", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <b style={{ fontSize: 13, color: "#991b1b" }}>⚠️ 리스크 분석 — {risks.length}건</b>
+                  <b style={{ fontSize: 13, color: "var(--red)" }}>리스크 분석 — {risks.length}건</b>
                   <button className="wz-btn" disabled={briefBusy} style={{ fontSize: 12 }}
                           onClick={() => { setBriefBusy(true); void riskBrief(planId!).then((r) => setBrief(r.brief)).finally(() => setBriefBusy(false)); }}>
-                    {briefBusy ? "분석 중…" : "🤖 AI 브리핑"}
+                    {briefBusy ? "분석 중…" : "AI 브리핑"}
                   </button>
                 </div>
                 {risks.map((r, i) => (
                   <div key={i} style={{ fontSize: 12, padding: "3px 0", borderTop: i ? "1px solid #fde0e0" : undefined, color: col(r.severity).fg }}>
-                    {col(r.severity).icon} <b>{r.title}</b> <span style={{ color: "#78716c" }}>— {r.detail}</span>
-                    <br /><span style={{ color: "#0369a1" }}>→ {r.mitigation}</span>
+                    {col(r.severity).icon} <b>{r.title}</b> <span style={{ color: "var(--muted)" }}>— {r.detail}</span>
+                    <br /><span style={{ color: "var(--primary-deep)" }}>→ {r.mitigation}</span>
                     {/* 동절기 타설 리스크 — 조강 원클릭(알폼 패턴). 감지·계산=시스템, 결정=클릭 1회(원가 할증은 사업 결정). */}
                     {r.category === "동절기" && !rapidConcrete && (
                       <button type="button" disabled={busy}
@@ -1697,16 +1697,16 @@ export default function SchedulePlanWizard() {
                           catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
                           finally { setBusy(false); }
                         }}
-                        style={{ marginLeft: 8, padding: "1px 9px", borderRadius: 6, border: "1px solid #fca5a5",
-                                 background: "#fff1f2", color: "#b91c1c", fontSize: 10.5, cursor: "pointer" }}>
-                        ⚡ 조강 적용 + 재계산
+                        style={{ marginLeft: 8, padding: "1px 9px", borderRadius: 6, border: "1px solid var(--red)",
+                                 background: "var(--surface)1f2", color: "var(--red)", fontSize: 10.5, cursor: "pointer" }}>
+                        조강 적용 + 재계산
                       </button>
                     )}
                   </div>
                 ))}
                 {brief && (
-                  <div style={{ marginTop: 8, padding: "8px 10px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, fontSize: 12, color: "#1e3a8a", whiteSpace: "pre-wrap" }}>
-                    🤖 {brief}
+                  <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 8, fontSize: 12, color: "var(--primary-deep)", whiteSpace: "pre-wrap" }}>
+                    {brief}
                   </div>
                 )}
               </div>
@@ -1719,25 +1719,25 @@ export default function SchedulePlanWizard() {
             if (!entries.length) return null;
             const totUnc = entries.reduce((s, [, c]) => s + (c.uncovered?.length || 0), 0);
             return (
-              <div style={{ border: "1px solid #ddd6fe", background: "#f5f3ff", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
+              <div style={{ border: "1px solid var(--primary-soft)", background: "var(--primary-soft)", borderRadius: 10, padding: "10px 14px", marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <b style={{ fontSize: 13, color: "#5b21b6" }}>📋 내역서 대조 — {totUnc ? `${totUnc}개 항목 공정표 누락` : "전 항목 반영 ✓"}</b>
+                  <b style={{ fontSize: 13, color: "#5b21b6" }}>내역서 대조 — {totUnc ? `${totUnc}개 항목 공정표 누락` : "전 항목 반영 "}</b>
                   {totUnc > 0 && (
                     <button className="wz-btn" disabled={boqBriefBusy} style={{ fontSize: 12 }}
                             onClick={() => { setBoqBriefBusy(true); void boqBrief(planId!).then((r) => setBoqBriefTxt(r.brief)).finally(() => setBoqBriefBusy(false)); }}>
-                      {boqBriefBusy ? "분석 중…" : "🤖 AI 브리핑"}
+                      {boqBriefBusy ? "분석 중…" : "AI 브리핑"}
                     </button>
                   )}
                 </div>
                 {entries.map(([disc, c]) => (
                   <div key={disc} style={{ fontSize: 12, padding: "3px 0", color: "#4c1d95" }}>
                     <b>{disc}</b> — 내역서 {c.total}항목 중 <b>{c.covered}</b> 반영
-                    {c.uncovered?.length ? <span style={{ color: "#b45309" }}> · 누락: {c.uncovered.join(", ")}</span> : <span style={{ color: "#15803d" }}> · 누락 없음</span>}
+                    {c.uncovered?.length ? <span style={{ color: "var(--primary-deep)" }}> · 누락: {c.uncovered.join(", ")}</span> : <span style={{ color: "var(--green)" }}> · 누락 없음</span>}
                   </div>
                 ))}
                 {boqBriefTxt && (
-                  <div style={{ marginTop: 8, padding: "8px 10px", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, fontSize: 12, color: "#3730a3", whiteSpace: "pre-wrap" }}>
-                    🤖 {boqBriefTxt}
+                  <div style={{ marginTop: 8, padding: "8px 10px", background: "var(--primary-soft)", border: "1px solid var(--primary-soft)", borderRadius: 8, fontSize: 12, color: "#3730a3", whiteSpace: "pre-wrap" }}>
+                    {boqBriefTxt}
                   </div>
                 )}
               </div>
@@ -1750,13 +1750,13 @@ export default function SchedulePlanWizard() {
             if (!tgt || stage === "done") return null;
             const m = (d?: number) => (d ? `${Math.round(d / 30.4)}개월` : "-");
             return tgt.met ? (
-              <div style={{ border: "1px solid #bbf7d0", background: "#f0fdf4", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#15803d", marginBottom: 10 }}>
-                ✅ 목표공기 달성 — 목표 {m(tgt.target_days)} / 산출 {m(tgt.achieved_days)}
+              <div style={{ border: "1px solid var(--green-soft)", background: "var(--green-soft)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--green)", marginBottom: 10 }}>
+                목표공기 달성 — 목표 {m(tgt.target_days)} / 산출 {m(tgt.achieved_days)}
               </div>
             ) : (
-              <div style={{ border: "1px solid #fde68a", background: "#fffbeb", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#92400e", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ border: "1px solid var(--amber-soft)", background: "var(--amber-soft)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--primary-deep)", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ flex: 1 }}>
-                  ⚠ 목표공기 초과 — 목표 <b>{m(tgt.target_days)}</b> vs 산출 <b>{m(tgt.achieved_days)}</b>.
+                  목표공기 초과 — 목표 <b>{m(tgt.target_days)}</b> vs 산출 <b>{m(tgt.achieved_days)}</b>.
                   {tgt.suggestion
                     ? <> 크레인 <b>{tgt.suggestion.crane}대</b>·작업조 <b>{tgt.suggestion.crew}조</b>면 <b>{m(tgt.suggestion.days)}</b> 달성 가능.</>
                     : <> 자원 증설로는 불가 — 선후행·기간이 지배(공법·플래닝 재검토 필요).</>}
@@ -1772,9 +1772,9 @@ export default function SchedulePlanWizard() {
             );
           })()}
           {stage === "scheduled" && civilQty && (
-            <div style={{ border: "1px solid #bae6fd", background: "#f0f9ff", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#0369a1", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ border: "1px solid var(--primary-soft)", background: "var(--primary-soft)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--primary-deep)", marginBottom: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <span style={{ flex: 1 }}>
-                🏗️ 토목이 길면 <b>굴착 장비 세트(백호·덤프·CIP 대수)</b>를 늘리세요 — 굴착 {(discBoq["토목"]?.quantities?.excavation_m3 || Math.round((civilQty?.footprint_m2 ?? 0) * (civilQty?.depth_m ?? 0))).toLocaleString()}㎥ ÷ (표준품셈 생산성 × 장비 세트). 늘릴수록 토목 기간 단축.
+                토목이 길면 <b>굴착 장비 세트(백호·덤프·CIP 대수)</b>를 늘리세요 — 굴착 {(discBoq["토목"]?.quantities?.excavation_m3 || Math.round((civilQty?.footprint_m2 ?? 0) * (civilQty?.depth_m ?? 0))).toLocaleString()}㎥ ÷ (표준품셈 생산성 × 장비 세트). 늘릴수록 토목 기간 단축.
               </span>
               <label style={{ display: "flex", alignItems: "center", gap: 4 }}>굴착 장비(백호) 세트
                 <input type="number" min={1} className="wz-in" style={{ width: 72 }} value={excavFleet} onChange={(e) => setExcavFleet(Number(e.target.value))} />
@@ -1788,78 +1788,78 @@ export default function SchedulePlanWizard() {
           {ganttReady && ganttTasks.length > 0 ? (
             <GanttChart tasks={ganttTasks} height={520} viewMode="Week" fillWidth />
           ) : (
-            <div style={{ fontSize: 13, color: "#94a3b8", padding: 20 }}>간트 렌더링 준비 중… (활동 {ganttTasks.length}개)</div>
+            <div style={{ fontSize: 13, color: "var(--muted)", padding: 20 }}>간트 렌더링 준비 중… (활동 {ganttTasks.length}개)</div>
           )}
         </div>
       )}
 
       <style jsx>{`
         .wz-steps { display: flex; gap: 0; align-items: stretch; }
-        .wz-step { flex: 1; display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid #e2e8f0;
-                   background: #fff; color: #94a3b8; position: relative; }
+        .wz-step { flex: 1; display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid var(--line);
+                   background: var(--surface); color: var(--muted); position: relative; }
         .wz-step:first-child { border-radius: 10px 0 0 10px; }
         .wz-step:last-child { border-radius: 0 10px 10px 0; }
         .wz-step + .wz-step { border-left: none; }
         .wz-step b { display: block; font-size: 12px; line-height: 1.2; }
         .wz-step small { display: block; font-size: 11px; }
-        .wz-step.on { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
-        .wz-step.done { background: #f0fdf4; color: #15803d; }
-        .wz-step-badge { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #64748b;
+        .wz-step.on { background: var(--primary-soft); border-color: var(--primary-soft); color: var(--primary-deep); }
+        .wz-step.done { background: var(--green-soft); color: var(--green); }
+        .wz-step-badge { width: 22px; height: 22px; border-radius: 50%; background: var(--line); color: var(--muted);
                          display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-        .wz-step.on .wz-step-badge { background: #2563eb; color: #fff; }
-        .wz-step.done .wz-step-badge { background: #22c55e; color: #fff; }
+        .wz-step.on .wz-step-badge { background: var(--primary); color: var(--surface); }
+        .wz-step.done .wz-step-badge { background: var(--green); color: var(--surface); }
         .wz-step.big { padding: 12px 16px; }
         .wz-substeps { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
-        .wz-substep { font-size: 10.5px; padding: 2px 8px; border-radius: 10px; background: #f1f5f9; color: #94a3b8; }
-        .wz-substep.on { background: #dbeafe; color: #1d4ed8; font-weight: 700; }
-        .wz-substep.done { background: #dcfce7; color: #15803d; }
-        .wz-step-arrow { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); color: #cbd5e1; font-size: 16px; z-index: 1; }
-        .wz-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; background: #fff; }
-        .wz-in { width: 100%; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; box-sizing: border-box; background: #fff; }
-        .wz-sub { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #64748b; flex: 1; }
-        .wz-chip { padding: 3px 10px; border: 1px solid #cbd5e1; border-radius: 13px; font-size: 11.5px;
-                   background: #fff; color: #475569; cursor: pointer; }
-        .wz-chip:hover { border-color: #2563eb; color: #2563eb; }
-        .wz-bim { display: inline-block; padding: 9px 14px; border: 1px dashed #94a3b8; border-radius: 8px; font-size: 12.5px;
-                  cursor: pointer; color: #475569; background: #f8fafc; }
-        .wz-bim:hover { border-color: #2563eb; color: #2563eb; }
-        .wz-btn { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-        .wz-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
-        .wz-btn.green { background: #16a34a; }
-        .wz-btn.green:disabled { background: #cbd5e1; }
-        .wz-btn.ghost { background: #fff; color: #334155; border: 1px solid #cbd5e1; }
-        .wz-btn.ghost:disabled { color: #cbd5e1; }
+        .wz-substep { font-size: 10.5px; padding: 2px 8px; border-radius: 10px; background: var(--surface-soft); color: var(--muted); }
+        .wz-substep.on { background: var(--primary-soft); color: var(--primary-deep); font-weight: 700; }
+        .wz-substep.done { background: var(--green-soft); color: var(--green); }
+        .wz-step-arrow { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); color: var(--line-strong); font-size: 16px; z-index: 1; }
+        .wz-card { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--surface); }
+        .wz-in { width: 100%; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 7px; font-size: 13px; box-sizing: border-box; background: var(--surface); }
+        .wz-sub { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); flex: 1; }
+        .wz-chip { padding: 3px 10px; border: 1px solid var(--line-strong); border-radius: 13px; font-size: 11.5px;
+                   background: var(--surface); color: var(--muted-strong); cursor: pointer; }
+        .wz-chip:hover { border-color: var(--primary); color: var(--primary); }
+        .wz-bim { display: inline-block; padding: 9px 14px; border: 1px dashed var(--muted); border-radius: 8px; font-size: 12.5px;
+                  cursor: pointer; color: var(--muted-strong); background: var(--surface-soft); }
+        .wz-bim:hover { border-color: var(--primary); color: var(--primary); }
+        .wz-btn { padding: 8px 16px; background: var(--primary); color: var(--surface); border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .wz-btn:disabled { background: var(--line-strong); cursor: not-allowed; }
+        .wz-btn.green { background: var(--green); }
+        .wz-btn.green:disabled { background: var(--line-strong); }
+        .wz-btn.ghost { background: var(--surface); color: var(--muted-strong); border: 1px solid var(--line-strong); }
+        .wz-btn.ghost:disabled { color: var(--line-strong); }
         .wz-gate-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-        .wz-gate-badge { display: inline-block; padding: 3px 10px; border-radius: 13px; background: #fef3c7; color: #b45309;
+        .wz-gate-badge { display: inline-block; padding: 3px 10px; border-radius: 13px; background: var(--amber-soft); color: var(--primary-deep);
                          font-size: 12px; font-weight: 700; margin-right: 6px; }
-        .wz-tablewrap { max-height: 480px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .wz-tablewrap { max-height: 480px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
         .wz-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .wz-table thead th { position: sticky; top: 0; background: #f1f5f9; color: #475569; font-size: 11px;
-                             padding: 8px; border-bottom: 1px solid #e2e8f0; z-index: 1; }
-        .wz-table td { padding: 4px 6px; border-bottom: 1px solid #f1f5f9; color: #475569; }
+        .wz-table thead th { position: sticky; top: 0; background: var(--surface-soft); color: var(--muted-strong); font-size: 11px;
+                             padding: 8px; border-bottom: 1px solid var(--line); z-index: 1; }
+        .wz-table td { padding: 4px 6px; border-bottom: 1px solid var(--surface-soft); color: var(--muted-strong); }
         .wz-table td.c { text-align: center; }
-        .wz-table tbody tr:hover { background: #f8fafc; }
+        .wz-table tbody tr:hover { background: var(--surface-soft); }
         .wz-cell { width: 100%; padding: 4px 7px; border: 1px solid transparent; border-radius: 5px; font-size: 12px;
                    background: transparent; box-sizing: border-box; }
         .wz-cell.c { text-align: center; }
-        .wz-cell:hover { border-color: #cbd5e1; background: #fff; }
-        .wz-cell:focus { border-color: #2563eb; background: #fff; outline: none; }
-        .wz-del { background: none; border: none; color: #ef4444; font-size: 11px; cursor: pointer; }
+        .wz-cell:hover { border-color: var(--line-strong); background: var(--surface); }
+        .wz-cell:focus { border-color: var(--primary); background: var(--surface); outline: none; }
+        .wz-del { background: none; border: none; color: var(--red); font-size: 11px; cursor: pointer; }
         .wz-del:hover { text-decoration: underline; }
-        .wz-rat { border: 1px solid #e9d5ff; background: #faf5ff; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
-        .wz-rat summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: #7c3aed; }
+        .wz-rat { border: 1px solid var(--primary-soft); background: var(--primary-soft); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+        .wz-rat summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--primary); }
         .wz-rat-body { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
-        .wz-rat-body p { margin: 0; font-size: 12.5px; color: #475569; line-height: 1.65; }
-        .wz-rat-body b { color: #1e293b; }
-        .wz-rat-stat { color: #7c3aed; font-size: 11.5px; }
-        .wz-stream { border: 1px solid #e0e7ff; background: #f5f7ff; border-radius: 10px; padding: 14px; }
+        .wz-rat-body p { margin: 0; font-size: 12.5px; color: var(--muted-strong); line-height: 1.65; }
+        .wz-rat-body b { color: var(--text); }
+        .wz-rat-stat { color: var(--primary); font-size: 11.5px; }
+        .wz-stream { border: 1px solid var(--primary-soft); background: #f5f7ff; border-radius: 10px; padding: 14px; }
         .wz-stream-head { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
-        .wz-dot { width: 9px; height: 9px; border-radius: 50%; background: #6366f1; animation: wz-pulse 1s ease-in-out infinite; }
+        .wz-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); animation: wz-pulse 1s ease-in-out infinite; }
         @keyframes wz-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
         .wz-skel-rows { display: flex; flex-direction: column; gap: 9px; }
         .wz-skel-row { display: flex; align-items: center; gap: 10px; }
-        .wz-skel-label { width: 130px; height: 13px; border-radius: 4px; background: linear-gradient(90deg,#e2e8f0 25%,#eef2f7 50%,#e2e8f0 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; flex-shrink: 0; }
-        .wz-skel-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,#c7d2fe 25%,#e0e7ff 50%,#c7d2fe 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; }
+        .wz-skel-label { width: 130px; height: 13px; border-radius: 4px; background: linear-gradient(90deg,var(--line) 25%,var(--surface-soft) 50%,var(--line) 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; flex-shrink: 0; }
+        .wz-skel-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,var(--primary-soft) 25%,var(--primary-soft) 50%,var(--primary-soft) 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; }
         @keyframes wz-shim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
       `}</style>
       {basis && (() => {
@@ -1876,40 +1876,40 @@ export default function SchedulePlanWizard() {
           a.download = `공정계획서_산정근거_${basis.project_name}.csv`; a.click(); URL.revokeObjectURL(a.href);
         };
         return (
-          <div onClick={() => setBasis(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, maxWidth: 1280, width: "100%", maxHeight: "90vh", overflow: "auto", padding: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, position: "sticky", top: 0, background: "#fff", paddingBottom: 8, borderBottom: "1px solid #e2e8f0" }}>
-                <div><b style={{ fontSize: 15 }}>📋 공정계획서 — 산정근거</b>
-                  <span style={{ color: "#64748b", fontSize: 12.5, marginLeft: 8 }}>물량 ÷ (생산성 × 투입조) ÷ 가동율 = Calendar Day</span>
-                  <div style={{ fontSize: 12.5, color: "#0f172a", marginTop: 3 }}>적정공기 <b>{basis.total_cd.toLocaleString()}일 = {basis.total_months}개월</b>
-                    {Object.keys(basis.util).length > 0 && <span style={{ color: "#64748b", marginLeft: 10 }}>가동율: {Object.entries(basis.util).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ")}</span>}</div>
+          <div onClick={() => setBasis(null)} style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0,.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--surface)", borderRadius: 12, maxWidth: 1280, width: "100%", maxHeight: "90vh", overflow: "auto", padding: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, position: "sticky", top: 0, background: "var(--surface)", paddingBottom: 8, borderBottom: "1px solid var(--line)" }}>
+                <div><b style={{ fontSize: 15 }}>공정계획서 — 산정근거</b>
+                  <span style={{ color: "var(--muted)", fontSize: 12.5, marginLeft: 8 }}>물량 ÷ (생산성 × 투입조) ÷ 가동율 = Calendar Day</span>
+                  <div style={{ fontSize: 12.5, color: "var(--text)", marginTop: 3 }}>적정공기 <b>{basis.total_cd.toLocaleString()}일 = {basis.total_months}개월</b>
+                    {Object.keys(basis.util).length > 0 && <span style={{ color: "var(--muted)", marginLeft: 10 }}>가동율: {Object.entries(basis.util).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ")}</span>}</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="wz-btn ghost" onClick={exportCsv}>⬇ Excel(CSV)</button>
+                  <button className="wz-btn ghost" onClick={exportCsv}>Excel(CSV)</button>
                   <button className="wz-btn ghost" onClick={() => setBasis(null)}>닫기</button>
                 </div>
               </div>
               {basis.groups.map((g) => (
                 <div key={g.phase} style={{ marginBottom: 16 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: "#1d4ed8", background: "#eff6ff", padding: "5px 10px", borderRadius: 6 }}>
-                    {g.phase} <span style={{ color: "#64748b", fontWeight: 400 }}>— {g.cd.toLocaleString()}일 ({g.months}개월)</span></div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "var(--primary-deep)", background: "var(--primary-soft)", padding: "5px 10px", borderRadius: 6 }}>
+                    {g.phase} <span style={{ color: "var(--muted)", fontWeight: 400 }}>— {g.cd.toLocaleString()}일 ({g.months}개월)</span></div>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5, marginTop: 4 }}>
-                    <thead><tr style={{ color: "#64748b", textAlign: "right" }}>
+                    <thead><tr style={{ color: "var(--muted)", textAlign: "right" }}>
                       {["공종", "활동", "단위", "물량", "생산성", "투입조", "생산량/일", "WD", "가동율", "CD"].map((h, i) => (
-                        <th key={h} style={{ padding: "3px 6px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>{h}</th>))}
+                        <th key={h} style={{ padding: "3px 6px", textAlign: i < 2 ? "left" : "right", borderBottom: "1px solid var(--line)", whiteSpace: "nowrap" }}>{h}</th>))}
                     </tr></thead>
                     <tbody>
                       {g.rows.map((r, i) => (
-                        <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                          <td style={{ padding: "3px 6px", color: "#475569" }}>{r.discipline}</td>
-                          <td style={{ padding: "3px 6px" }}>{r.name}{r.inferred && <span style={{ color: "#a78bfa", marginLeft: 4 }} title="온톨로지 미수록 추정">🤖</span>}</td>
-                          <td style={{ padding: "3px 6px", textAlign: "right", color: "#94a3b8" }}>{r.unit}</td>
+                        <tr key={i} style={{ borderBottom: "1px solid var(--surface-soft)" }}>
+                          <td style={{ padding: "3px 6px", color: "var(--muted-strong)" }}>{r.discipline}</td>
+                          <td style={{ padding: "3px 6px" }}>{r.name}{r.inferred && <span style={{ color: "var(--primary)", marginLeft: 4 }} title="온톨로지 미수록 추정"></span>}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right", color: "var(--muted)" }}>{r.unit}</td>
                           <td style={{ padding: "3px 6px", textAlign: "right" }}>{r.qty?.toLocaleString()}</td>
                           <td style={{ padding: "3px 6px", textAlign: "right" }}>{r.productivity ?? "—"}</td>
                           <td style={{ padding: "3px 6px", textAlign: "right" }}>{r.crew ?? "—"}</td>
-                          <td style={{ padding: "3px 6px", textAlign: "right", color: "#64748b" }}>{r.daily?.toLocaleString()}</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right", color: "var(--muted)" }}>{r.daily?.toLocaleString()}</td>
                           <td style={{ padding: "3px 6px", textAlign: "right" }}>{r.wd}</td>
-                          <td style={{ padding: "3px 6px", textAlign: "right", color: "#94a3b8" }}>{Math.round(r.util * 100)}%</td>
+                          <td style={{ padding: "3px 6px", textAlign: "right", color: "var(--muted)" }}>{Math.round(r.util * 100)}%</td>
                           <td style={{ padding: "3px 6px", textAlign: "right", fontWeight: 600 }}>{r.cd}</td>
                         </tr>
                       ))}
@@ -1928,7 +1928,7 @@ export default function SchedulePlanWizard() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>{label}</label>
+      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-strong)" }}>{label}</label>
       {children}
     </div>
   );

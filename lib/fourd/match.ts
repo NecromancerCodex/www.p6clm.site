@@ -608,7 +608,7 @@ export function matchAllHybrid(
   const byVia: Record<string, number> = {};
   let matched = 0;
   for (const el of elements) {
-    // ★ 모듈러(MO) 부재 — disc(건축/MEP) 단축경로보다 먼저. PC모듈러는 마감·설비가 공장 완제품이라
+    // 모듈러(MO) 부재 — disc(건축/MEP) 단축경로보다 먼저. PC모듈러는 마감·설비가 공장 완제품이라
     //   현장에선 '그 층 모듈이 설치되는 시점'(양중~토핑)에 함께 등장한다. disc 단축경로의 글로벌
     //   finishWindow 를 쓰면 천장이 마감기간(전체) 내내 진행중으로 잘못 표시됨.
     //   canonStorey 로 storey 포맷('02'/'2F') 흡수, zone 일치 우선 → zone 무관 폴백.
@@ -637,7 +637,7 @@ export function matchAllHybrid(
       }
       // 모듈 윈도 못 잡으면 아래 disc/코드 폴백으로 진행(미매칭 방지)
     }
-    // ★ 슬롯이 정한 공종(disc)이 진실 — 타입보다 우선. 건축 슬롯 마감 벽/바닥(IfcSlab/Wall)·조명까지
+    // 슬롯이 정한 공종(disc)이 진실 — 타입보다 우선. 건축 슬롯 마감 벽/바닥(IfcSlab/Wall)·조명까지
     //   전부 그 공종 window 로. (타입 기반은 disc 없는 종합 파일용으로 아래에서 처리)
     //   + 종합 파일(disc 없음)은 마감/단열 자재명으로 건축 판정 — PSet Trade=ST 오태깅(단열판넬·석고
     //     칸막이가 IfcWall+ST)을 무시하고 finishWindow 로. 백엔드 _FINISH_NM 미러(단열벽이 골조 매칭 차단).

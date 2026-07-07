@@ -270,10 +270,10 @@ export default function ScheduleGeneratePage() {
     <div style={{ padding: 20, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>공정표 자동생성기</h1>
-        <p style={{ fontSize: 13, color: "#64748b", margin: "4px 0 0" }}>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: "4px 0 0" }}>
           6가지 정보를 입력하면 GPT-5.4가 공정표 초안을 생성합니다. (날짜·P6 XML은 시스템이 결정론적으로 계산)
           <br />
-          ⚠️ 기간은 표준품셈(2,998항목) 기반 산정 — 품셈 없는 항목은 AI 추정. <b>초안</b>이며 PM 검토·확정 필요.
+          기간은 표준품셈(2,998항목) 기반 산정 — 품셈 없는 항목은 AI 추정. <b>초안</b>이며 PM 검토·확정 필요.
         </p>
       </div>
 
@@ -283,7 +283,7 @@ export default function ScheduleGeneratePage() {
             placeholder="예: 모듈러 공동주택, 근린생활시설" />
           <input className="gen-in" value={scope} onChange={(e) => setScope(e.target.value)}
             placeholder="범위 (예: 골조까지 / 마감 포함)" style={{ marginTop: 6 }} />
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#334155", marginTop: 6 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-strong)", marginTop: 6 }}>
             구조유형 (층 시공순서 결정):
             <select className="gen-in" style={{ width: "auto", flex: 1 }}
               value={structureType} onChange={(e) => setStructureType(e.target.value)}>
@@ -296,7 +296,7 @@ export default function ScheduleGeneratePage() {
             </select>
           </label>
           {inferReason && (
-            <div style={{ fontSize: 11, color: "#7c3aed", marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: "var(--primary)", marginTop: 4 }}>
               ◆ AI 추천 (BIM 분석): {inferReason} — 수정 가능
             </div>
           )}
@@ -310,12 +310,12 @@ export default function ScheduleGeneratePage() {
 
         <Field label="③ 얼마나 — BIM 물량 (선택)">
           <label className="gen-bim">
-            {bimBusy ? "BIM 파싱 중…" : bimName ? `✅ ${bimName}` : "IFC 업로드 → 물량 자동집계"}
+            {bimBusy ? "BIM 파싱 중…" : bimName ? `${bimName}` : "IFC 업로드 → 물량 자동집계"}
             <input type="file" accept=".ifc" style={{ display: "none" }}
               onChange={(e) => e.target.files?.[0] && onBim(e.target.files[0])} disabled={bimBusy} />
           </label>
           {workUnits.length > 0 && (
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>
               {workUnits.length}개 물량유형 ({workUnits.reduce((s, u) => s + (u.count ?? 0), 0)}부재)
             </div>
           )}
@@ -338,14 +338,14 @@ export default function ScheduleGeneratePage() {
                 <option value={7}>주 7일</option>
               </select>
             </label>
-            <label className="gen-sub" title="동시 양중(모듈/PC설치) 구역 한계 — 초과 시 스태거">🏗 타워크레인
+            <label className="gen-sub" title="동시 양중(모듈/PC설치) 구역 한계 — 초과 시 스태거">타워크레인
               <input type="number" min={1} className="gen-in" value={towerCranes} onChange={(e) => setTowerCranes(Math.max(1, Number(e.target.value)))} />
             </label>
-            <label className="gen-sub" title="동시 동일공종 작업 한계">👷 작업조
+            <label className="gen-sub" title="동시 동일공종 작업 한계">작업조
               <input type="number" min={1} className="gen-in" value={workCrews} onChange={(e) => setWorkCrews(Math.max(1, Number(e.target.value)))} />
             </label>
           </div>
-          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
             자원이 구역 수보다 적으면 AI가 자동 스태거(순차화). 예: 크레인 1대 → A→B→C 직렬
           </div>
         </Field>
@@ -354,7 +354,7 @@ export default function ScheduleGeneratePage() {
       <Field label={`④ 어떤 방식 — 공법 선택 (${methods.length}개 선택)`}>
         {recommendedDisc.size > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: -2, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, color: "#7c3aed" }}>
+            <span style={{ fontSize: 11, color: "var(--primary)" }}>
               ◆ BIM 분석 결과 <b>연보라 = 유력 공법</b> (부재 유형 기반 추천)
             </span>
             <button type="button" className="gen-rec-all" onClick={selectAllRecommended}>
@@ -381,7 +381,7 @@ export default function ScheduleGeneratePage() {
               </div>
             </div>
           ))}
-          {methodGroups.length === 0 && <div style={{ fontSize: 12, color: "#94a3b8" }}>공법 목록 로딩 중…</div>}
+          {methodGroups.length === 0 && <div style={{ fontSize: 12, color: "var(--muted)" }}>공법 목록 로딩 중…</div>}
         </div>
       </Field>
 
@@ -394,7 +394,7 @@ export default function ScheduleGeneratePage() {
         <button type="button" className="gen-btn" disabled={!canSubmit} onClick={onGenerate}>
           {busy ? `생성 중… ${genElapsed}초` : "공정표 생성"}
         </button>
-        {err && <span style={{ color: "#dc2626", fontSize: 13 }}>{err}</span>}
+        {err && <span style={{ color: "var(--red)", fontSize: 13 }}>{err}</span>}
       </div>
 
       {/* AI 실시간 진행 + 스켈레톤 */}
@@ -402,8 +402,8 @@ export default function ScheduleGeneratePage() {
         <div className="gen-stream">
           <div className="gen-stream-head">
             <span className="gen-dot" />
-            <span style={{ fontWeight: 600, color: "#4338ca" }}>{genProgress || "AI 작업 중…"}</span>
-            <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>
+            <span style={{ fontWeight: 600, color: "var(--primary-deep)" }}>{genProgress || "AI 작업 중…"}</span>
+            <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--muted)" }}>
               gpt-5.4 · {genElapsed}초 (최대 10분)
             </span>
           </div>
@@ -419,11 +419,11 @@ export default function ScheduleGeneratePage() {
       )}
 
       {result && (
-        <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>
               {result.project_name} — 활동 {result.activity_count} · 관계 {result.relationship_count} · {result.start_date} ~ {result.end_date ?? "?"}
-              <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 8 }}>
+              <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 8 }}>
                 ({result.model}{result.search_rounds ? ` · 온톨로지 ${result.search_rounds}라운드 탐색` : ""})
               </span>
             </div>
@@ -434,52 +434,52 @@ export default function ScheduleGeneratePage() {
                     onClick={() => setViewMode(vm)}>{vm === "Day" ? "일" : vm === "Week" ? "주" : "월"}</button>
                 ))}
               </div>
-              <button type="button" className="gen-btn" onClick={downloadXml}>📥 P6 XML 다운로드</button>
+              <button type="button" className="gen-btn" onClick={downloadXml}>P6 XML 다운로드</button>
             </div>
           </div>
 
           {result.notes && (
-            <div style={{ fontSize: 12, background: "#f1f5f9", padding: 8, borderRadius: 6, color: "#475569" }}>
-              💡 {result.notes}
+            <div style={{ fontSize: 12, background: "var(--surface-soft)", padding: 8, borderRadius: 6, color: "var(--muted-strong)" }}>
+              {result.notes}
             </div>
           )}
           {result.warnings.length > 0 && (
-            <div style={{ fontSize: 12, background: "#fef3c7", padding: 8, borderRadius: 6, color: "#92400e" }}>
-              ⚠ {result.warnings.join(" · ")}
+            <div style={{ fontSize: 12, background: "var(--amber-soft)", padding: 8, borderRadius: 6, color: "var(--primary-deep)" }}>
+              {result.warnings.join(" · ")}
             </div>
           )}
 
           {ganttReady && ganttTasks.length > 0 ? (
             <GanttChart tasks={ganttTasks} height={560} viewMode={viewMode} fillWidth />
           ) : (
-            <div style={{ fontSize: 13, color: "#94a3b8" }}>간트 렌더링 준비 중…</div>
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>간트 렌더링 준비 중…</div>
           )}
         </div>
       )}
 
       <style jsx>{`
-        .gen-in { width: 100%; padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; box-sizing: border-box; }
-        .gen-sub { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #64748b; flex: 1; min-width: 110px; }
-        .gen-bim { display: inline-block; padding: 8px 12px; border: 1px dashed #94a3b8; border-radius: 7px; font-size: 12px; cursor: pointer; color: #475569; background: #f8fafc; }
-        .gen-methods { max-height: 230px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-        .gen-mcat { font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 4px; }
+        .gen-in { width: 100%; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 7px; font-size: 13px; box-sizing: border-box; }
+        .gen-sub { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); flex: 1; min-width: 110px; }
+        .gen-bim { display: inline-block; padding: 8px 12px; border: 1px dashed var(--muted); border-radius: 7px; font-size: 12px; cursor: pointer; color: var(--muted-strong); background: var(--surface-soft); }
+        .gen-methods { max-height: 230px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .gen-mcat { font-size: 11px; font-weight: 700; color: var(--muted-strong); margin-bottom: 4px; }
         .gen-mlist { display: flex; flex-wrap: wrap; gap: 5px; }
-        .gen-mchip { padding: 3px 9px; border: 1px solid #cbd5e1; border-radius: 14px; font-size: 12px; background: #fff; cursor: pointer; color: #334155; }
-        .gen-mchip.on { background: #2563eb; color: #fff; border-color: #2563eb; }
-        .gen-mchip.rec { background: #ede9fe; color: #6d28d9; border-color: #c4b5fd; }
-        .gen-rec { font-size: 9px; font-weight: 700; color: #7c3aed; margin-left: 4px; vertical-align: top; }
-        .gen-rec-all { padding: 3px 10px; background: #7c3aed; color: #fff; border: none; border-radius: 13px; font-size: 11px; font-weight: 600; cursor: pointer; }
-        .gen-rec-all:hover { background: #6d28d9; }
-        .gen-btn { padding: 8px 16px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-        .gen-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
-        .gen-stream { border: 1px solid #e0e7ff; background: #f5f7ff; border-radius: 10px; padding: 14px; }
+        .gen-mchip { padding: 3px 9px; border: 1px solid var(--line-strong); border-radius: 14px; font-size: 12px; background: var(--surface); cursor: pointer; color: var(--muted-strong); }
+        .gen-mchip.on { background: var(--primary); color: var(--surface); border-color: var(--primary); }
+        .gen-mchip.rec { background: var(--primary-soft); color: var(--primary-deep); border-color: var(--primary); }
+        .gen-rec { font-size: 9px; font-weight: 700; color: var(--primary); margin-left: 4px; vertical-align: top; }
+        .gen-rec-all { padding: 3px 10px; background: var(--primary); color: var(--surface); border: none; border-radius: 13px; font-size: 11px; font-weight: 600; cursor: pointer; }
+        .gen-rec-all:hover { background: var(--primary-deep); }
+        .gen-btn { padding: 8px 16px; background: var(--primary); color: var(--surface); border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .gen-btn:disabled { background: var(--line-strong); cursor: not-allowed; }
+        .gen-stream { border: 1px solid var(--primary-soft); background: #f5f7ff; border-radius: 10px; padding: 14px; }
         .gen-stream-head { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
-        .gen-dot { width: 9px; height: 9px; border-radius: 50%; background: #6366f1; animation: gen-pulse 1s ease-in-out infinite; }
+        .gen-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); animation: gen-pulse 1s ease-in-out infinite; }
         @keyframes gen-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
         .gen-skel-rows { display: flex; flex-direction: column; gap: 9px; }
         .gen-skel-row { display: flex; align-items: center; gap: 10px; }
-        .gen-skel-label { width: 130px; height: 13px; border-radius: 4px; background: linear-gradient(90deg,#e2e8f0 25%,#eef2f7 50%,#e2e8f0 75%); background-size: 200% 100%; animation: gen-shim 1.4s linear infinite; flex-shrink: 0; }
-        .gen-skel-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,#c7d2fe 25%,#e0e7ff 50%,#c7d2fe 75%); background-size: 200% 100%; animation: gen-shim 1.4s linear infinite; }
+        .gen-skel-label { width: 130px; height: 13px; border-radius: 4px; background: linear-gradient(90deg,var(--line) 25%,var(--surface-soft) 50%,var(--line) 75%); background-size: 200% 100%; animation: gen-shim 1.4s linear infinite; flex-shrink: 0; }
+        .gen-skel-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,var(--primary-soft) 25%,var(--primary-soft) 50%,var(--primary-soft) 75%); background-size: 200% 100%; animation: gen-shim 1.4s linear infinite; }
         @keyframes gen-shim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
       `}</style>
     </div>
@@ -489,7 +489,7 @@ export default function ScheduleGeneratePage() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>{label}</label>
+      <label style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-strong)" }}>{label}</label>
       {children}
     </div>
   );

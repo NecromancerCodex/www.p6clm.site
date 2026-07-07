@@ -5,7 +5,6 @@
  *  · IDW 보간 입체 슬랩(층별 색) + 시추공 기둥.
  *  · 층별 체적(m³) = 격자 적분. 토사/풍화/암반 그룹 소계.
  */
-import { Layers, Mountain, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EarthworkViewer } from "../../../components/earthwork/EarthworkViewer";
@@ -22,7 +21,7 @@ import { loadEarthwork, saveEarthwork } from "../../../lib/api/earthwork";
 /** 가장 멀리 떨어진 두 시추공 = 대표 단면 기본값. */
 function Chip({ label, c }: { label: string; c: string }) {
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: c, padding: "3px 9px", borderRadius: 999 }}>
+    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--surface)", background: c, padding: "3px 9px", borderRadius: 999 }}>
       {label}
     </span>
   );
@@ -30,15 +29,15 @@ function Chip({ label, c }: { label: string; c: string }) {
 
 function StatBox({ title, color, rows }: { title: string; color: string; rows: [string, string][] }) {
   return (
-    <div style={{ border: "1px solid #eef1f6", borderRadius: 10, padding: 12, background: "#fbfcfe" }}>
+    <div style={{ border: "1px solid var(--surface-muted)", borderRadius: 10, padding: 12, background: "var(--surface-soft)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
         <span style={{ width: 10, height: 10, borderRadius: 3, background: color, display: "inline-block" }} />
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#1e293b" }}>{title}</span>
+        <span style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{title}</span>
       </div>
       {rows.map(([k, v]) => (
-        <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, color: "#475569", padding: "2px 0" }}>
+        <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, color: "var(--muted-strong)", padding: "2px 0" }}>
           <span>{k}</span>
-          <strong style={{ color: "#334155" }}>{v}</strong>
+          <strong style={{ color: "var(--muted-strong)" }}>{v}</strong>
         </div>
       ))}
     </div>
@@ -185,15 +184,14 @@ export default function EarthworkPage() {
   }
 
   const CARD: React.CSSProperties = {
-    background: "#fff", border: "1px solid #e8ecf2", borderRadius: 14,
+    background: "var(--surface)", border: "1px solid #e8ecf2", borderRadius: 14,
     boxShadow: "0 1px 3px rgba(16,24,40,0.05)", padding: 16, marginBottom: 16,
   };
 
   return (
     <div className="ws-inner-pad" style={{ maxWidth: "none" }}>
       <div className="ws-section-title">
-        <Mountain size={18} strokeWidth={1.8} />
-        토공 / 지반
+                토공 / 지반
       </div>
       <p className="ws-section-desc">
         시추 {boreholes.length}공을 IDW 보간한 3D 지층 모델·층별 토공 물량·단면도입니다.
@@ -210,25 +208,24 @@ export default function EarthworkPage() {
             onClick={() => fileRef.current?.click()}
             style={{
               display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10,
-              border: "none", background: "linear-gradient(180deg,#3b82f6,#2563eb)", color: "#fff",
+              border: "none", background: "linear-gradient(180deg,var(--primary),var(--primary))", color: "var(--surface)",
               fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 1px 2px rgba(37,99,235,0.4)",
             }}
           >
-            <Upload size={15} strokeWidth={2.2} />
-            CSV 업로드
+                        CSV 업로드
           </button>
           <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-            <span style={{ fontSize: 13, color: "#334155", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ fontSize: 13, color: "var(--muted-strong)", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {source}
             </span>
-            <span style={{ fontSize: 11, color: "#94a3b8" }}>시추 CSV · add 통합 CSV(##섹션) 지원</span>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>시추 CSV · add 통합 CSV(##섹션) 지원</span>
           </div>
           {(extra.terrain.length > 0 || extra.boundary.length > 0 || extra.piles.length > 0 || extra.walls.length > 0) && (
             <span style={{ display: "flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
-              {extra.terrain.length > 0 && <Chip label={`지형 ${extra.terrain.length}점`} c="#0e7490" />}
-              {extra.boundary.length > 0 && <Chip label={`경계 ${extra.boundary.length}점`} c="#15803d" />}
-              {extra.piles.length > 0 && <Chip label={`Pile ${extra.piles.length}`} c="#b45309" />}
-              {extra.walls.length > 0 && <Chip label={`흙막이 ${extra.walls.length}`} c="#be123c" />}
+              {extra.terrain.length > 0 && <Chip label={`지형 ${extra.terrain.length}점`} c="var(--teal)" />}
+              {extra.boundary.length > 0 && <Chip label={`경계 ${extra.boundary.length}점`} c="var(--green)" />}
+              {extra.piles.length > 0 && <Chip label={`Pile ${extra.piles.length}`} c="var(--primary-deep)" />}
+              {extra.walls.length > 0 && <Chip label={`흙막이 ${extra.walls.length}`} c="var(--red)" />}
             </span>
           )}
         </div>
@@ -237,8 +234,8 @@ export default function EarthworkPage() {
         <CadImportPanel onGenerated={applyCsvText} />
 
         {/* 프리셋 + 옵션 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 14, paddingTop: 14, borderTop: "1px solid #f1f5f9" }}>
-          <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>지형 프리셋</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--surface-soft)" }}>
+          <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>지형 프리셋</span>
           {TERRAIN_PRESETS.map((p) => (
             <button
               key={p.kind}
@@ -250,21 +247,21 @@ export default function EarthworkPage() {
                 setSec(farthestPair(bh));
                 setSource(`프리셋: ${p.label} (가상 ${bh.length}공)`);
               }}
-              style={{ padding: "6px 13px", borderRadius: 999, border: "1px solid #d8dee8", background: "#fff", color: "#475569", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
+              style={{ padding: "6px 13px", borderRadius: 999, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--muted-strong)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
             >
               {p.label}
             </button>
           ))}
 
           {clipLocal.length >= 3 && (
-            <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer", marginLeft: 4 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--muted-strong)", cursor: "pointer", marginLeft: 4 }}>
               <input type="checkbox" checked={clip} onChange={(e) => setClip(e.target.checked)} />
               경계 내부만 ({fmt(polygonArea(clipLocal))}㎡)
             </label>
           )}
           {terrainForContour.length >= 3 && (
             <label
-              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#334155", cursor: "pointer" }}
+              style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--muted-strong)", cursor: "pointer" }}
               title={extra.terrain.length >= 3 ? "지형 표고점 기반" : "지형 데이터 없음 → 시추공 지표고 기반(평탄하면 간격 0.1m)"}
             >
               <input type="checkbox" checked={showContour} onChange={(e) => setShowContour(e.target.checked)} />
@@ -272,7 +269,7 @@ export default function EarthworkPage() {
               <input
                 type="number" min={0.1} step={0.5} value={contourInterval}
                 onChange={(e) => setContourInterval(Math.max(0.1, Number(e.target.value) || 1))}
-                style={{ width: 50, padding: "2px 5px", fontSize: 12, border: "1px solid #d8dee8", borderRadius: 6 }}
+                style={{ width: 50, padding: "2px 5px", fontSize: 12, border: "1px solid var(--line)", borderRadius: 6 }}
               />
               m{showContour ? ` · ${contours.length}선` : ""}
             </label>
@@ -282,32 +279,31 @@ export default function EarthworkPage() {
 
       {/* ── 3D 뷰어 카드 (상단 컨트롤바 + 뷰어) ── */}
       <div style={{ ...CARD, padding: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid #eef1f6", background: "#fafbfd" }}>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid var(--surface-muted)", background: "#fafbfd" }}>
           <button
             type="button"
             onClick={() => setShowLabels((v) => !v)}
             style={{
               padding: "4px 11px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
-              border: "1px solid " + (showLabels ? "#2563eb" : "#d8dee8"),
-              background: showLabels ? "#2563eb" : "#fff",
-              color: showLabels ? "#fff" : "#64748b",
+              border: "1px solid " + (showLabels ? "var(--primary)" : "var(--line)"),
+              background: showLabels ? "var(--primary)" : "var(--surface)",
+              color: showLabels ? "var(--surface)" : "var(--muted)",
             }}
             title="시추공 공번 라벨 표시/숨김"
           >
-            🏷 시추공 라벨 {showLabels ? "ON" : "OFF"}
+            시추공 라벨 {showLabels ? "ON" : "OFF"}
           </button>
-          <span style={{ width: 1, height: 16, background: "#e2e8f0", margin: "0 2px" }} />
-          <Layers size={14} strokeWidth={1.8} style={{ color: "#94a3b8" }} />
-          {LAYERS.map((L) => (
+          <span style={{ width: 1, height: 16, background: "var(--line)", margin: "0 2px" }} />
+                    {LAYERS.map((L) => (
             <button
               key={L.key}
               type="button"
               onClick={() => toggle(L.key)}
               style={{
                 display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px",
-                borderRadius: 999, border: "1px solid #e2e8f0", fontSize: 11.5, fontWeight: 600,
-                background: visible[L.key] ? "#fff" : "#f1f5f9",
-                color: visible[L.key] ? "#334155" : "#a8b3c2", cursor: "pointer",
+                borderRadius: 999, border: "1px solid var(--line)", fontSize: 11.5, fontWeight: 600,
+                background: visible[L.key] ? "var(--surface)" : "var(--surface-soft)",
+                color: visible[L.key] ? "var(--muted-strong)" : "#a8b3c2", cursor: "pointer",
                 opacity: visible[L.key] ? 1 : 0.55,
               }}
               title={visible[L.key] ? "숨기기" : "표시"}
@@ -335,22 +331,22 @@ export default function EarthworkPage() {
       {/* ── 가져온 CAD 데이터 (CSV ##섹션 전체) ── */}
       {(extra.boundary.length >= 3 || extra.piles.length > 0 || extra.walls.length > 0 || extra.terrain.length > 0) && (
         <div style={CARD}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "0 0 12px" }}>가져온 CAD 데이터</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: "0 0 12px" }}>가져온 CAD 데이터</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
             {extra.boundary.length >= 3 && (
-              <StatBox title="대지경계선" color="#15803d" rows={[["꼭짓점", `${extra.boundary.length}점`], ["면적", `${fmt(polygonArea(clipLocal))} ㎡`]]} />
+              <StatBox title="대지경계선" color="var(--green)" rows={[["꼭짓점", `${extra.boundary.length}점`], ["면적", `${fmt(polygonArea(clipLocal))} ㎡`]]} />
             )}
             {extra.piles.length > 0 && (
-              <StatBox title="Pile" color="#b45309" rows={[["총", `${extra.piles.length}개`], ...kindRows(extra.piles)]} />
+              <StatBox title="Pile" color="var(--primary-deep)" rows={[["총", `${extra.piles.length}개`], ...kindRows(extra.piles)]} />
             )}
             {extra.walls.length > 0 && (
-              <StatBox title="흙막이 벽" color="#be123c" rows={[["벽 수", `${extra.walls.length}개`], ...kindRows(extra.walls)]} />
+              <StatBox title="흙막이 벽" color="var(--red)" rows={[["벽 수", `${extra.walls.length}개`], ...kindRows(extra.walls)]} />
             )}
             {extra.terrain.length > 0 && (
-              <StatBox title="지형 표고점" color="#0e7490" rows={[["점", `${extra.terrain.length}개`]]} />
+              <StatBox title="지형 표고점" color="var(--teal)" rows={[["점", `${extra.terrain.length}개`]]} />
             )}
           </div>
-          <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 10, marginBottom: 0 }}>
+          <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 10, marginBottom: 0 }}>
             CSV ##섹션에서 읽은 값 · 3D에 함께 표시됨 (검수용)
           </p>
         </div>
@@ -360,11 +356,11 @@ export default function EarthworkPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(440px, 1fr))", gap: 16, alignItems: "start" }}>
         {/* 물량표 카드 */}
         <div style={CARD}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: "0 0 12px" }}>층별 토공 물량</h3>
-          <div style={{ overflowX: "auto", border: "1px solid #eef1f6", borderRadius: 10 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: "0 0 12px" }}>층별 토공 물량</h3>
+          <div style={{ overflowX: "auto", border: "1px solid var(--surface-muted)", borderRadius: 10 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ background: "#f8fafc", color: "#475569" }}>
+                <tr style={{ background: "var(--surface-soft)", color: "var(--muted-strong)" }}>
                   <th style={th()}>구분</th>
                   <th style={th()}>지층</th>
                   <th style={th(true)}>물량 (m³)</th>
@@ -375,11 +371,11 @@ export default function EarthworkPage() {
                 {(["토사", "풍화", "암반"] as const).map((grp) => {
                   const rows = vols.filter((v) => v.group === grp);
                   return rows.map((v, i) => (
-                    <tr key={v.key} style={{ borderTop: "1px solid #f1f5f9" }}>
+                    <tr key={v.key} style={{ borderTop: "1px solid var(--surface-soft)" }}>
                       {i === 0 && (
-                        <td rowSpan={rows.length} style={{ ...td(), fontWeight: 700, color: "#334155", verticalAlign: "top", background: "#fbfcfe" }}>
+                        <td rowSpan={rows.length} style={{ ...td(), fontWeight: 700, color: "var(--muted-strong)", verticalAlign: "top", background: "var(--surface-soft)" }}>
                           {grp}
-                          <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>
+                          <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>
                             {fmt(groupTotal[grp])} m³
                           </div>
                         </td>
@@ -393,7 +389,7 @@ export default function EarthworkPage() {
                     </tr>
                   ));
                 })}
-                <tr style={{ borderTop: "2px solid #cbd5e1", background: "#f8fafc", fontWeight: 700 }}>
+                <tr style={{ borderTop: "2px solid var(--line-strong)", background: "var(--surface-soft)", fontWeight: 700 }}>
                   <td style={td()} colSpan={2}>합계</td>
                   <td style={td(true)}>{fmt(grand)}</td>
                   <td style={td(true)}>100%</td>
@@ -401,7 +397,7 @@ export default function EarthworkPage() {
               </tbody>
             </table>
           </div>
-          <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 10, marginBottom: 0 }}>
+          <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 10, marginBottom: 0 }}>
             ※ IDW 보간 추정치. {clipLocal.length >= 3 && clip ? "대지경계선 내부 기준." : "전체 격자 기준."} 외곽·심부는 오차가 큽니다.
           </p>
         </div>
@@ -409,15 +405,15 @@ export default function EarthworkPage() {
         {/* 단면도 카드 */}
         <div style={CARD}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", margin: 0 }}>지질 단면도</h3>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>지질 단면도</h3>
             <select value={secA} onChange={(e) => setSec([e.target.value, secB])} style={selStyle}>
               {boreholes.map((b) => <option key={b.id} value={b.id}>{b.id}</option>)}
             </select>
-            <span style={{ color: "#94a3b8" }}>→</span>
+            <span style={{ color: "var(--muted)" }}>→</span>
             <select value={secB} onChange={(e) => setSec([secA, e.target.value])} style={selStyle}>
               {boreholes.map((b) => <option key={b.id} value={b.id}>{b.id}</option>)}
             </select>
-            <span style={{ fontSize: 11, color: "#94a3b8" }}>지하수위 ─ ─ 청색</span>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>지하수위 ─ ─ 청색</span>
           </div>
           {bhA && bhB && (
             <EarthworkSection set={set} boreholes={boreholes} ax={bhA.x} ay={bhA.y} bx={bhB.x} by={bhB.y} aLabel={bhA.id} bLabel={bhB.id} />
@@ -449,7 +445,7 @@ export default function EarthworkPage() {
 }
 
 const selStyle: React.CSSProperties = {
-  padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 13, background: "#fff", color: "#1e293b",
+  padding: "4px 8px", borderRadius: 6, border: "1px solid var(--line-strong)", fontSize: 13, background: "var(--surface)", color: "var(--text)",
 };
 
 function th(right?: boolean): React.CSSProperties {

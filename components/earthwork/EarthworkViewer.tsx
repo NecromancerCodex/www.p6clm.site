@@ -64,7 +64,7 @@ function makeTextSprite(text: string, span: number): THREE.Sprite {
   ctx.font = `bold ${fs}px sans-serif`; // 리사이즈로 초기화 → 재설정
   ctx.fillStyle = "rgba(15,17,22,0.72)";
   roundRect(ctx, 0, 0, canvas.width, canvas.height, 10);
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "var(--surface)";
   ctx.textBaseline = "middle";
   ctx.fillText(text, 12, canvas.height / 2 + 1);
 
@@ -327,7 +327,7 @@ export function EarthworkViewer({
   return (
     <div
       ref={mountRef}
-      style={{ position: "absolute", inset: 0, borderRadius: 10, overflow: "hidden", background: "#0e1116" }}
+      style={{ position: "absolute", inset: 0, borderRadius: 10, overflow: "hidden", background: "var(--bg-deep)" }}
     />
   );
 }

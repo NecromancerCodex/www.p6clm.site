@@ -30,13 +30,13 @@ function formatDuration(sec: number | null): string {
 /** stage → 한글 라벨 + 색상 */
 function stageBadge(stage: string): { label: string; color: string } {
   switch (stage) {
-    case "fetched": return { label: "수집됨", color: "#64748b" };
-    case "classified_candidate": return { label: "분류: 후보", color: "#0ea5e9" };
-    case "classified_skip": return { label: "분류: 제외", color: "#94a3b8" };
-    case "grouped": return { label: "묶음", color: "#8b5cf6" };
-    case "triggered": return { label: "보고서 생성됨", color: "#16a34a" };
-    case "failed": return { label: "실패", color: "#dc2626" };
-    default: return { label: stage, color: "#64748b" };
+    case "fetched": return { label: "수집됨", color: "var(--muted)" };
+    case "classified_candidate": return { label: "분류: 후보", color: "var(--primary)" };
+    case "classified_skip": return { label: "분류: 제외", color: "var(--muted)" };
+    case "grouped": return { label: "묶음", color: "var(--primary)" };
+    case "triggered": return { label: "보고서 생성됨", color: "var(--green)" };
+    case "failed": return { label: "실패", color: "var(--red)" };
+    default: return { label: stage, color: "var(--muted)" };
   }
 }
 
@@ -107,7 +107,7 @@ export function TlinkCallsView() {
           <RefreshCw size={15} /> 새로고침
         </button>
       </header>
-      <p style={{ color: "#64748b", fontSize: 13, marginTop: 0, marginBottom: 18 }}>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0, marginBottom: 18 }}>
         티링크 무전 녹음의 STT 변환 결과와, 그 텍스트로 생성된 보고서를 확인합니다.
       </p>
 
@@ -118,9 +118,9 @@ export function TlinkCallsView() {
       )}
 
       {loading ? (
-        <div style={{ color: "#94a3b8", padding: 40, textAlign: "center" }}>불러오는 중…</div>
+        <div style={{ color: "var(--muted)", padding: 40, textAlign: "center" }}>불러오는 중…</div>
       ) : items.length === 0 ? (
-        <div style={{ color: "#94a3b8", padding: 40, textAlign: "center" }}>
+        <div style={{ color: "var(--muted)", padding: 40, textAlign: "center" }}>
           전화 내역이 없습니다. (통화 후 STT 변환되면 표시됩니다)
         </div>
       ) : (
@@ -136,25 +136,25 @@ export function TlinkCallsView() {
                 style={cardBtn}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
-                  {isOut ? <PhoneOutgoing size={16} color="#0ea5e9" /> : <PhoneIncoming size={16} color="#16a34a" />}
+                  {isOut ? <PhoneOutgoing size={16} color="var(--primary)" /> : <PhoneIncoming size={16} color="var(--green)" />}
                   <div style={{ minWidth: 0, flex: 1, textAlign: "left" }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <strong style={{ fontSize: 14 }}>{it.member_name || it.guest_num || "통화"}</strong>
-                      <span style={{ fontSize: 12, color: "#94a3b8" }}>{formatDuration(it.call_time_sec)}</span>
+                      <span style={{ fontSize: 12, color: "var(--muted)" }}>{formatDuration(it.call_time_sec)}</span>
                       <span style={{ ...pill, background: badge.color }}>{badge.label}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {it.stt_preview || (it.has_stt ? "(STT 있음)" : "STT 대기/없음")}
                     </div>
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                   {it.triggered_doc_type && (
-                    <span style={{ ...pill, background: "#16a34a", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <span style={{ ...pill, background: "var(--green)", display: "inline-flex", alignItems: "center", gap: 3 }}>
                       <FileText size={11} /> {DOC_TYPE_LABEL[it.triggered_doc_type] || it.triggered_doc_type}
                     </span>
                   )}
-                  <span style={{ fontSize: 11, color: "#94a3b8" }}>{formatDate(it.b_date)}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted)" }}>{formatDate(it.b_date)}</span>
                   <span
                     role="button"
                     tabIndex={0}
@@ -204,7 +204,7 @@ function CallDetailModal({
         </div>
 
         {loading || !detail ? (
-          <div style={{ color: "#94a3b8", padding: 30, textAlign: "center" }}>불러오는 중…</div>
+          <div style={{ color: "var(--muted)", padding: 30, textAlign: "center" }}>불러오는 중…</div>
         ) : (
           <>
             <dl style={metaGrid}>
@@ -222,17 +222,17 @@ function CallDetailModal({
               {detail.stt_summary ? (
                 <div style={sttBox}>{detail.stt_summary}</div>
               ) : (
-                <div style={{ ...sttBox, color: "#94a3b8" }}>STT 변환 텍스트가 없습니다.</div>
+                <div style={{ ...sttBox, color: "var(--muted)" }}>STT 변환 텍스트가 없습니다.</div>
               )}
               {detail.transcript.length > 0 && (
                 <details style={{ marginTop: 8 }}>
-                  <summary style={{ cursor: "pointer", fontSize: 13, color: "#0ea5e9" }}>
+                  <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--primary)" }}>
                     발화 타임라인 ({detail.transcript.length})
                   </summary>
                   <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
                     {detail.transcript.map((seg, i) => (
                       <div key={i} style={{ fontSize: 13, display: "flex", gap: 8 }}>
-                        <span style={{ color: "#94a3b8", flexShrink: 0, minWidth: 42 }}>{seg.time || ""}</span>
+                        <span style={{ color: "var(--muted)", flexShrink: 0, minWidth: 42 }}>{seg.time || ""}</span>
                         <span>{seg.text}</span>
                       </div>
                     ))}
@@ -247,7 +247,7 @@ function CallDetailModal({
                 <h3 style={sectionTitle}>분류 근거 키워드 {detail.classifier_score != null && `(점수 ${detail.classifier_score})`}</h3>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {detail.matched_keywords.map((kw) => (
-                    <span key={kw} style={{ ...pill, background: "#0ea5e9" }}>{kw}</span>
+                    <span key={kw} style={{ ...pill, background: "var(--primary)" }}>{kw}</span>
                   ))}
                 </div>
               </section>
@@ -260,10 +260,10 @@ function CallDetailModal({
                 <a href="/progress" style={docLink}>
                   <FileText size={14} />
                   {DOC_TYPE_LABEL[detail.triggered_doc_type] || detail.triggered_doc_type}
-                  <span style={{ color: "#94a3b8", fontSize: 12 }}>· 문서저장소에서 보기</span>
+                  <span style={{ color: "var(--muted)", fontSize: 12 }}>· 문서저장소에서 보기</span>
                 </a>
               ) : (
-                <div style={{ color: "#94a3b8", fontSize: 13 }}>
+                <div style={{ color: "var(--muted)", fontSize: 13 }}>
                   {detail.stage_reason || "보고서가 생성되지 않았습니다."}
                 </div>
               )}
@@ -273,7 +273,7 @@ function CallDetailModal({
               <button
                 type="button"
                 onClick={() => onDelete(detail.id, detail.member_name)}
-                style={{ ...btnGhost, color: "#dc2626" }}
+                style={{ ...btnGhost, color: "var(--red)" }}
               >
                 <Trash2 size={14} /> 삭제
               </button>
@@ -288,21 +288,21 @@ function CallDetailModal({
 function Meta({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt style={{ fontSize: 11, color: "#94a3b8" }}>{label}</dt>
+      <dt style={{ fontSize: 11, color: "var(--muted)" }}>{label}</dt>
       <dd style={{ fontSize: 14, margin: 0, fontWeight: 500 }}>{value}</dd>
     </div>
   );
 }
 
 // ── 인라인 스타일 ──
-const btnGhost: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid #e2e8f0", borderRadius: 8, padding: "5px 10px", fontSize: 13, cursor: "pointer", color: "#334155" };
-const cardBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", padding: "12px 14px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, cursor: "pointer" };
-const pill: React.CSSProperties = { fontSize: 11, color: "#fff", padding: "2px 7px", borderRadius: 999, fontWeight: 600, whiteSpace: "nowrap" };
-const delBtn: React.CSSProperties = { display: "inline-flex", padding: 5, color: "#cbd5e1", borderRadius: 6, cursor: "pointer" };
-const errorBox: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14 };
-const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 100 };
-const modal: React.CSSProperties = { background: "#fff", borderRadius: 14, padding: 22, maxWidth: 560, width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" };
+const btnGhost: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid var(--line)", borderRadius: 8, padding: "5px 10px", fontSize: 13, cursor: "pointer", color: "var(--muted-strong)" };
+const cardBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", padding: "12px 14px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 10, cursor: "pointer" };
+const pill: React.CSSProperties = { fontSize: 11, color: "var(--surface)", padding: "2px 7px", borderRadius: 999, fontWeight: 600, whiteSpace: "nowrap" };
+const delBtn: React.CSSProperties = { display: "inline-flex", padding: 5, color: "var(--line-strong)", borderRadius: 6, cursor: "pointer" };
+const errorBox: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, background: "var(--red-soft)", color: "var(--red)", border: "1px solid var(--red-soft)", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14 };
+const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0, 0, 0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 100 };
+const modal: React.CSSProperties = { background: "var(--surface)", borderRadius: 14, padding: 22, maxWidth: 560, width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" };
 const metaGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, margin: 0 };
-const sectionTitle: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: "#475569", marginBottom: 8, marginTop: 0 };
-const sttBox: React.CSSProperties = { background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" };
-const docLink: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, color: "#16a34a", fontSize: 14, fontWeight: 600, textDecoration: "none" };
+const sectionTitle: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: "var(--muted-strong)", marginBottom: 8, marginTop: 0 };
+const sttBox: React.CSSProperties = { background: "var(--surface-soft)", border: "1px solid var(--line)", borderRadius: 8, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" };
+const docLink: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, color: "var(--green)", fontSize: 14, fontWeight: 600, textDecoration: "none" };

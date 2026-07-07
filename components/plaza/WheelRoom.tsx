@@ -7,7 +7,7 @@ import type { ClientMsg, ServerMsg } from "../../lib/plaza/protocol";
 import type { Participant, ChatLine } from "./PlazaCanvas";
 import { AvatarThumb } from "./AvatarThumb";
 
-const SEG_COLORS = ["#ff6b6b", "#4dabf7", "#51cf66", "#ffd43b", "#cc5de8", "#ff922b", "#20c997", "#f783ac"];
+const SEG_COLORS = ["var(--red)", "#4dabf7", "var(--green)", "var(--primary)", "#cc5de8", "#ff922b", "#20c997", "#f783ac"];
 const WS = 320; // 휠 캔버스 크기
 
 /** 돌림판(룰렛) 룸 — 가운데 바늘이 돌다 한 명 지목. 그림퀴즈와 동일 룸 UI. */
@@ -62,7 +62,7 @@ export function WheelRoom({
       // 이름
       ctx.save();
       ctx.translate(cx, cy); ctx.rotate(a0 + seg / 2);
-      ctx.fillStyle = "#1a2332"; ctx.font = "700 13px system-ui, sans-serif";
+      ctx.fillStyle = "var(--text)"; ctx.font = "700 13px system-ui, sans-serif";
       ctx.textAlign = "right"; ctx.textBaseline = "middle";
       ctx.fillText(nameOf(wheelIds[i]).slice(0, 7), r - 12, 0);
       ctx.restore();
@@ -70,7 +70,7 @@ export function WheelRoom({
     // 가운데 허브
     ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2);
     ctx.fillStyle = "#222e44"; ctx.fill();
-    ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = "var(--surface)"; ctx.lineWidth = 2; ctx.stroke();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinOrder, participants]);
 
@@ -120,7 +120,7 @@ export function WheelRoom({
     <div className="plaza-board-backdrop" onClick={onClose}>
       <div className="plaza-room" onClick={(e) => e.stopPropagation()}>
         <div className="plaza-panel-head">
-          <span className="plaza-panel-title">🎡 돌림판</span>
+          <span className="plaza-panel-title">돌림판</span>
           <span className="plaza-game-status">참가 {participants.length}명 · 돌리면 한 명 지목</span>
           <button type="button" className="plaza-game-start" disabled={spinning || participants.length < 2}
             onClick={() => send({ t: "wheel_spin" })}>
@@ -140,7 +140,7 @@ export function WheelRoom({
                 style={{ transform: `rotate(${rot}deg)`, transition: spinning ? `transform ${dur}ms cubic-bezier(0.18,0.7,0.16,1)` : "none" }}
               />
               {winnerId !== null && !spinning && (
-                <div className="plaza-wheel-result">🎯 {nameOf(winnerId)} 지목!</div>
+                <div className="plaza-wheel-result">{nameOf(winnerId)} 지목!</div>
               )}
             </div>
 

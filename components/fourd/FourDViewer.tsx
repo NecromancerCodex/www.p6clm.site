@@ -536,7 +536,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
     const totalVerts = parsed.groups.reduce((s, g) => s + (g.geometry.getAttribute("position")?.count ?? 0), 0);
     const totalIdx = parsed.groups.reduce((s, g) => s + (g.geometry.getIndex()?.count ?? 0), 0);
     const batched = new THREE.BatchedMesh(Math.max(1, totalInst), Math.max(1, totalVerts), Math.max(1, totalIdx), material);
-    // ⚠️ 둘 다 false 여야 onBeforeRender 가 early-return(three BatchedMesh.js:1509) → 매 프레임 480k
+    // 둘 다 false 여야 onBeforeRender 가 early-return(three BatchedMesh.js:1509) → 매 프레임 480k
     // 인스턴스 정렬·컬링 skip. 불투명이라 깊이정렬 불필요, 인스턴스 과다라 per-instance 컬링 CPU 손해 >
     // GPU 이득(4M 정점은 GPU 가뿐). multiDraw 1회 구성 후 재사용(가시성 변경 시에만 1회 재구성).
     batched.perObjectFrustumCulled = false;
@@ -975,7 +975,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       <div style={{ position: "relative", flex: 1, minHeight: 360 }}>
         <div
           ref={mountRef}
-          style={{ position: "absolute", inset: 0, borderRadius: 8, overflow: "hidden", background: "#0e1116" }}
+          style={{ position: "absolute", inset: 0, borderRadius: 8, overflow: "hidden", background: "var(--bg-deep)" }}
         />
         {hover &&
           (() => {
@@ -986,12 +986,12 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             const actName = code4d ? codeToName?.get(code4d) : undefined; // 실제 활동명
             const stMeta =
               st === 2
-                ? { t: "완료", c: "#10b981" }
+                ? { t: "완료", c: "var(--green)" }
                 : st === 1
-                  ? { t: "진행중", c: "#22d3ee" }
+                  ? { t: "진행중", c: "var(--primary)" }
                   : st === 0
-                    ? { t: "미착수", c: "#60a5fa" }
-                    : { t: "미매칭", c: "#9ca3af" };
+                    ? { t: "미착수", c: "var(--primary)" }
+                    : { t: "미매칭", c: "var(--muted)" };
             return (
               <div
                 style={{
@@ -1001,9 +1001,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                   maxWidth: 280,
                   padding: "8px 10px",
                   background: "rgba(15,17,22,0.95)",
-                  border: "1px solid #334155",
+                  border: "1px solid var(--muted-strong)",
                   borderRadius: 8,
-                  color: "#e2e8f0",
+                  color: "var(--line)",
                   fontSize: 12,
                   lineHeight: 1.6,
                   pointerEvents: "none",
@@ -1014,7 +1014,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                 <div style={{ fontWeight: 600, maxWidth: 320, wordBreak: "break-all" }}>
                   {hover.el.name || (TYPE_KO[hover.el.ifcType] ?? hover.el.ifcType)}
                 </div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>
                   {typeLabel(hover.el)} · {storeyDisplay(hover.el)}
                   {hover.el.zone ? ` · ${hover.el.zone}` : ""}
                 </div>
@@ -1022,22 +1022,22 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                   <>
                     <div>공정: {actName || procLabel(hover.el, mr.via)}</div>
                     {code4d && (
-                      <div style={{ fontSize: 10, color: "#64748b", fontFamily: "monospace" }}>ID: {code4d}</div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", fontFamily: "monospace" }}>ID: {code4d}</div>
                     )}
                     {hover.el.recalibrated && (
-                      <div style={{ color: "#fbbf24", fontSize: 11 }}>
-                        ⚙ BIM PT태그 → 높이로 {storeyDisplay(hover.el)} 보정 (시공순서 정합)
+                      <div style={{ color: "var(--primary)", fontSize: 11 }}>
+                        BIM PT태그 → 높이로 {storeyDisplay(hover.el)} 보정 (시공순서 정합)
                       </div>
                     )}
                     <div
                       style={{
                         color: mr.via.startsWith("policy")
-                          ? "#c4b5fd"
+                          ? "var(--primary)"
                           : mr.via.startsWith("seq")
                             ? "#f0abfc"
                             : mr.via.includes("|")
-                              ? "#34d399"
-                              : "#94a3b8",
+                              ? "var(--green)"
+                              : "var(--muted)",
                         fontSize: 11,
                       }}
                     >
@@ -1046,23 +1046,23 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                         : mr.via.startsWith("seq")
                           ? "▷ 순서기반(규칙) — 선후행 보간 날짜"
                           : mr.via.includes("|")
-                            ? "✓ 구역 정확 매칭"
+                            ? "구역 정확 매칭"
                             : "○ 층 단위 매칭 (구역 미상)"}
                     </div>
                     {hiliteCount > 0 && (
-                      <div style={{ color: "#fbbf24" }}>
+                      <div style={{ color: "var(--primary)" }}>
                         {hiliteMode === "object"
                           ? "이 부재 1개 강조 (객체 모드)"
                           : `이 공정단위 부재 ${hiliteCount.toLocaleString()}개 강조 중`}
                       </div>
                     )}
-                    <div style={{ color: "#94a3b8" }}>
+                    <div style={{ color: "var(--muted)" }}>
                       기간: {fmt(range.start)} ~ {fmt(range.end)}
                     </div>
                     <div style={{ color: stMeta.c, fontWeight: 600 }}>상태: {stMeta.t}</div>
                   </>
                 ) : (
-                  <div style={{ color: "#fbbf24" }}>
+                  <div style={{ color: "var(--primary)" }}>
                     미매칭 — {unmatchedReason(ranges.get(hover.el.globalId)?.via ?? "", hover.el.storeyName)}
                   </div>
                 )}
@@ -1084,8 +1084,8 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
               zIndex: 12,
             }}
           >
-            <div style={{ position: "absolute", left: 8, top: 0, width: 2, height: 18, background: "rgba(255,255,255,0.85)" }} />
-            <div style={{ position: "absolute", left: 0, top: 8, width: 18, height: 2, background: "rgba(255,255,255,0.85)" }} />
+            <div style={{ position: "absolute", left: 8, top: 0, width: 2, height: 18, background: "rgba(26, 26, 31, 0.92)" }} />
+            <div style={{ position: "absolute", left: 0, top: 8, width: 18, height: 2, background: "rgba(26, 26, 31, 0.92)" }} />
           </div>
         )}
 
@@ -1103,14 +1103,14 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
               justifyContent: "center",
               gap: 8,
               background: "rgba(10,12,18,0.55)",
-              color: "#e2e8f0",
+              color: "var(--line)",
               cursor: "pointer",
               zIndex: 11,
               borderRadius: 8,
             }}
           >
-            <div style={{ fontSize: 18, fontWeight: 700 }}>🚶 클릭하여 워크스루 시작</div>
-            <div style={{ fontSize: 13, color: "#cbd5e1" }}>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>클릭하여 워크스루 시작</div>
+            <div style={{ fontSize: 13, color: "var(--line-strong)" }}>
               마우스 = 시점 · WASD = 이동 · Space = 점프 · 중력 적용 · 벽 통과 불가 · ESC = 종료
             </div>
           </div>
@@ -1119,75 +1119,75 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
 
       {/* KPI + 실사 모드 토글 */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 13, alignItems: "center" }}>
-        <span style={{ color: "#10b981" }}>● 완료 {kpi.done.toLocaleString()}</span>
-        <span style={{ color: "#22d3ee" }}>● 진행중 {kpi.active.toLocaleString()}</span>
-        <span style={{ color: "#a78bfa" }} title="규칙 확정이 아닌 AI 추론 연결 — 검증 필요">◆ 추정(AI) {kpi.estimate.toLocaleString()}</span>
-        <span style={{ color: "#60a5fa" }}>● 미착수 {kpi.planned.toLocaleString()}</span>
-        <span style={{ color: "#6b7280" }}>● 미매칭 {kpi.ghost.toLocaleString()}</span>
+        <span style={{ color: "var(--green)" }}>● 완료 {kpi.done.toLocaleString()}</span>
+        <span style={{ color: "var(--primary)" }}>● 진행중 {kpi.active.toLocaleString()}</span>
+        <span style={{ color: "var(--primary)" }} title="규칙 확정이 아닌 AI 추론 연결 — 검증 필요">◆ 추정(AI) {kpi.estimate.toLocaleString()}</span>
+        <span style={{ color: "var(--primary)" }}>● 미착수 {kpi.planned.toLocaleString()}</span>
+        <span style={{ color: "var(--muted)" }}>● 미매칭 {kpi.ghost.toLocaleString()}</span>
         <button
           onClick={() => setHiliteMode((v) => (v === "unit" ? "object" : "unit"))}
           style={{
             marginLeft: "auto",
             padding: "6px 12px",
             borderRadius: 999,
-            border: "1px solid " + (hiliteMode === "object" ? "#f59e0b" : "#475569"),
-            background: hiliteMode === "object" ? "#f59e0b" : "transparent",
-            color: hiliteMode === "object" ? "#fff" : "#94a3b8",
+            border: "1px solid " + (hiliteMode === "object" ? "var(--primary)" : "var(--muted-strong)"),
+            background: hiliteMode === "object" ? "var(--primary)" : "transparent",
+            color: hiliteMode === "object" ? "var(--surface)" : "var(--muted)",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",
           }}
           title="유닛 = 같은 공정단위 전체 강조 / 객체 = 호버한 부재 1개만 강조"
         >
-          {hiliteMode === "object" ? "🔍 객체로 보기" : "📦 유닛으로 보기"}
+          {hiliteMode === "object" ? "객체로 보기" : "유닛으로 보기"}
         </button>
         <button
           onClick={() => setFly((v) => { if (!v) setWalk(false); return !v; })}
           style={{
             padding: "6px 12px",
             borderRadius: 999,
-            border: "1px solid " + (fly ? "#3b82f6" : "#475569"),
-            background: fly ? "#3b82f6" : "transparent",
-            color: fly ? "#fff" : "#94a3b8",
+            border: "1px solid " + (fly ? "var(--primary)" : "var(--muted-strong)"),
+            background: fly ? "var(--primary)" : "transparent",
+            color: fly ? "var(--surface)" : "var(--muted)",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",
           }}
           title="WASD 이동 · Space/E 위 · Shift/Q 아래 · 마우스 드래그 회전"
         >
-          {fly ? "🎮 자유시점 ON (WASD)" : "자유시점 OFF"}
+          {fly ? "자유시점 ON (WASD)" : "자유시점 OFF"}
         </button>
         <button
           onClick={() => setWalk((v) => { if (!v) setFly(false); return !v; })}
           style={{
             padding: "6px 12px",
             borderRadius: 999,
-            border: "1px solid " + (walk ? "#a855f7" : "#475569"),
-            background: walk ? "#a855f7" : "transparent",
-            color: walk ? "#fff" : "#94a3b8",
+            border: "1px solid " + (walk ? "var(--primary)" : "var(--muted-strong)"),
+            background: walk ? "var(--primary)" : "transparent",
+            color: walk ? "var(--surface)" : "var(--muted)",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",
           }}
           title="관리자 1인칭 워크스루(중력) — 클릭하여 시작, 마우스 시점·WASD 이동·Space 점프, 벽 통과 불가, ESC 종료"
         >
-          {walk ? "🚶 관리자 워크 ON" : "관리자 워크 OFF"}
+          {walk ? "관리자 워크 ON" : "관리자 워크 OFF"}
         </button>
         <button
           onClick={() => setRealistic((v) => !v)}
           style={{
             padding: "6px 12px",
             borderRadius: 999,
-            border: "1px solid " + (realistic ? "#10b981" : "#475569"),
-            background: realistic ? "#10b981" : "transparent",
-            color: realistic ? "#fff" : "#94a3b8",
+            border: "1px solid " + (realistic ? "var(--green)" : "var(--muted-strong)"),
+            background: realistic ? "var(--green)" : "transparent",
+            color: realistic ? "var(--surface)" : "var(--muted)",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",
           }}
           title="재질색(콘크리트 등) + 완성된 부재만 표시 (미완성 투명)"
         >
-          {realistic ? "🏗 실사 모드 ON" : "실사 모드 OFF"}
+          {realistic ? "실사 모드 ON" : "실사 모드 OFF"}
         </button>
         {geoBoreholes && geoBoreholes.length >= 2 && (
           <button
@@ -1195,16 +1195,16 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             style={{
               padding: "6px 12px",
               borderRadius: 999,
-              border: "1px solid " + (geoOn ? "#b45309" : "#475569"),
-              background: geoOn ? "#b45309" : "transparent",
-              color: geoOn ? "#fff" : "#94a3b8",
+              border: "1px solid " + (geoOn ? "var(--primary-deep)" : "var(--muted-strong)"),
+              background: geoOn ? "var(--primary-deep)" : "transparent",
+              color: geoOn ? "var(--surface)" : "var(--muted)",
               fontSize: 12,
               fontWeight: 600,
               cursor: "pointer",
             }}
             title="시추 지질(지반)을 BIM 아래로 이식 — 지하구조 × 지반 확인"
           >
-            {geoOn ? "🏔 지반 ON" : "지반 OFF"}
+            {geoOn ? "지반 ON" : "지반 OFF"}
           </button>
         )}
         {presentDiscs.map((d) => {
@@ -1223,9 +1223,9 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
               style={{
                 padding: "6px 12px",
                 borderRadius: 999,
-                border: "1px solid " + (on ? "#0891b2" : "#475569"),
-                background: on ? "#0891b2" : "transparent",
-                color: on ? "#fff" : "#94a3b8",
+                border: "1px solid " + (on ? "var(--teal)" : "var(--muted-strong)"),
+                background: on ? "var(--teal)" : "transparent",
+                color: on ? "var(--surface)" : "var(--muted)",
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
@@ -1245,7 +1245,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             style={{
               padding: "6px 12px",
               borderRadius: 999,
-              border: "1px dashed #a16207",
+              border: "1px dashed var(--primary-deep)",
               background: "transparent",
               color: "#ca8a04",
               fontSize: 12,
@@ -1254,13 +1254,13 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
             }}
             title={`${layerName(t)} 레이어는 메모리 절약을 위해 미로드 — 클릭 시 로드(재파싱, 메모리 더 사용)`}
           >
-            ⬇ {layerName(t)} 로드
+            {layerName(t)} 로드
           </button>
         ))}
       </div>
       {geoOn && geoBoreholes && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "#fcd34d", marginTop: -2 }}>
-          <span>🏔 건물 위치 정합 (지반에 맞추기)</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: "var(--primary)", marginTop: -2 }}>
+          <span>건물 위치 정합 (지반에 맞추기)</span>
           {([
             ["좌우 (X)", "x"],
             ["앞뒤 (Z)", "z"],
@@ -1284,7 +1284,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
           <button
             type="button"
             onClick={() => setBimOffset({ x: 0, y: 0, z: 0 })}
-            style={{ alignSelf: "flex-start", padding: "2px 10px", borderRadius: 6, border: "1px solid #475569", background: "transparent", color: "#94a3b8", fontSize: 11, cursor: "pointer" }}
+            style={{ alignSelf: "flex-start", padding: "2px 10px", borderRadius: 6, border: "1px solid var(--muted-strong)", background: "transparent", color: "var(--muted)", fontSize: 11, cursor: "pointer" }}
           >
             위치 초기화
           </button>
@@ -1292,7 +1292,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
       )}
       {fly && (
         <div style={{ fontSize: 11, color: "#93c5fd", marginTop: -4 }}>
-          🎮 자유시점: W/A/S/D 이동 · Space·E 위 · Shift·Q 아래 · 마우스 드래그 시점 회전
+          자유시점: W/A/S/D 이동 · Space·E 위 · Shift·Q 아래 · 마우스 드래그 시점 회전
         </div>
       )}
 
@@ -1323,16 +1323,16 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
               fontSize: 12,
               fontWeight: 600,
               whiteSpace: "nowrap",
-              color: "#fff",
-              background: dailyBusy ? "#64748b" : "#2563eb",
+              color: "var(--surface)",
+              background: dailyBusy ? "var(--muted)" : "var(--primary)",
               cursor: dailyBusy ? "default" : "pointer",
             }}
           >
-            {dailyBusy ? "작성 중…" : "📄 이 날짜 공사일보"}
+            {dailyBusy ? "작성 중…" : "이 날짜 공사일보"}
           </button>
         )}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9ca3af" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted)" }}>
         <span>{fmt(tMin)}</span>
         <span>{fmt(tMin + numDays * DAY)}</span>
       </div>

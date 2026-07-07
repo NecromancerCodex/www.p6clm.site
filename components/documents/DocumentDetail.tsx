@@ -174,7 +174,7 @@ export function DocumentDetail({ id, mode }: Props) {
           <span className="docdetail-meta">
             ID {doc.id} · 프로젝트 {projectName}
             {doc.updated_at ? ` · 수정 ${new Date(doc.updated_at).toLocaleString("ko-KR")}` : ""}
-            {isEdit && " · ✏️ 편집 모드 — A4 셀 직접 클릭해서 수정"}
+            {isEdit && " · 편집 모드 — A4 셀 직접 클릭해서 수정"}
           </span>
         </div>
 

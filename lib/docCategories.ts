@@ -24,7 +24,7 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
   {
     id: "design",
     label: "설계관리",
-    icon: "📐",
+    icon: "",
     color: "blue",
     description: "도면 검토·설계 변경 요청·적합성 확인 문서",
     documents: [
@@ -36,7 +36,7 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
   {
     id: "process",
     label: "공정관리",
-    icon: "📊",
+    icon: "",
     color: "purple",
     description: "P6 공정표 기반 공정 보고서 (공사관리 연동)",
     documents: [
@@ -49,7 +49,7 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
   {
     id: "construction",
     label: "시공관리",
-    icon: "🏗️",
+    icon: "",
     color: "amber",
     description: "시공 계획·작업 일보·품질 확인 문서",
     documents: [
@@ -61,7 +61,7 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
   {
     id: "quality",
     label: "품질관리",
-    icon: "✅",
+    icon: "",
     color: "teal",
     description:
       "품질 검사·자재 검수가 시작점입니다. 적합이면 그대로 완료, 부적합이면 NCR이 자동 발행되고 NCR에서 CAR(시정조치)을 생성합니다.",
@@ -75,7 +75,7 @@ export const DOC_CATEGORIES: readonly DocCategoryDef[] = [
   {
     id: "safety",
     label: "안전관리",
-    icon: "⛑️",
+    icon: "",
     color: "red",
     description: "안전 점검·위험성 평가·사고 조사 문서",
     documents: [

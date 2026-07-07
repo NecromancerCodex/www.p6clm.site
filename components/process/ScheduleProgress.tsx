@@ -113,7 +113,7 @@ export function ScheduleProgress() {
                     <td className="num warn">{d.delay_days}</td>
                     <td className="num">{d.percent_complete.toFixed(0)}%</td>
                     <td>{d.planned_finish ?? "-"}</td>
-                    <td>{d.is_critical ? "⚠" : ""}</td>
+                    <td>{d.is_critical ? "" : ""}</td>
                   </tr>
                 ))}
               </tbody>

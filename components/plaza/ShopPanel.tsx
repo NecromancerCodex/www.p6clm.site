@@ -61,7 +61,7 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
     setBusy(key); setMsg(null);
     const r = await buy(key);
     setBusy(null);
-    setMsg(r.ok ? "구매 완료! 🎨 캐릭터에서 착용하세요." : r.error || "구매 실패");
+    setMsg(r.ok ? "구매 완료! 캐릭터에서 착용하세요." : r.error || "구매 실패");
   };
 
   const selKey = sel ? partKey(cat, sel) : null;
@@ -70,8 +70,8 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
   return (
     <div className="plaza-panel plaza-panel--wide">
       <div className="plaza-panel-head">
-        <span className="plaza-panel-title">🛒 상점</span>
-        <span className="plaza-coin">🪙 {currency.toLocaleString()}</span>
+        <span className="plaza-panel-title">상점</span>
+        <span className="plaza-coin">{currency.toLocaleString()}</span>
         <button type="button" className="plaza-panel-x" onClick={onClose} aria-label="닫기"><X size={16} /></button>
       </div>
 
@@ -98,7 +98,7 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
                   disabled={!selKey || selOwned || currency < price || busy === selKey}
                   onClick={() => selKey && void handleBuy(selKey)}
                 >
-                  {selOwned ? "보유중" : currency < price ? "재화 부족" : busy === selKey ? "구매 중…" : `구매 🪙${price}`}
+                  {selOwned ? "보유중" : currency < price ? "재화 부족" : busy === selKey ? "구매 중…" : `구매 ${price}`}
                 </button>
               </>
             ) : <div className="plaza-shop-preview-hint">아이템을 눌러<br />미리보기</div>}
@@ -119,7 +119,7 @@ export function ShopPanel({ onClose }: { onClose: () => void }) {
                 onClick={() => setSel(shape)}
               >
                 <div className="plaza-shop-thumb">{url && <img src={url} alt="" loading="lazy" />}</div>
-                {have ? <span className="plaza-card-badge">보유</span> : <span className="plaza-card-price">🪙{isPaid(cat) ? price : 0}</span>}
+                {have ? <span className="plaza-card-badge">보유</span> : <span className="plaza-card-price">{isPaid(cat) ? price : 0}</span>}
               </button>
             );
           })}

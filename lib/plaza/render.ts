@@ -113,7 +113,7 @@ function drawNameTag(ctx: CanvasRenderingContext2D, x: number, feetY: number, na
   const tw = ctx.measureText(name).width;
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   roundRect(ctx, x - tw / 2 - 6, feetY + 5, tw + 12, 17, 8); ctx.fill();
-  ctx.fillStyle = isMe ? "#ffe066" : "#fff";
+  ctx.fillStyle = isMe ? "var(--primary)" : "var(--surface)";
   ctx.fillText(name, x, feetY + 17);
 }
 

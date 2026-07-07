@@ -71,12 +71,12 @@ export function OmokRoom({
         const cx = PAD + x * CELL, cy = PAD + y * CELL;
         const g = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, CELL / 2 - 1);
         if (v === 1) { g.addColorStop(0, "#555"); g.addColorStop(1, "#000"); }
-        else { g.addColorStop(0, "#fff"); g.addColorStop(1, "#bbb"); }
+        else { g.addColorStop(0, "var(--surface)"); g.addColorStop(1, "#bbb"); }
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(cx, cy, CELL / 2 - 1.5, 0, Math.PI * 2); ctx.fill();
       }
     }
-    // 흑 금수 자리 표시 (빨간 ✕)
+    // 흑 금수 자리 표시 (빨간 )
     if (st?.forbidden?.length) {
       ctx.strokeStyle = "rgba(224,49,49,0.85)"; ctx.lineWidth = 2;
       for (const [fx, fy] of st.forbidden) {
@@ -109,7 +109,7 @@ export function OmokRoom({
   };
 
   const nameOf = (pid: number | null) =>
-    pid == null ? "비어 있음" : pid === 0 ? "🤖 AI" : (participants.find((p) => p.id === pid)?.name ?? "?");
+    pid == null ? "비어 있음" : pid === 0 ? "AI" : (participants.find((p) => p.id === pid)?.name ?? "?");
   const avatarOf = (pid: number | null) => (pid && pid !== 0 ? participants.find((p) => p.id === pid)?.avatar : undefined);
 
   const seat = (color: number) => {
@@ -130,8 +130,8 @@ export function OmokRoom({
     if (st.status === "waiting") return "참가하여 좌석을 채우세요 (흑/백)";
     if (st.status === "done") {
       if (st.winner === 1 || st.winner === 2)
-        return `${st.winner === 1 ? "흑" : "백"} (${nameOf(st.winner === 1 ? st.black : st.white)}) 승리! 🏆`;
-      return "무승부 — 판이 가득 찼어요 🤝";
+        return `${st.winner === 1 ? "흑" : "백"} (${nameOf(st.winner === 1 ? st.black : st.white)}) 승리! `;
+      return "무승부 — 판이 가득 찼어요 ";
     }
     return `${st.turn === 1 ? "흑" : "백"} 차례${myTurn ? " — 당신!" : ""}`;
   };
@@ -140,7 +140,7 @@ export function OmokRoom({
     <div className="plaza-board-backdrop" onClick={onClose}>
       <div className="plaza-room plaza-omok" onClick={(e) => e.stopPropagation()}>
         <div className="plaza-panel-head">
-          <span className="plaza-panel-title">⚫ 오목</span>
+          <span className="plaza-panel-title">오목</span>
           <span className="plaza-game-status">{statusText()}</span>
           <button type="button" className="plaza-panel-x" onClick={onClose} aria-label="닫기"><X size={16} /></button>
         </div>
@@ -151,7 +151,7 @@ export function OmokRoom({
             <canvas ref={canvasRef} width={SIZE} height={SIZE} className="plaza-omok-canvas"
               onPointerDown={click} style={{ cursor: myTurn ? "pointer" : "default" }} />
             {st?.status === "done" && <div className="plaza-omok-over">{statusText()}</div>}
-            {notice && <div className="plaza-omok-notice">⛔ {notice}</div>}
+            {notice && <div className="plaza-omok-notice">{notice}</div>}
           </div>
           {seat(1)}
 
@@ -186,7 +186,7 @@ export function OmokRoom({
                 <LogOut size={14} /> 나가기
               </button>
             )}
-            {!seated && st?.status === "playing" && <span className="plaza-omok-spec">👀 관전 중</span>}
+            {!seated && st?.status === "playing" && <span className="plaza-omok-spec">관전 중</span>}
           </div>
         </div>
       </div>

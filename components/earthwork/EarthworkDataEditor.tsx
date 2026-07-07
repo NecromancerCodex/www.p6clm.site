@@ -67,11 +67,11 @@ export function EarthworkDataEditor({ boreholes, extra, onApply, onSave }: Props
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1e293b", marginRight: 4 }}>토공 데이터 편집</h3>
-        <button type="button" onClick={exportCsv} style={btn("#fff", "#334155", "#cbd5e1")}>📤 CSV 내보내기</button>
-        <button type="button" onClick={apply} style={btn("#2563eb", "#fff")}>적용 (3D·물량 갱신)</button>
-        <button type="button" onClick={save} disabled={busy} style={btn(busy ? "#94a3b8" : "#16a34a", "#fff")}>
-          {busy ? "저장 중…" : "💾 DB 저장"}
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginRight: 4 }}>토공 데이터 편집</h3>
+        <button type="button" onClick={exportCsv} style={btn("var(--surface)", "var(--muted-strong)", "var(--line-strong)")}>CSV 내보내기</button>
+        <button type="button" onClick={apply} style={btn("var(--primary)", "var(--surface)")}>적용 (3D·물량 갱신)</button>
+        <button type="button" onClick={save} disabled={busy} style={btn(busy ? "var(--muted)" : "var(--green)", "var(--surface)")}>
+          {busy ? "저장 중…" : "DB 저장"}
         </button>
       </div>
 
@@ -81,8 +81,8 @@ export function EarthworkDataEditor({ boreholes, extra, onApply, onSave }: Props
           <button key={t.id} type="button" onClick={() => setTab(t.id)}
             style={{
               padding: "5px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-              border: `1px solid ${tab === t.id ? "#2563eb" : "#e2e8f0"}`,
-              background: tab === t.id ? "#eff6ff" : "#fff", color: tab === t.id ? "#2563eb" : "#64748b",
+              border: `1px solid ${tab === t.id ? "var(--primary)" : "var(--line)"}`,
+              background: tab === t.id ? "var(--primary-soft)" : "var(--surface)", color: tab === t.id ? "var(--primary)" : "var(--muted)",
             }}>
             {t.label} <span style={{ opacity: 0.7 }}>{t.n}</span>
           </button>
@@ -95,7 +95,7 @@ export function EarthworkDataEditor({ boreholes, extra, onApply, onSave }: Props
       {tab === "walls" && <WallTab walls={walls} setWalls={setWalls} />}
       {tab === "terrain" && <TerrainTab terrain={terrain} clear={() => setTerrain([])} />}
 
-      <p style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
+      <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>
         편집 후 <strong>적용</strong>으로 3D·물량 갱신, <strong>DB 저장</strong>으로 영속. <strong>CSV 내보내기</strong>로 ##섹션 CSV 파일 생성.
       </p>
     </div>
@@ -151,7 +151,7 @@ function PointTab({ title, pts, setPts }: { title: string; pts: { x: number; y: 
           <tbody>
             {pts.map((p, i) => (
               <tr key={i} style={trb}>
-                <Td><span style={{ fontSize: 12, color: "#94a3b8", padding: "0 6px" }}>{i + 1}</span></Td>
+                <Td><span style={{ fontSize: 12, color: "var(--muted)", padding: "0 6px" }}>{i + 1}</span></Td>
                 <Td><Num v={p.x} w={110} onCh={(x) => set(i, "x", x)} /></Td>
                 <Td><Num v={p.y} w={110} onCh={(x) => set(i, "y", x)} /></Td>
                 <Td><Del onClick={() => del(i)} /></Td>
@@ -207,13 +207,13 @@ function WallTab({ walls, setWalls }: { walls: WallLine[]; setWalls: React.Dispa
       <AddBar onAdd={addWall} label="+ 흙막이 벽 추가" />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {walls.map((w, wi) => (
-          <div key={wi} style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 10 }}>
+          <div key={wi} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>벽 {wi + 1}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)" }}>벽 {wi + 1}</span>
               <Txt v={w.kind} w={110} onCh={(x) => setKind(wi, x)} />
-              <span style={{ fontSize: 11, color: "#94a3b8" }}>{w.points.length}점</span>
-              <button type="button" onClick={() => addPt(wi)} style={{ ...btn("#fff", "#334155", "#cbd5e1"), padding: "3px 8px", fontSize: 12 }}>+ 점</button>
-              <button type="button" onClick={() => delWall(wi)} style={{ marginLeft: "auto", ...btn("#fff", "#dc2626", "#fecaca"), padding: "3px 8px", fontSize: 12 }}>벽 삭제</button>
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>{w.points.length}점</span>
+              <button type="button" onClick={() => addPt(wi)} style={{ ...btn("var(--surface)", "var(--muted-strong)", "var(--line-strong)"), padding: "3px 8px", fontSize: 12 }}>+ 점</button>
+              <button type="button" onClick={() => delWall(wi)} style={{ marginLeft: "auto", ...btn("var(--surface)", "var(--red)", "var(--red-soft)"), padding: "3px 8px", fontSize: 12 }}>벽 삭제</button>
             </div>
             <Scroll>
               <table style={tbl}>
@@ -221,7 +221,7 @@ function WallTab({ walls, setWalls }: { walls: WallLine[]; setWalls: React.Dispa
                 <tbody>
                   {w.points.map((p, pi) => (
                     <tr key={pi} style={trb}>
-                      <Td><span style={{ fontSize: 12, color: "#94a3b8", padding: "0 6px" }}>{pi + 1}</span></Td>
+                      <Td><span style={{ fontSize: 12, color: "var(--muted)", padding: "0 6px" }}>{pi + 1}</span></Td>
                       <Td><Num v={p.x} w={100} onCh={(x) => setPt(wi, pi, "x", x)} /></Td>
                       <Td><Num v={p.y} w={100} onCh={(x) => setPt(wi, pi, "y", x)} /></Td>
                       <Td><Del onClick={() => delPt(wi, pi)} /></Td>
@@ -241,14 +241,14 @@ function WallTab({ walls, setWalls }: { walls: WallLine[]; setWalls: React.Dispa
 /* ── 지형 탭 (개수 + 비우기) ── */
 function TerrainTab({ terrain, clear }: { terrain: TerrainPt[]; clear: () => void }) {
   return (
-    <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: "16px 18px" }}>
-      <div style={{ fontSize: 14, color: "#334155" }}>
-        지형 표고점 <strong style={{ color: "#0e7490" }}>{terrain.length.toLocaleString()}</strong>개
+    <div style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "16px 18px" }}>
+      <div style={{ fontSize: 14, color: "var(--muted-strong)" }}>
+        지형 표고점 <strong style={{ color: "var(--teal)" }}>{terrain.length.toLocaleString()}</strong>개
       </div>
-      <p style={{ fontSize: 12, color: "#94a3b8", margin: "6px 0 12px" }}>
+      <p style={{ fontSize: 12, color: "var(--muted)", margin: "6px 0 12px" }}>
         지형은 점 수가 많아 행 편집 대신 <strong>가져오기(상단 CSV/CAD 임포트)</strong>와 <strong>비우기</strong>만 제공합니다.
       </p>
-      <button type="button" onClick={clear} disabled={terrain.length === 0} style={btn(terrain.length ? "#fff" : "#f1f5f9", terrain.length ? "#dc2626" : "#cbd5e1", "#fecaca")}>
+      <button type="button" onClick={clear} disabled={terrain.length === 0} style={btn(terrain.length ? "var(--surface)" : "var(--surface-soft)", terrain.length ? "var(--red)" : "var(--line-strong)", "var(--red-soft)")}>
         지형 비우기
       </button>
     </div>
@@ -257,13 +257,13 @@ function TerrainTab({ terrain, clear }: { terrain: TerrainPt[]; clear: () => voi
 
 /* ── 공용 UI ── */
 function AddBar({ onAdd, label }: { onAdd: () => void; label: string }) {
-  return <div style={{ marginBottom: 8 }}><button type="button" onClick={onAdd} style={btn("#fff", "#334155", "#cbd5e1")}>{label}</button></div>;
+  return <div style={{ marginBottom: 8 }}><button type="button" onClick={onAdd} style={btn("var(--surface)", "var(--muted-strong)", "var(--line-strong)")}>{label}</button></div>;
 }
 function Empty({ label }: { label: string }) {
-  return <div style={{ fontSize: 13, color: "#94a3b8", padding: "12px 4px" }}>{label}</div>;
+  return <div style={{ fontSize: 13, color: "var(--muted)", padding: "12px 4px" }}>{label}</div>;
 }
 function Scroll({ children }: { children: React.ReactNode }) {
-  return <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>{children}</div>;
+  return <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>{children}</div>;
 }
 function Th({ children, w }: { children?: React.ReactNode; w?: number }) {
   return <th style={{ padding: "6px 8px", textAlign: "left", fontWeight: 600, width: w }}>{children}</th>;
@@ -276,14 +276,14 @@ function Num({ v, w, onCh }: { v: number; w?: number; onCh: (v: number) => void 
   return <input value={String(v)} inputMode="decimal" onChange={(e) => onCh(Number(e.target.value) || 0)} style={{ ...inp(w ?? 52), textAlign: "right" }} />;
 }
 function Del({ onClick }: { onClick: () => void }) {
-  return <button type="button" onClick={onClick} title="삭제" style={{ border: "none", background: "transparent", color: "#cbd5e1", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>✕</button>;
+  return <button type="button" onClick={onClick} title="삭제" style={{ border: "none", background: "transparent", color: "var(--line-strong)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}></button>;
 }
 function inp(w: number): React.CSSProperties {
-  return { width: w, padding: "4px 6px", border: "1px solid #e2e8f0", borderRadius: 5, fontSize: 12.5, background: "#fff" };
+  return { width: w, padding: "4px 6px", border: "1px solid var(--line)", borderRadius: 5, fontSize: 12.5, background: "var(--surface)" };
 }
 function btn(bg: string, color: string, border?: string): React.CSSProperties {
   return { padding: "6px 12px", borderRadius: 8, border: border ? `1px solid ${border}` : "none", background: bg, color, fontSize: 13, fontWeight: 600, cursor: "pointer" };
 }
 const tbl: React.CSSProperties = { borderCollapse: "collapse", fontSize: 12.5, whiteSpace: "nowrap" };
-const thr: React.CSSProperties = { background: "#f8fafc", color: "#475569" };
-const trb: React.CSSProperties = { borderTop: "1px solid #f1f5f9" };
+const thr: React.CSSProperties = { background: "var(--surface-soft)", color: "var(--muted-strong)" };
+const trb: React.CSSProperties = { borderTop: "1px solid var(--surface-soft)" };

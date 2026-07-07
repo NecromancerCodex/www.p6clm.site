@@ -140,7 +140,7 @@ export function DashboardSchedule({
   return (
     <div style={{ marginTop: 12, width: "100%", flexShrink: 0 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--muted-strong)" }}>
           공정표 ({ganttTasks.length}개 활동)
         </div>
         <div className="sch-viewmode">
