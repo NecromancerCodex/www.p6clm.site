@@ -76,6 +76,8 @@ function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
     if (nameToCode.has(t.name)) dupNames.add(t.name);
     else nameToCode.set(t.name, t.code);
   }
+  const rankOf = new Map<string, number>();
+  for (const t of tasks) if (t.wbsRank != null) rankOf.set(t.code, t.wbsRank);
   return tasks
     .filter((t) => t.start && t.end) // 날짜 없는 활동은 간트에 못 그림
     .map((t) => {
@@ -90,7 +92,7 @@ function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
         id: t.code,
         activity_code: t.code,
         name: t.name ?? t.code,
-        wbs_code: "",
+        wbs_code: t.wbs ?? "",
         start: date10(t.start),
         end: bumpEnd(date10(t.start), date10(t.end)),
         progress,
@@ -100,9 +102,11 @@ function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
         dependencies: deps,
       } satisfies GanttTask;
     })
-    // 시공 순서(시작일순) — 먼저 하는 활동이 위(실무 공정표 관례). 생성 순서(01층부터)를 그대로
-    // 그리면 B6(7월 착공)이 B5(10월)보다 아래에 놓이는 역전. 동일 시작일은 코드순(안정 정렬).
+    // P6 관례 정렬: ① WBS 트리 순서(PROJWBS DFS) → ② 그룹 내 시작일(선행 체인 순서의 결과)
+    // → ③ 코드(안정). WBS 없는 XER 는 시작일순 폴백과 동일하게 동작.
     .sort((a, b) => {
+      const ar = rankOf.get(a.activity_code) ?? 1e9, br = rankOf.get(b.activity_code) ?? 1e9;
+      if (ar !== br) return ar - br;
       const as = a.start ?? "", bs = b.start ?? "";
       return as < bs ? -1 : as > bs ? 1 : a.activity_code < b.activity_code ? -1 : 1;
     });

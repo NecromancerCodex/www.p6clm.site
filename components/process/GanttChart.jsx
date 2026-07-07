@@ -10,10 +10,10 @@ const TASK_INFO_WIDTH = 320;
 // 비교 차선 색상 — Construction.jsx 와 동일 팔레트.
 // 0=메인 바에 가장 가까움 (보통 가장 최근 비교/실적), 마지막=베이스라인.
 const COMPARE_COLORS = [
-  "#a855f7", // purple
-  "#14b8a6", // teal
-  "#6b7280", // gray
-  "#f97316", // orange (legacy baseline)
+  "#c9a35c", // purple
+  "#8f8a7c", // teal
+  "#97917f", // gray
+  "#b3383e", // orange (legacy baseline)
 ];
 const colorForLane = (idx) => COMPARE_COLORS[idx % COMPARE_COLORS.length];
 
@@ -66,8 +66,8 @@ const drawLagLabel = (gantt, layer, arrow, lagDays) => {
   bg.setAttribute("height", String(h));
   bg.setAttribute("rx", "2");
   bg.setAttribute("ry", "2");
-  bg.setAttribute("fill", "#fff");
-  bg.setAttribute("stroke", "#cbd5e1");
+  bg.setAttribute("fill", "#1a1a1f");
+  bg.setAttribute("stroke", "#3a3a42");
   bg.setAttribute("stroke-width", "0.5");
   bg.setAttribute("class", "rel-lag-bg");
   layer.appendChild(bg);
@@ -79,7 +79,7 @@ const drawLagLabel = (gantt, layer, arrow, lagDays) => {
   t.setAttribute("dominant-baseline", "central");
   t.setAttribute("font-size", "9");
   t.setAttribute("font-weight", "600");
-  t.setAttribute("fill", lagDays > 0 ? "#dc2626" : "#2563eb");
+  t.setAttribute("fill", lagDays > 0 ? "#c0463f" : "#c9a35c");
   t.setAttribute("class", "rel-lag-text");
   t.textContent = text;
   layer.appendChild(t);
@@ -164,11 +164,11 @@ const setHighlight = (svg, taskId) => {
     const connected = fromId === key || toId === key;
     if (connected) {
       a.style.opacity = "1";
-      a.style.stroke = "#1e293b";
+      a.style.stroke = "#e9e5dc";
       a.style.strokeWidth = "2";
     } else {
       a.style.opacity = "0.12";
-      a.style.stroke = "#cbd5e1";
+      a.style.stroke = "#3a3a42";
       a.style.strokeWidth = "0.8";
     }
   });
@@ -179,7 +179,7 @@ const setHighlight = (svg, taskId) => {
       if (id === key) {
         const bar = wrapper.querySelector(".bar");
         if (bar) {
-          bar.style.stroke = "#1e293b";
+          bar.style.stroke = "#e9e5dc";
           bar.style.strokeWidth = "1.5";
         }
       }
@@ -505,7 +505,7 @@ const drawSliderMarker = (gantt, date) => {
   line.setAttribute("y1", "0");
   line.setAttribute("y2", String(h));
   line.setAttribute("class", SLIDER_MARKER_CLASS);
-  line.setAttribute("stroke", "#2563eb");
+  line.setAttribute("stroke", "#c9a35c");
   line.setAttribute("stroke-width", "2");
   line.setAttribute("stroke-dasharray", "4 3");
   line.setAttribute("pointer-events", "none");
@@ -533,7 +533,7 @@ const applyTaskInfoWidthToGantt = (gantt, taskInfoWidth = TASK_INFO_WIDTH, codeC
     gantt.$task_info_grid.style.position = "sticky";
     gantt.$task_info_grid.style.left = "0";
     gantt.$task_info_grid.style.zIndex = "2000";
-    gantt.$task_info_grid.style.backgroundColor = "white";
+    gantt.$task_info_grid.style.backgroundColor = "#1a1a1f";
   }
   if (gantt.$task_info_svg) {
     gantt.$task_info_svg.setAttribute("width", String(taskInfoWidth));
@@ -640,8 +640,8 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
       scroll_to: scrollTarget,
       container_height: height,
       code_col_width: codeColWidth,
-      milestone_colors: { start: "#0ea5e9", finish: "#f59e0b" },
-      status_border_colors: { DELAY: "#ef4444", DONE: "#22c55e", EARLY: "#3b82f6" },
+      milestone_colors: { start: "#c9a35c", finish: "#a8843f" },
+      status_border_colors: { DELAY: "#c0463f", DONE: "#7da077", EARLY: "#c9a35c" },
       popup_on: "hover",
       popup: ({ task }) => `
         <div class="title">${task.name}</div>
@@ -721,17 +721,17 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
   return (
     <div>
       {/* 범례 — 한 줄 inline */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6, fontSize: 11, color: "#6b7280", userSelect: "none" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6, fontSize: 11, color: "#97917f", userSelect: "none" }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ display: "inline-block", width: 18, height: 6, background: "#3b82f6", borderRadius: 2 }} />
+          <span style={{ display: "inline-block", width: 18, height: 6, background: "#c9a35c", borderRadius: 2 }} />
           {"실적"}
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ display: "inline-block", width: 18, height: 3, background: "#f97316", borderRadius: 2 }} />
+          <span style={{ display: "inline-block", width: 18, height: 3, background: "#b3383e", borderRadius: 2 }} />
           {"계획(기준선)"}
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ display: "inline-block", width: 8, height: 8, background: "#3b82f6", transform: "rotate(45deg)" }} />
+          <span style={{ display: "inline-block", width: 8, height: 8, background: "#c9a35c", transform: "rotate(45deg)" }} />
           {"마일스톤"}
         </span>
       </div>
@@ -739,7 +739,7 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
       {/* 간트 영역 */}
       <div
         className="related-gantt"
-        style={{ border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", width: "100%", position: "relative", height: `${height}px`, overflow: "hidden" }}
+        style={{ border: "1px solid #2c2c34", borderRadius: 8, background: "#1a1a1f", width: "100%", position: "relative", height: `${height}px`, overflow: "hidden" }}
       >
         <style>{`
           /* 내부 스크롤 컨테이너 */
@@ -763,11 +763,11 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
 
           /* 커스텀 가로 스크롤바 thumb 톤 */
           .related-gantt .related-gantt-hscroll::-webkit-scrollbar { height: 10px; }
-          .related-gantt .related-gantt-hscroll::-webkit-scrollbar-track { background: #f1f5f9; }
+          .related-gantt .related-gantt-hscroll::-webkit-scrollbar-track { background: #202026; }
           .related-gantt .related-gantt-hscroll::-webkit-scrollbar-thumb {
-            background: #cbd5e1; border-radius: 5px;
+            background: #3a3a42; border-radius: 5px;
           }
-          .related-gantt .related-gantt-hscroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+          .related-gantt .related-gantt-hscroll::-webkit-scrollbar-thumb:hover { background: #55554f; }
 
           /* 사이드 컨트롤 전부 숨김 — read-only 미리보기 */
           .related-gantt .side-header { display: none !important; }
@@ -780,10 +780,10 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
           /* 관계선 — 프리마베라풍 톤:
              기본은 가늘게(1px) + 슬레이트 회색 + 살짝 투명 + 픽셀 정렬.
              분류 클래스(rel-cp / rel-pred / rel-succ / rel-other) 로 색·굵기·투명도 덮어씀. */
-          .related-gantt { --g-arrow-color: #64748b; }
+          .related-gantt { --g-arrow-color: #8a8474; }
           .related-gantt .gantt path.arrow {
             fill: none;
-            stroke: #64748b;
+            stroke: #8a8474;
             stroke-width: 1;
             opacity: 0.55;
             stroke-linejoin: miter;
@@ -794,7 +794,7 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
 
           /* Critical Path — 두 활동 모두 critical 일 때 빨간 굵은 선 */
           .related-gantt .gantt path.arrow.rel-cp {
-            stroke: #ef4444;
+            stroke: #c0463f;
             stroke-width: 1.6;
             opacity: 0.85;
           }
@@ -806,25 +806,25 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
           }
           /* focus 의 후행 (나가는 화살표) */
           .related-gantt .gantt path.arrow.rel-succ {
-            stroke: #14b8a6;
+            stroke: #8f8a7c;
             stroke-width: 1.4;
             opacity: 0.9;
           }
           /* 그 외 — 차분한 회색 */
           .related-gantt .gantt path.arrow.rel-other {
-            stroke: #94a3b8;
+            stroke: #55554f;
             stroke-width: 1;
             opacity: 0.4;
           }
 
           /* hover 시 — 연결된 화살표는 진하게, 무관 화살표는 거의 투명 */
           .related-gantt .gantt path.arrow.rel-hover {
-            stroke: #1e293b !important;
+            stroke: #e9e5dc !important;
             stroke-width: 2 !important;
             opacity: 1 !important;
           }
           .related-gantt .gantt path.arrow.rel-faded {
-            stroke: #cbd5e1 !important;
+            stroke: #3a3a42 !important;
             stroke-width: 0.8 !important;
             opacity: 0.12 !important;
           }
@@ -844,7 +844,7 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
           }
           /* hover 대상 막대 자체는 살짝 강조 — outline 으로 */
           .related-gantt .gantt .bar-wrapper.bar-focus .bar {
-            stroke: #1e293b !important;
+            stroke: #e9e5dc !important;
             stroke-width: 1.5 !important;
           }
         `}</style>
@@ -859,11 +859,11 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
             left: 0,
             width: `${taskInfoWidth}px`,
             height: `${ganttHeaderHeight}px`,
-            background: "white",
+            background: "#1a1a1f",
             zIndex: 2001,
             pointerEvents: "none",
-            borderRight: "1px solid #e5e7eb",
-            borderBottom: "1px solid #e5e7eb",
+            borderRight: "1px solid #2c2c34",
+            borderBottom: "1px solid #2c2c34",
             display: "flex",
             alignItems: "center",
             overflow: "hidden",
@@ -879,8 +879,8 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
               paddingLeft: "8px",
               fontSize: "11px",
               fontWeight: 600,
-              color: "#64748b",
-              borderRight: "1px solid #e5e7eb",
+              color: "#8a8474",
+              borderRight: "1px solid #2c2c34",
               boxSizing: "border-box",
               overflow: "hidden",
               whiteSpace: "nowrap",
@@ -897,7 +897,7 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
               paddingLeft: "8px",
               fontSize: "11px",
               fontWeight: 600,
-              color: "#64748b",
+              color: "#8a8474",
               overflow: "hidden",
               whiteSpace: "nowrap",
             }}
@@ -915,7 +915,7 @@ export default function GanttChart({ tasks = [], height = 400, viewMode = "Month
             left: `${taskInfoWidth}px`,
             width: "1px",
             bottom: 0,
-            background: "#e5e7eb",
+            background: "#2c2c34",
             zIndex: 2001,
             pointerEvents: "none",
           }}

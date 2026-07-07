@@ -20,6 +20,8 @@ export interface ScheduleTask {
   progress?: number;
   preds?: string[]; // 선행 활동명 (XER TASKPRED)
   succs?: string[]; // 후행 활동명
+  wbs?: string; // WBS 경로 표시용 (예: "토목 > 굴착")
+  wbsRank?: number; // WBS 트리 DFS 순서 — 간트 행 정렬(WBS 순 → 그룹 내 시작일순)
 }
 
 export type Trade = "ST" | "MO";

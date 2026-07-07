@@ -81,6 +81,42 @@ function buildUdfMap(tables: Map<string, XerTable>, typeId: string | null): Map<
   return map;
 }
 
+
+/** PROJWBS → wbs_id 별 (경로 문자열, 트리 DFS rank). P6 화면과 같은 WBS 순서(부모 seq_num 우선). */
+function buildWbsIndex(tables: Map<string, XerTable>): Map<string, { path: string; rank: number }> {
+  const out = new Map<string, { path: string; rank: number }>();
+  const t = tables.get("PROJWBS");
+  if (!t) return out;
+  interface Node { id: string; parent: string; name: string; seq: number }
+  const nodes = new Map<string, Node>();
+  for (const row of t.rows) {
+    const id = get(row, t.cols, "wbs_id");
+    if (!id) continue;
+    nodes.set(id, {
+      id,
+      parent: get(row, t.cols, "parent_wbs_id"),
+      name: get(row, t.cols, "wbs_name") || id,
+      seq: Number(get(row, t.cols, "seq_num")) || 0,
+    });
+  }
+  const children = new Map<string, Node[]>();
+  const roots: Node[] = [];
+  for (const n of nodes.values()) {
+    if (n.parent && nodes.has(n.parent)) {
+      (children.get(n.parent) ?? children.set(n.parent, []).get(n.parent)!).push(n);
+    } else roots.push(n);
+  }
+  const bySeq = (a: Node, b: Node) => a.seq - b.seq || (a.name < b.name ? -1 : 1);
+  let rank = 0;
+  const walk = (n: Node, path: string[]) => {
+    const p = [...path, n.name];
+    out.set(n.id, { path: p.slice(1).join(" > ") || n.name, rank: rank++ }); // 루트(프로젝트명)는 경로에서 생략
+    for (const c of (children.get(n.id) ?? []).sort(bySeq)) walk(c, p);
+  };
+  for (const r of roots.sort(bySeq)) walk(r, []);
+  return out;
+}
+
 /**
  * XER 텍스트 → ScheduleTask[].
  *  code  = UDF 4D 코드 우선, 없으면 task_code (502HG 형식이면)
@@ -93,6 +129,7 @@ export function parseXerTasks(text: string): ScheduleTask[] {
   if (!task) return [];
 
   const udfMap = buildUdfMap(tables, find4dUdfTypeId(tables));
+  const wbsIdx = buildWbsIndex(tables);
 
   // task_id → 활동명 (선후행 표시용 — 프론트는 EUC-KR 디코드라 한글 정상)
   const idToName = new Map<string, string>();
@@ -137,6 +174,8 @@ export function parseXerTasks(text: string): ScheduleTask[] {
       end,
       preds: names(predsOf.get(taskId)),
       succs: names(succsOf.get(taskId)),
+      wbs: wbsIdx.get(get(row, task.cols, "wbs_id"))?.path,
+      wbsRank: wbsIdx.get(get(row, task.cols, "wbs_id"))?.rank,
     });
   }
   return out;
