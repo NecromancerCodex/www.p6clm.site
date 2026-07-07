@@ -535,18 +535,45 @@ export interface IfcWorkUnitsResult {
   element_count: number;
 }
 
-/** presigned URL 발급 → S3 직접 업로드 → 서버 추출. 실패 시 throw(호출측이 클라 파싱 폴백). */
-export async function extractIfcWorkUnitsViaS3(file: File): Promise<IfcWorkUnitsResult> {
+/** 콘텐츠 지문 — size + 앞 1MB + 뒤 1MB SHA-256. 전체 해시 대비 대용량(357MB)도 즉시.
+ *  IFC 는 헤더에 수출 타임스탬프가 있어 재수출본도 구분됨 — 같은 파일만 같은 지문. */
+async function ifcFingerprint(file: File): Promise<string | undefined> {
+  try {
+    const MB = 1024 * 1024;
+    const head = await file.slice(0, Math.min(MB, file.size)).arrayBuffer();
+    const tail = await file.slice(Math.max(0, file.size - MB)).arrayBuffer();
+    const buf = new Uint8Array(8 + head.byteLength + tail.byteLength);
+    new DataView(buf.buffer).setFloat64(0, file.size);
+    buf.set(new Uint8Array(head), 8);
+    buf.set(new Uint8Array(tail), 8 + head.byteLength);
+    const digest = await crypto.subtle.digest("SHA-256", buf);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return undefined;   // 지문 실패 시 서버가 uuid 방식 폴백 (dedup 없이 동작)
+  }
+}
+
+/** presign + (미존재 시에만) S3 PUT — 같은 파일이면 재업로드 스킵(dedup). object_key 반환. */
+async function presignAndUpload(file: File): Promise<string> {
+  const fingerprint = await ifcFingerprint(file);
   const pres = await fetch(`${API_BASE}/schedule/ifc/presign`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename: file.name, content_type: file.type || "application/octet-stream" }),
+    body: JSON.stringify({ filename: file.name, content_type: file.type || "application/octet-stream", fingerprint }),
   });
   if (!pres.ok) throw new Error(`presign 실패 (${pres.status})`);
-  const { object_key, upload_url, headers } = (await pres.json()) as {
-    object_key: string; upload_url: string; headers: Record<string, string>;
+  const { object_key, upload_url, exists, headers } = (await pres.json()) as {
+    object_key: string; upload_url: string | null; exists?: boolean; headers: Record<string, string>;
   };
-  const put = await fetch(upload_url, { method: "PUT", body: file, headers });
-  if (!put.ok) throw new Error(`S3 업로드 실패 (${put.status})`);
+  if (!exists && upload_url) {
+    const put = await fetch(upload_url, { method: "PUT", body: file, headers });
+    if (!put.ok) throw new Error(`S3 업로드 실패 (${put.status})`);
+  }
+  return object_key;
+}
+
+/** presigned URL 발급 → S3 직접 업로드(dedup) → 서버 추출. 실패 시 throw(호출측이 클라 파싱 폴백). */
+export async function extractIfcWorkUnitsViaS3(file: File): Promise<IfcWorkUnitsResult> {
+  const object_key = await presignAndUpload(file);
   const ext = await fetch(`${API_BASE}/schedule/ifc/workunits`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ object_key }),
@@ -564,19 +591,9 @@ export interface PlanIfcMeta {
   download_url?: string | null;   // GET 시에만 — presigned 다운로드 URL
 }
 
-/** presign → S3 직접 업로드만 (work_units 추출 없이). 4D 3D 렌더용 원본 영속화. object_key 반환. */
+/** presign → S3 직접 업로드만 (work_units 추출 없이, dedup). 4D 3D 렌더용 원본 영속화. object_key 반환. */
 export async function uploadIfcToS3(file: File): Promise<string> {
-  const pres = await fetch(`${API_BASE}/schedule/ifc/presign`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename: file.name, content_type: file.type || "application/octet-stream" }),
-  });
-  if (!pres.ok) throw new Error(`presign 실패 (${pres.status})`);
-  const { upload_url, object_key, headers } = (await pres.json()) as {
-    object_key: string; upload_url: string; headers: Record<string, string>;
-  };
-  const put = await fetch(upload_url, { method: "PUT", body: file, headers });
-  if (!put.ok) throw new Error(`S3 업로드 실패 (${put.status})`);
-  return object_key;
+  return presignAndUpload(file);
 }
 
 /** plan 에 IFC S3 키 연결 영속화 (전체 교체 — 멀티 IFC 일괄). */
