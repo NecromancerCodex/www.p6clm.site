@@ -21,7 +21,7 @@ import { loadEarthwork, saveEarthwork } from "../../../lib/api/earthwork";
 /** 가장 멀리 떨어진 두 시추공 = 대표 단면 기본값. */
 function Chip({ label, c }: { label: string; c: string }) {
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--surface)", background: c, padding: "3px 9px", borderRadius: 999 }}>
+    <span style={{ fontSize: 11, fontWeight: 600, color: "#141419", background: c, padding: "3px 9px", borderRadius: 999 }}>
       {label}
     </span>
   );
@@ -208,7 +208,7 @@ export default function EarthworkPage() {
             onClick={() => fileRef.current?.click()}
             style={{
               display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 16px", borderRadius: 10,
-              border: "none", background: "linear-gradient(180deg,var(--primary),var(--primary))", color: "var(--surface)",
+              border: "none", background: "linear-gradient(180deg,var(--primary),var(--primary))", color: "#141419",
               fontSize: 14, fontWeight: 600, cursor: "pointer", boxShadow: "0 1px 2px rgba(37,99,235,0.4)",
             }}
           >

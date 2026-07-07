@@ -122,5 +122,5 @@ function btn(bg: string, color: string, border?: string): React.CSSProperties {
   };
 }
 const delBtn: React.CSSProperties = {
-  border: "none", background: "transparent", color: "var(--line-strong)", cursor: "pointer", fontSize: 13, fontWeight: 700,
+  border: "none", background: "transparent", color: "var(--muted-strong)", cursor: "pointer", fontSize: 13, fontWeight: 700,
 };

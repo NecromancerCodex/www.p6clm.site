@@ -82,7 +82,7 @@ export default function PlanWatcher() {
                     box-shadow: 0 8px 30px rgba(2, 6, 23, .18); animation: pw-in .25s ease-out; }
         .pw-toast.err { border-color: var(--red-soft); }
         @keyframes pw-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
-        .pw-go { flex-shrink: 0; padding: 7px 13px; background: var(--green); color: var(--surface); border: none;
+        .pw-go { flex-shrink: 0; padding: 7px 13px; background: var(--green); color: #141419; border: none;
                  border-radius: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
         .pw-toast.err .pw-go { background: var(--red); }
         .pw-x { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; flex-shrink: 0; }

@@ -276,7 +276,7 @@ function Num({ v, w, onCh }: { v: number; w?: number; onCh: (v: number) => void 
   return <input value={String(v)} inputMode="decimal" onChange={(e) => onCh(Number(e.target.value) || 0)} style={{ ...inp(w ?? 52), textAlign: "right" }} />;
 }
 function Del({ onClick }: { onClick: () => void }) {
-  return <button type="button" onClick={onClick} title="삭제" style={{ border: "none", background: "transparent", color: "var(--line-strong)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}></button>;
+  return <button type="button" onClick={onClick} title="삭제" style={{ border: "none", background: "transparent", color: "var(--muted-strong)", cursor: "pointer", fontSize: 13, fontWeight: 700 }}></button>;
 }
 function inp(w: number): React.CSSProperties {
   return { width: w, padding: "4px 6px", border: "1px solid var(--line)", borderRadius: 5, fontSize: 12.5, background: "var(--surface)" };

@@ -1795,14 +1795,14 @@ export default function SchedulePlanWizard() {
         .wz-step.done { background: var(--green-soft); color: var(--green); }
         .wz-step-badge { width: 22px; height: 22px; border-radius: 50%; background: var(--line); color: var(--muted);
                          display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-        .wz-step.on .wz-step-badge { background: var(--primary); color: var(--surface); }
-        .wz-step.done .wz-step-badge { background: var(--green); color: var(--surface); }
+        .wz-step.on .wz-step-badge { background: var(--primary); color: #141419; }
+        .wz-step.done .wz-step-badge { background: var(--green); color: #141419; }
         .wz-step.big { padding: 12px 16px; }
         .wz-substeps { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
         .wz-substep { font-size: 10.5px; padding: 2px 8px; border-radius: 10px; background: var(--surface-soft); color: var(--muted); }
         .wz-substep.on { background: var(--primary-soft); color: var(--primary-deep); font-weight: 700; }
         .wz-substep.done { background: var(--green-soft); color: var(--green); }
-        .wz-step-arrow { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); color: var(--line-strong); font-size: 16px; z-index: 1; }
+        .wz-step-arrow { position: absolute; right: -6px; top: 50%; transform: translateY(-50%); color: var(--muted-strong); font-size: 16px; z-index: 1; }
         .wz-card { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--surface); }
         .wz-in { width: 100%; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 7px; font-size: 13px; box-sizing: border-box; background: var(--surface); }
         .wz-sub { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); flex: 1; }
@@ -1812,12 +1812,12 @@ export default function SchedulePlanWizard() {
         .wz-bim { display: inline-block; padding: 9px 14px; border: 1px dashed var(--muted); border-radius: 8px; font-size: 12.5px;
                   cursor: pointer; color: var(--muted-strong); background: var(--surface-soft); }
         .wz-bim:hover { border-color: var(--primary); color: var(--primary); }
-        .wz-btn { padding: 8px 16px; background: var(--primary); color: var(--surface); border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .wz-btn { padding: 8px 16px; background: var(--primary); color: #141419; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .wz-btn:disabled { background: var(--line-strong); cursor: not-allowed; }
         .wz-btn.green { background: var(--green); }
         .wz-btn.green:disabled { background: var(--line-strong); }
         .wz-btn.ghost { background: var(--surface); color: var(--muted-strong); border: 1px solid var(--line-strong); }
-        .wz-btn.ghost:disabled { color: var(--line-strong); }
+        .wz-btn.ghost:disabled { color: var(--muted-strong); }
         .wz-gate-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
         .wz-gate-badge { display: inline-block; padding: 3px 10px; border-radius: 13px; background: var(--amber-soft); color: var(--primary-deep);
                          font-size: 12px; font-weight: 700; margin-right: 6px; }
@@ -1831,7 +1831,7 @@ export default function SchedulePlanWizard() {
         .wz-cell { width: 100%; padding: 4px 7px; border: 1px solid transparent; border-radius: 5px; font-size: 12px;
                    background: transparent; box-sizing: border-box; }
         .wz-cell.c { text-align: center; }
-        .wz-cell:hover { border-color: var(--line-strong); background: var(--surface); }
+        .wz-cell:hover { border-color: var(--muted-strong); background: var(--surface); }
         .wz-cell:focus { border-color: var(--primary); background: var(--surface); outline: none; }
         .wz-del { background: none; border: none; color: var(--red); font-size: 11px; cursor: pointer; }
         .wz-del:hover { text-decoration: underline; }

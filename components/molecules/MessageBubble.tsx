@@ -101,7 +101,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 <pre
                   style={{
                     background: "var(--text)",
-                    color: "var(--line)",
+                    color: "var(--text)",
                     padding: "0.85em 1em",
                     borderRadius: 8,
                     fontSize: "0.85em",

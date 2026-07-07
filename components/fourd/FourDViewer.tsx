@@ -1003,7 +1003,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
                   background: "rgba(15,17,22,0.95)",
                   border: "1px solid var(--muted-strong)",
                   borderRadius: 8,
-                  color: "var(--line)",
+                  color: "var(--text)",
                   fontSize: 12,
                   lineHeight: 1.6,
                   pointerEvents: "none",
@@ -1103,14 +1103,14 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
               justifyContent: "center",
               gap: 8,
               background: "rgba(10,12,18,0.55)",
-              color: "var(--line)",
+              color: "var(--text)",
               cursor: "pointer",
               zIndex: 11,
               borderRadius: 8,
             }}
           >
             <div style={{ fontSize: 18, fontWeight: 700 }}>클릭하여 워크스루 시작</div>
-            <div style={{ fontSize: 13, color: "var(--line-strong)" }}>
+            <div style={{ fontSize: 13, color: "var(--muted-strong)" }}>
               마우스 = 시점 · WASD = 이동 · Space = 점프 · 중력 적용 · 벽 통과 불가 · ESC = 종료
             </div>
           </div>
@@ -1323,7 +1323,7 @@ export function FourDViewer({ parsed, ranges, minDate, maxDate, activities = [],
               fontSize: 12,
               fontWeight: 600,
               whiteSpace: "nowrap",
-              color: "var(--surface)",
+              color: "#141419",
               background: dailyBusy ? "var(--muted)" : "var(--primary)",
               cursor: dailyBusy ? "default" : "pointer",
             }}

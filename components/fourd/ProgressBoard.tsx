@@ -170,7 +170,7 @@ export function ProgressBoard() {
               onClick={() => generateAgg("weekly")}
               disabled={genBusy !== null}
               title="이번 주 공사일보를 모아 주간 보고서 생성"
-              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: genBusy === "weekly" ? "var(--muted)" : "var(--primary)", color: "var(--surface)", fontSize: 12, fontWeight: 600, cursor: genBusy ? "default" : "pointer" }}
+              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: genBusy === "weekly" ? "var(--muted)" : "var(--primary)", color: "#141419", fontSize: 12, fontWeight: 600, cursor: genBusy ? "default" : "pointer" }}
             >
               {genBusy === "weekly" ? "집계 중…" : "주간 생성"}
             </button>
@@ -179,7 +179,7 @@ export function ProgressBoard() {
               onClick={() => generateAgg("monthly")}
               disabled={genBusy !== null}
               title="이번 달 공사일보를 모아 월간 보고서 생성"
-              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: genBusy === "monthly" ? "var(--muted)" : "var(--primary)", color: "var(--surface)", fontSize: 12, fontWeight: 600, cursor: genBusy ? "default" : "pointer" }}
+              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: genBusy === "monthly" ? "var(--muted)" : "var(--primary)", color: "#141419", fontSize: 12, fontWeight: 600, cursor: genBusy ? "default" : "pointer" }}
             >
               {genBusy === "monthly" ? "집계 중…" : "월간 생성"}
             </button>
@@ -219,8 +219,7 @@ export function ProgressBoard() {
 
       {!loading && units.length === 0 && (
         <div style={{ padding: 24, background: "var(--surface-soft)", borderRadius: 10, color: "var(--muted-strong)", fontSize: 14 }}>
-          저장된 워크유닛이 없습니다. <strong>대시보드</strong>에서 공정표·BIM을 올려 분석한 뒤
-          <strong> 진도율·PMIS-X 저장</strong> 버튼을 누르면 여기에 목록이 나타납니다.
+          저장된 워크유닛이 없습니다.
         </div>
       )}
 

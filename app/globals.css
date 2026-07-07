@@ -232,7 +232,7 @@ select option {
   padding: 6px 14px;
   border-radius: 999px;
   background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
-  color: var(--surface);
+  color: #141419;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -428,7 +428,7 @@ select option {
   border: 0;
   border-radius: 10px;
   background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
-  color: var(--surface);
+  color: #141419;
   font-size: 0.94rem;
   font-weight: 700;
   cursor: pointer;
@@ -461,7 +461,7 @@ select option {
   width: 14px;
   height: 14px;
   border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: var(--surface);
+  border-top-color: #141419;
   border-radius: 50%;
   animation: spin 0.65s linear infinite;
   flex-shrink: 0;
@@ -642,7 +642,7 @@ select option {
 }
 
 .dag-reset-btn:hover {
-  border-color: var(--line-strong);
+  border-color: var(--muted-strong);
   color: var(--text);
 }
 
@@ -835,7 +835,7 @@ select option {
   border: 0;
   border-radius: 6px;
   background: rgba(0,0,0,0.55);
-  color: var(--surface);
+  color: #141419;
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
@@ -890,7 +890,7 @@ select option {
   padding: 16px;
   animation: fadeInUp 0.25s var(--ease-out) both;
   scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
+  scrollbar-color: var(--text) transparent;
 }
 
 .ncr-wrapper::-webkit-scrollbar {
@@ -1388,7 +1388,7 @@ select option {
 
 .cbot-bubble.user {
   background: var(--primary);
-  color: var(--surface);
+  color: #141419;
   border-bottom-right-radius: 4px;
 }
 
@@ -1575,7 +1575,7 @@ select option {
 }
 
 .cbot-mode-btn:hover {
-  border-color: var(--line-strong);
+  border-color: var(--muted-strong);
   background: var(--surface-muted);
 }
 
@@ -1646,7 +1646,7 @@ select option {
   border-radius: 50%;
   border: none;
   background: var(--text);
-  color: var(--surface);
+  color: #141419;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1714,7 +1714,7 @@ select option {
   height: 34px;
   border-radius: 10px;
   background: var(--primary);
-  color: var(--surface);
+  color: #141419;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1778,7 +1778,7 @@ select option {
   padding: 1px 7px;
   border-radius: 99px;
   background: var(--primary);
-  color: var(--surface);
+  color: #141419;
   font-size: 0.7rem;
   font-weight: 600;
 }
@@ -2110,7 +2110,7 @@ select option {
   letter-spacing: 0.5px;
 }
 
-.sir-risk-critical { background: var(--red); color: var(--surface); }
+.sir-risk-critical { background: var(--red); color: #141419; }
 .sir-risk-high     { background: var(--red-soft); color: var(--red); border: 1.5px solid var(--red); }
 .sir-risk-medium   { background: var(--amber-soft); color: var(--primary-deep); border: 1.5px solid var(--primary); }
 .sir-risk-low      { background: var(--green-soft); color: var(--green); border: 1.5px solid var(--green); }
@@ -2126,7 +2126,7 @@ select option {
   font-size: 11.5px;
   font-weight: 700;
   background: var(--primary-deep);
-  color: var(--surface);
+  color: #141419;
   padding: 4px 10px;
   border-radius: 2px;
   display: flex;
@@ -2506,7 +2506,7 @@ select option {
 
 .progress-retry:hover {
   background: var(--surface-soft);
-  border-color: var(--line-strong);
+  border-color: var(--muted-strong);
 }
 
 .progress-loading,
@@ -2743,7 +2743,7 @@ select option {
 
 .progress-cal-nav-btn:hover {
   background: var(--surface-soft);
-  border-color: var(--line-strong);
+  border-color: var(--muted-strong);
 }
 
 .progress-cal-month {
@@ -2858,7 +2858,7 @@ select option {
   font-size: 0.62rem;
   font-weight: 700;
   background: var(--primary);
-  color: var(--surface);
+  color: #141419;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -3056,7 +3056,7 @@ select option {
 }
 
 .progress-doc-type-btn:hover {
-  border-color: var(--line-strong);
+  border-color: var(--muted-strong);
 }
 
 .progress-doc-type-btn.is-active {
@@ -3138,7 +3138,7 @@ select option {
 
 .progress-history-row:hover {
   background: var(--surface-soft);
-  border-color: var(--line);
+  border-color: var(--text);
 }
 
 .progress-history-row.is-selected {
@@ -3224,7 +3224,7 @@ select option {
 
 .progress-history-action:hover {
   background: var(--surface-soft);
-  border-color: var(--line-strong);
+  border-color: var(--muted-strong);
   color: var(--text);
 }
 
@@ -3304,7 +3304,7 @@ select option {
 
 .docdetail-btn:hover {
   background: var(--surface-soft);
-  border-color: var(--line-strong);
+  border-color: var(--muted-strong);
 }
 
 .docdetail-btn:disabled {
@@ -3325,7 +3325,7 @@ select option {
 .docdetail-btn--primary {
   background: var(--primary);
   border-color: var(--primary);
-  color: var(--surface);
+  color: #141419;
 }
 
 .docdetail-btn--primary:hover {
@@ -3508,7 +3508,7 @@ select option {
 /* 엑셀(CSV) 내려받기 버튼 — 기존 dag-copy-btn 톤 재사용 + 초록 강조 */
 .ra-export-btn {
   background: var(--green) !important;
-  color: var(--surface) !important;
+  color: #141419 !important;
   border-color: var(--green) !important;
 }
 .ra-export-btn:hover { background: var(--green) !important; }
@@ -3603,7 +3603,7 @@ select option {
   padding: 5px 12px;
   font-size: 0.74rem;
   font-weight: 600;
-  color: var(--surface);
+  color: #141419;
   background: var(--teal);
   border: 0;
   border-radius: 6px;
@@ -3916,17 +3916,17 @@ select option {
 
 .cbot-job-card.is-done .cbot-job-card-icon {
   background: var(--green);
-  color: var(--surface);
+  color: #141419;
 }
 
 .cbot-job-card.is-rejected .cbot-job-card-icon {
   background: var(--primary);
-  color: var(--surface);
+  color: #141419;
 }
 
 .cbot-job-card.is-error .cbot-job-card-icon {
   background: var(--red);
-  color: var(--surface);
+  color: #141419;
 }
 
 .cbot-job-card-body {
@@ -4026,7 +4026,7 @@ select option {
 .icon-btn:hover {
   background: var(--surface-soft);
   color: var(--text);
-  border-color: var(--line-strong);
+  border-color: var(--muted-strong);
 }
 
 .icon-btn:focus-visible {
@@ -4094,7 +4094,7 @@ select option {
   height: 26px;
   border-radius: 7px;
   background: var(--primary);
-  color: var(--surface);
+  color: #141419;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4402,7 +4402,7 @@ select option {
   border-radius: var(--radius-m);
   transition: all 0.15s var(--ease-out);
 }
-.sch-doctype:hover { border-color: var(--line-strong); }
+.sch-doctype:hover { border-color: var(--muted-strong); }
 .sch-doctype.active { border-color: var(--purple); background: var(--primary-soft); }
 .sch-doctype strong { font-size: 0.92rem; color: var(--text); }
 .sch-doctype.active strong { color: var(--purple); }
@@ -4429,7 +4429,7 @@ select option {
 }
 .sch-submit {
   padding: 12px 18px; font-size: 0.95rem; font-weight: 600;
-  color: var(--surface); cursor: pointer; border: none; border-radius: var(--radius-m);
+  color: #141419; cursor: pointer; border: none; border-radius: var(--radius-m);
   background: linear-gradient(135deg, var(--primary) 0%, var(--purple) 100%);
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   transition: opacity 0.15s var(--ease-out);
@@ -4491,7 +4491,7 @@ select option {
 .sch-viewmode { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-s); overflow: hidden; margin-left: auto; }
 .sch-vm-btn { padding: 7px 14px; font-size: 0.85rem; background: var(--surface); border: none; cursor: pointer; color: var(--muted); border-left: 1px solid var(--line); }
 .sch-vm-btn:first-child { border-left: none; }
-.sch-vm-btn.active { background: var(--primary); color: var(--surface); font-weight: 600; }
+.sch-vm-btn.active { background: var(--primary); color: #141419; font-weight: 600; }
 .sch-hint { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 0.86rem; }
 
 .sch-metric.big .sch-metric-val { font-size: 1.4rem; color: var(--primary); }
@@ -4536,7 +4536,7 @@ select option {
 .sch-impact-list { margin: 0; padding-left: 18px; }
 .sch-impact-list li { font-size: 0.86rem; margin: 5px 0; line-height: 1.5; }
 .sch-impact-ms { color: var(--red); font-weight: 500; }
-.sch-tag-cp { display: inline-block; background: var(--red); color: var(--surface); font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 2px; }
+.sch-tag-cp { display: inline-block; background: var(--red); color: #141419; font-size: 0.68rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 2px; }
 
 /* 필요문서 추천 */
 .sch-recsum { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -4663,7 +4663,7 @@ select option {
   padding: 10px 16px;
   background: rgba(14, 23, 38, 0.92);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--surface-muted);
+  color: var(--muted-strong);
   flex-wrap: wrap;
 }
 .plaza-title { font-weight: 700; font-size: 0.95rem; }
@@ -4675,7 +4675,7 @@ select option {
 .plaza-dot.connecting { background: var(--primary); animation: plazaPulse 1s ease-in-out infinite; }
 .plaza-dot.closed { background: var(--red); }
 @keyframes plazaPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-.plaza-status { font-size: 0.82rem; color: var(--line-strong); }
+.plaza-status { font-size: 0.82rem; color: var(--muted-strong); }
 .plaza-hint {
   margin-left: auto; font-size: 0.76rem; color: var(--muted);
   white-space: nowrap;
@@ -4716,7 +4716,7 @@ select option {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
-  color: var(--surface-soft);
+  color: var(--text);
   font-size: 0.9rem;
   outline: none;
 }
@@ -4727,7 +4727,7 @@ select option {
   border-radius: 10px;
   border: none;
   background: var(--primary);
-  color: var(--surface);
+  color: #141419;
   font-weight: 600;
   font-size: 0.88rem;
   cursor: pointer;
@@ -4744,7 +4744,7 @@ select option {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 10px; border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.07); color: var(--surface-muted);
+  background: rgba(255,255,255,0.07); color: var(--muted-strong);
   font-size: 0.8rem; font-weight: 600; cursor: pointer;
 }
 .plaza-tool:hover { background: rgba(255,255,255,0.13); }
@@ -4763,7 +4763,7 @@ select option {
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 14px;
   box-shadow: 0 12px 48px rgba(0,0,0,0.5);
-  color: var(--surface-muted); overflow: hidden;
+  color: var(--muted-strong); overflow: hidden;
   backdrop-filter: blur(6px);
 }
 .plaza-panel--wide { width: 460px; }
@@ -4780,7 +4780,7 @@ select option {
   display: inline-flex; padding: 4px; border-radius: 6px;
   border: none; background: transparent; color: var(--muted); cursor: pointer;
 }
-.plaza-panel-x:hover { background: rgba(255,255,255,0.1); color: var(--surface); }
+.plaza-panel-x:hover { background: rgba(255,255,255,0.1); color: #141419; }
 .plaza-panel-empty { padding: 36px 16px; text-align: center; color: var(--muted); font-size: 0.86rem; line-height: 1.7; }
 .plaza-panel-foot { padding: 10px 14px; margin: 0; font-size: 0.74rem; color: var(--muted); border-top: 1px solid rgba(255,255,255,0.08); }
 
@@ -4794,7 +4794,7 @@ select option {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px;
   padding: 10px 6px; border-radius: 10px;
   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-  color: var(--surface-muted); cursor: pointer; font: inherit;
+  color: var(--muted-strong); cursor: pointer; font: inherit;
 }
 .plaza-card:hover { background: rgba(255,255,255,0.1); }
 .plaza-card.equipped { border-color: var(--primary); background: rgba(255,200,40,0.12); }
@@ -4811,7 +4811,7 @@ select option {
 }
 .plaza-buy {
   margin-top: 4px; width: 100%; padding: 5px 0; border-radius: 7px;
-  border: none; background: var(--primary); color: var(--surface);
+  border: none; background: var(--primary); color: #141419;
   font-size: 0.76rem; font-weight: 700; cursor: pointer;
 }
 .plaza-buy:hover:not(:disabled) { background: var(--primary-deep); }
@@ -4829,7 +4829,7 @@ select option {
 .plaza-slot-label { width: 42px; font-size: 0.78rem; font-weight: 700; color: var(--muted); flex: 0 0 auto; }
 .plaza-slot-item {
   display: flex; align-items: center; gap: 10px; flex: 1;
-  background: none; border: none; color: var(--surface-muted); cursor: pointer; font: inherit; text-align: left;
+  background: none; border: none; color: var(--muted-strong); cursor: pointer; font: inherit; text-align: left;
 }
 .plaza-slot-item .plaza-item-icon { width: 40px; height: 40px; }
 .plaza-slot-remove { margin-left: auto; font-size: 0.72rem; color: #ff8d8d; }
@@ -4852,7 +4852,7 @@ select option {
   background: rgba(22, 30, 46, 0.98);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 16px; padding: 22px;
-  box-shadow: 0 16px 60px rgba(0,0,0,0.55); color: var(--surface-muted); text-align: center;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.55); color: var(--muted-strong); text-align: center;
 }
 .plaza-charsel-title { margin: 0 0 4px; font-size: 1.2rem; font-weight: 800; }
 .plaza-charsel-desc { margin: 0 0 18px; font-size: 0.84rem; color: var(--muted); }
@@ -4861,7 +4861,7 @@ select option {
 }
 .plaza-charsel-card {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 12px 6px; border-radius: 12px; cursor: pointer; font: inherit; color: var(--surface-muted);
+  padding: 12px 6px; border-radius: 12px; cursor: pointer; font: inherit; color: var(--muted-strong);
   background: rgba(255,255,255,0.05); border: 2px solid transparent;
 }
 .plaza-charsel-card:hover { background: rgba(255,255,255,0.1); }
@@ -4870,7 +4870,7 @@ select option {
 .plaza-charsel-name { font-size: 0.82rem; font-weight: 600; }
 .plaza-charsel-confirm {
   width: 100%; padding: 12px 0; border-radius: 10px; border: none;
-  background: var(--primary); color: var(--surface); font-size: 0.92rem; font-weight: 700; cursor: pointer;
+  background: var(--primary); color: #141419; font-size: 0.92rem; font-weight: 700; cursor: pointer;
 }
 .plaza-charsel-confirm:hover:not(:disabled) { background: var(--primary-deep); }
 .plaza-charsel-confirm:disabled { background: rgba(255,255,255,0.1); color: var(--muted); cursor: not-allowed; }
@@ -4881,7 +4881,7 @@ select option {
   width: min(720px, 94%); max-height: calc(100% - 24px);
   display: flex; flex-direction: column;
   background: rgba(22, 30, 46, 0.98); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 16px; box-shadow: 0 16px 60px rgba(0,0,0,0.55); color: var(--surface-muted); overflow: hidden;
+  border-radius: 16px; box-shadow: 0 16px 60px rgba(0,0,0,0.55); color: var(--muted-strong); overflow: hidden;
 }
 .plaza-creator-body { display: flex; gap: 14px; padding: 14px; min-height: 0; flex: 1; }
 .plaza-creator-preview {
@@ -4894,10 +4894,10 @@ select option {
 .plaza-creator-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
 .plaza-creator-tab {
   padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.05); color: var(--line-strong); font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  background: rgba(255,255,255,0.05); color: var(--muted-strong); font-size: 0.78rem; font-weight: 600; cursor: pointer;
 }
 .plaza-creator-tab:hover { background: rgba(255,255,255,0.1); }
-.plaza-creator-tab.on { background: var(--primary); border-color: var(--primary); color: var(--surface); }
+.plaza-creator-tab.on { background: var(--primary); border-color: var(--primary); color: #141419; }
 .plaza-creator-colors { display: flex; flex-wrap: wrap; gap: 6px; }
 .plaza-color-chip {
   width: 34px; height: 34px; border-radius: 8px; overflow: hidden; padding: 0; cursor: pointer;
@@ -4942,7 +4942,7 @@ select option {
   background: rgba(22, 30, 46, 0.98);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 14px; box-shadow: 0 16px 60px rgba(0,0,0,0.55);
-  color: var(--surface-muted); overflow: hidden;
+  color: var(--muted-strong); overflow: hidden;
 }
 .plaza-board-tools {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
@@ -4962,12 +4962,12 @@ select option {
 .plaza-board-size.on { border-color: var(--primary); background: rgba(255,200,40,0.14); }
 .plaza-board-size span { background: var(--surface-muted); border-radius: 50%; display: block; }
 .plaza-board-btn {
-  width: 30px; height: 30px; border-radius: 7px; cursor: pointer; color: var(--line-strong);
+  width: 30px; height: 30px; border-radius: 7px; cursor: pointer; color: var(--muted-strong);
   border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06);
   display: flex; align-items: center; justify-content: center;
 }
 .plaza-board-btn:hover { background: rgba(255,255,255,0.12); }
-.plaza-board-btn.on { border-color: var(--primary); background: var(--primary); color: var(--surface); }
+.plaza-board-btn.on { border-color: var(--primary); background: var(--primary); color: #141419; }
 .plaza-board-canvas {
   display: block; width: 100%; height: auto; aspect-ratio: 640 / 420;
   background: var(--surface); cursor: crosshair; touch-action: none;
@@ -4978,7 +4978,7 @@ select option {
   width: min(980px, 96%); max-height: calc(100% - 16px);
   display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto;
   background: rgba(22, 30, 46, 0.98); border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 14px; box-shadow: 0 16px 60px rgba(0,0,0,0.55); color: var(--surface-muted);
+  border-radius: 14px; box-shadow: 0 16px 60px rgba(0,0,0,0.55); color: var(--muted-strong);
 }
 .plaza-room-body { display: flex; gap: 10px; padding: 12px; min-height: 0; }
 .plaza-room-side { display: flex; flex-direction: column; gap: 8px; flex: 0 0 130px; }
@@ -5016,19 +5016,19 @@ select option {
 }
 
 /* 광장 — 캐치마인드 게임 UI */
-.plaza-game-status { font-size: 0.8rem; color: var(--line-strong); }
+.plaza-game-status { font-size: 0.8rem; color: var(--muted-strong); }
 .plaza-game-status b { color: var(--primary); }
 .plaza-timer { color: #8fd0ff; font-weight: 700; }
 .plaza-timer.low { color: var(--red); }
 .plaza-game-start {
   display: inline-flex; align-items: center; gap: 5px; margin-left: auto;
   padding: 5px 12px; border-radius: 8px; border: none;
-  background: var(--green, var(--green)); color: var(--surface); font-weight: 700; font-size: 0.8rem; cursor: pointer;
+  background: var(--green, var(--green)); color: #141419; font-weight: 700; font-size: 0.8rem; cursor: pointer;
 }
 .plaza-game-start:disabled { background: rgba(255,255,255,0.12); color: var(--muted); cursor: not-allowed; }
 .plaza-word-bar {
   padding: 7px 12px; border-radius: 8px; text-align: center; font-size: 0.86rem;
-  background: rgba(255,255,255,0.06); color: var(--surface-muted);
+  background: rgba(255,255,255,0.06); color: var(--muted-strong);
 }
 .plaza-word-bar b { color: var(--primary); font-size: 1.05rem; letter-spacing: 1px; }
 .plaza-word-blanks { letter-spacing: 3px; color: var(--primary); font-weight: 700; }
@@ -5037,11 +5037,11 @@ select option {
 .plaza-game-overlay {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 8px;
-  background: rgba(10, 16, 28, 0.78); border-radius: 8px; color: var(--surface); text-align: center;
+  background: rgba(10, 16, 28, 0.78); border-radius: 8px; color: #141419; text-align: center;
 }
 .plaza-game-overlay-title { font-size: 1.3rem; font-weight: 800; }
 .plaza-game-overlay-title b { color: var(--primary); }
-.plaza-game-overlay-sub { font-size: 0.85rem; color: var(--line-strong); }
+.plaza-game-overlay-sub { font-size: 0.85rem; color: var(--muted-strong); }
 .plaza-rank { margin: 0; padding: 0; list-style: none; font-size: 0.95rem; line-height: 1.8; }
 .plaza-rank li:first-child { color: var(--primary); font-weight: 700; }
 .plaza-rank b { color: var(--primary); }
@@ -5062,7 +5062,7 @@ select option {
   pointer-events: none;
 }
 .plaza-chatlog-line {
-  font-size: 0.8rem; line-height: 1.45; color: var(--surface);
+  font-size: 0.8rem; line-height: 1.45; color: #141419;
   text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 3px rgba(0,0,0,0.7);
   background: rgba(14,23,38,0.35); padding: 1px 7px; border-radius: 6px;
   width: fit-content; max-width: 100%; word-break: break-word;
@@ -5099,7 +5099,7 @@ select option {
 }
 .plaza-pcard-bubble::after {
   content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-  border: 6px solid transparent; border-top-color: var(--surface);
+  border: 6px solid transparent; border-top-color: #141419;
 }
 .plaza-room-chathint { color: var(--muted); font-size: 0.78rem; text-align: center; padding: 6px 0; }
 
@@ -5108,10 +5108,10 @@ select option {
 .plaza-diff { display: inline-flex; gap: 4px; }
 .plaza-diff-btn {
   padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 0.76rem; font-weight: 700;
-  border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: var(--line-strong);
+  border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: var(--muted-strong);
 }
 .plaza-diff-btn:hover { background: rgba(255,255,255,0.12); }
-.plaza-diff-btn.on { background: var(--primary); border-color: var(--primary); color: var(--surface); }
+.plaza-diff-btn.on { background: var(--primary); border-color: var(--primary); color: #141419; }
 
 /* 광장 — 오목 룸 */
 .plaza-omok { width: min(560px, 96%); }
@@ -5142,7 +5142,7 @@ select option {
 /* 광장 오목 — 금수 알림 */
 .plaza-omok-notice {
   position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
-  background: rgba(224,49,49,0.95); color: var(--surface); font-weight: 700; font-size: 0.85rem;
+  background: rgba(224,49,49,0.95); color: #141419; font-weight: 700; font-size: 0.85rem;
   padding: 6px 14px; border-radius: 10px; white-space: nowrap; box-shadow: 0 3px 10px rgba(0,0,0,0.4);
 }
 
@@ -5190,7 +5190,7 @@ select option {
   background-size: 18px 18px; background-position: 0 0,9px 9px;
 }
 .plaza-shop-preview-info { width: 100%; text-align: center; display: flex; flex-direction: column; gap: 6px; }
-.plaza-shop-preview-name { font-size: 0.8rem; font-weight: 700; color: var(--surface-muted); }
+.plaza-shop-preview-name { font-size: 0.8rem; font-weight: 700; color: var(--muted-strong); }
 .plaza-shop-preview-hint { font-size: 0.78rem; color: var(--muted); line-height: 1.5; padding: 20px 0; }
 .plaza-shop-grid { flex: 1; padding: 0; align-content: start; }
 .plaza-card--shop.sel { border-color: var(--primary); background: rgba(255,200,40,0.14); }

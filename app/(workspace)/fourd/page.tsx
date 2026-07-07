@@ -41,7 +41,6 @@ import { policyMatch, type UnmatchedGroup } from "../../../lib/fourd/policy";
 import { saveFourdFiles, loadFourdFiles, clearFourdFiles, loadPlanIfcs, savePlanIfcs, saveParsedCache, loadParsedCache, type CachedFourd } from "../../../lib/fourd/fileCache";
 import { DEFAULT_HIDDEN_TRADES } from "../../../lib/fourd/layers";
 import { buildSchedOpStorey, classifyUnmatched, CAUSE_ORDER, classifyNoBim, NOBIM_ORDER, type Cause } from "../../../lib/fourd/diagnose";
-import { deriveWorkPackages } from "../../../lib/fourd/workpackage";
 import type { ParsedElement, ParsedIfc } from "../../../lib/fourd/ifc";
 
 interface Ready {
@@ -652,32 +651,6 @@ export default function FourDPage() {
   // ── 시뮬레이션 보고서 — 공정표↔BIM 양방향 정합성 진단 ──
   const [report, setReport] = useState<ReportData | null>(null);
 
-  // ── 워크패키지 — BIM 메타(호·타입·부재종류)로 세분, Neon 영속화 ──
-  const [wpSaving, setWpSaving] = useState<"idle" | "saving" | "done" | "error">("idle");
-  // 원클릭 저장 — 4D 분석 결과(패키지 1:N 유닛)를 Neon 영속(진도율 보드·PMIS-X 연동 소스).
-  // 물량 확인=/schedule/resource, 활동 목록=공정표, 연결 진단=진단 보고서로 일원화 → 모달 제거.
-  const saveWorkPackages = async () => {
-    if (!ready) return;
-    setWpSaving("saving");
-    try {
-      const packages = deriveWorkPackages(ready.tasks, ready.parsed.elements, ready.ranges);
-      const res = await fetch("/api/clm/fourd/work-packages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: ready.sessionId, packages }),
-      });
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        console.error("[워크패키지 저장]", res.status, txt.slice(0, 300));
-        alert(`저장 실패 (HTTP ${res.status})${res.status === 413 ? " — 페이로드가 서버 한도 초과(nginx client_max_body_size 증설 필요)" : ""}`);
-      }
-      setWpSaving(res.ok ? "done" : "error");
-    } catch (e) {
-      console.error("[워크패키지 저장]", e);
-      setWpSaving("error");
-    }
-  };
-
   // ── 공사일보 — 타임라인 슬라이더 '해당일' 기준, 기존 schedule/analyze 재사용 ──
   const [dailyBusy, setDailyBusy] = useState(false);
   const [dailyDoc, setDailyDoc] = useState<ScheduleReportDoc | null>(null);
@@ -985,7 +958,7 @@ export default function FourDPage() {
               </div>
               <button
                 onClick={restoreCached}
-                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--primary)", color: "var(--surface)", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--primary)", color: "#141419", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
               >
                 이어서 열기
               </button>
@@ -1045,7 +1018,7 @@ export default function FourDPage() {
               borderRadius: 8,
               border: "none",
               background: !scheduleFile || !ifcFiles.length || busy ? "var(--line-strong)" : "var(--primary)",
-              color: "var(--surface)",
+              color: "#141419",
               fontSize: 15,
               fontWeight: 600,
               cursor: !scheduleFile || !ifcFiles.length || busy ? "default" : "pointer",
@@ -1120,7 +1093,7 @@ export default function FourDPage() {
                   borderRadius: 8,
                   border: "none",
                   background: policyBusy ? "var(--line-strong)" : "var(--primary)",
-                  color: "var(--surface)",
+                  color: "#141419",
                   fontWeight: 600,
                   cursor: policyBusy ? "default" : "pointer",
                 }}
@@ -1150,7 +1123,7 @@ export default function FourDPage() {
                   }}
                   style={{
                     padding: "8px 14px", borderRadius: 8, border: "1px solid var(--green)",
-                    background: "var(--green)", color: "var(--surface)", fontWeight: 600, cursor: "pointer",
+                    background: "var(--green)", color: "#141419", fontWeight: 600, cursor: "pointer",
                   }}
                   title="AI가 추정한 워크유닛 배정을 검토 후 공정표에 정식 편입 — 보라(추정) → 초록(확정)"
                 >
@@ -1164,27 +1137,12 @@ export default function FourDPage() {
                   borderRadius: 8,
                   border: "1px solid var(--primary)",
                   background: "var(--primary)",
-                  color: "var(--surface)",
+                  color: "#141419",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
               >
                 시뮬레이션 보고서
-              </button>
-              <button
-                onClick={saveWorkPackages}
-                disabled={wpSaving === "saving"}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                  border: "1px solid var(--primary)",
-                  background: wpSaving === "done" ? "var(--green)" : "var(--primary)",
-                  color: "var(--surface)",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {wpSaving === "saving" ? "저장 중…" : wpSaving === "done" ? "진도율·PMIS-X 저장됨" : wpSaving === "error" ? "저장 실패 — 재시도" : "진도율·PMIS-X 저장"}
               </button>
             </div>
           )}
@@ -1338,7 +1296,7 @@ function DailyPlanModal({
           <button
             onClick={onGenerate}
             disabled={busy}
-            style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: busy ? "var(--muted)" : "var(--primary)", color: "var(--surface)", fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer" }}
+            style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: busy ? "var(--muted)" : "var(--primary)", color: "#141419", fontSize: 14, fontWeight: 600, cursor: busy ? "default" : "pointer" }}
           >
             {busy ? "생성 중…" : "공사일보 생성"}
           </button>

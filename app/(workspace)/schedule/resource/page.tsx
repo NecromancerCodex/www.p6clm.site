@@ -70,6 +70,24 @@ export default function ResourcePlanPage() {
     }
   };
 
+  // 전체 삭제 — 누적된 테스트 플랜 일괄 정리. 파괴적이라 이중 확인(개수 명시).
+  const onDeleteAll = async () => {
+    if (!plans.length) return;
+    if (!window.confirm(`공정계획 전체 삭제\n\n저장된 ${plans.length}개를 모두 삭제합니다. 되돌릴 수 없습니다.`)) return;
+    if (!window.confirm(`정말로 ${plans.length}개 전부 삭제할까요? (마지막 확인)`)) return;
+    setLoading(true); setErr("");
+    let failed = 0;
+    for (const p of plans) {
+      try { await deletePlan(p.id); } catch { failed += 1; }
+    }
+    if (failed) setErr(`${failed}개 삭제 실패 — 새로고침 후 재시도하세요`);
+    const rest = failed ? await listPlans().catch(() => []) : [];
+    setPlans(rest);
+    setPlanId(rest.length ? rest[0].id : "");
+    setRows([]);
+    setLoading(false);
+  };
+
   const byDisc = useMemo(() => {
     const g: Record<string, ResourceRow[]> = {};
     for (const r of rows) (g[r.discipline] ??= []).push(r);
@@ -106,6 +124,11 @@ export default function ResourcePlanPage() {
                 style={{ color: "var(--red)", borderColor: "var(--red-soft)" }}
                 onClick={() => void onDelete()} title="이 공정계획 삭제">
           삭제
+        </button>
+        <button className="wz-btn" disabled={!plans.length || loading}
+                style={{ color: "var(--red)", borderColor: "var(--red-soft)" }}
+                onClick={() => void onDeleteAll()} title="저장된 공정계획 전부 삭제">
+          전체 삭제 ({plans.length})
         </button>
         {err && <span style={{ color: "var(--red)", fontSize: 12 }}>{err}</span>}
       </div>
@@ -156,7 +179,7 @@ export default function ResourcePlanPage() {
                       <td style={td}>
                         {r.equip.length
                           ? r.equip.map((e) => <span key={e.name} style={eqChip}>{e.name} {e.count}</span>)
-                          : <span style={{ color: "var(--line-strong)" }}>—</span>}
+                          : <span style={{ color: "var(--muted-strong)" }}>—</span>}
                       </td>
                     </tr>
                   ))}

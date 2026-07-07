@@ -297,8 +297,8 @@ function Meta({ label, value }: { label: string; value: string }) {
 // ── 인라인 스타일 ──
 const btnGhost: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid var(--line)", borderRadius: 8, padding: "5px 10px", fontSize: 13, cursor: "pointer", color: "var(--muted-strong)" };
 const cardBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", padding: "12px 14px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 10, cursor: "pointer" };
-const pill: React.CSSProperties = { fontSize: 11, color: "var(--surface)", padding: "2px 7px", borderRadius: 999, fontWeight: 600, whiteSpace: "nowrap" };
-const delBtn: React.CSSProperties = { display: "inline-flex", padding: 5, color: "var(--line-strong)", borderRadius: 6, cursor: "pointer" };
+const pill: React.CSSProperties = { fontSize: 11, color: "#141419", padding: "2px 7px", borderRadius: 999, fontWeight: 600, whiteSpace: "nowrap" };
+const delBtn: React.CSSProperties = { display: "inline-flex", padding: 5, color: "var(--muted-strong)", borderRadius: 6, cursor: "pointer" };
 const errorBox: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, background: "var(--red-soft)", color: "var(--red)", border: "1px solid var(--red-soft)", borderRadius: 8, padding: "10px 14px", fontSize: 13, marginBottom: 14 };
 const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0, 0, 0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 100 };
 const modal: React.CSSProperties = { background: "var(--surface)", borderRadius: 14, padding: 22, maxWidth: 560, width: "100%", maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" };
