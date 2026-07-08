@@ -30,14 +30,22 @@ export function CadLayerPreview({ files, catFor, selectedKey, onSelectLayer, hei
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
-  // 전체 좌표 범위
+  // 좌표 범위 — 이상치(스트레이 점·0뭉치·-2억 좌표) 제거. 중앙값 ± 2.5×IQR:
+  // 도면(대체로 균일분포)은 전부 담기고, 극단 아웃라이어는 뷰 밖으로 클립됨.
   const bounds = useMemo(() => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const xs: number[] = [], ys: number[] = [];
     for (const f of files) for (const e of f.doc.entities) for (const v of e.verts) {
-      if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x;
-      if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y;
+      if (Number.isFinite(v.x) && Number.isFinite(v.y)) { xs.push(v.x); ys.push(v.y); }
     }
-    if (!Number.isFinite(minX)) return null;
+    if (xs.length < 2) return null;
+    xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
+    const q = (a: number[], p: number) => a[Math.min(a.length - 1, Math.max(0, Math.round(p * (a.length - 1))))];
+    const rng = (a: number[]) => {
+      const p25 = q(a, 0.25), p50 = q(a, 0.5), p75 = q(a, 0.75);
+      const iqr = (p75 - p25) || Math.max(1, Math.abs(p50) * 0.01);
+      return [p50 - 2.5 * iqr, p50 + 2.5 * iqr] as const;
+    };
+    const [minX, maxX] = rng(xs), [minY, maxY] = rng(ys);
     return { minX, minY, maxX, maxY };
   }, [files]);
 
