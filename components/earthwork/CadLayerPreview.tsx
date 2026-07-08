@@ -7,7 +7,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { layerKey, type FileImport, type Category } from "../../lib/earthwork/dxfImport";
+import { layerKey, mainRange, type FileImport, type Category } from "../../lib/earthwork/dxfImport";
 
 export const CAT_COLOR: Record<Category, string> = {
   boreholes: "#a855f7", boundary: "#22c55e", piles: "#f59e0b", walls: "#ef4444", terrain: "#2dd4bf", ignore: "#4b5563",
@@ -30,22 +30,17 @@ export function CadLayerPreview({ files, catFor, selectedKey, onSelectLayer, hei
   const [view, setView] = useState<View | null>(null);
   const drag = useRef<{ x: number; y: number; tx: number; ty: number; moved: number } | null>(null);
 
-  // 좌표 범위 — 중앙값 ± 2.5×IQR (극단 이상치·0뭉치 제거)
+  // 좌표 범위 — 주 도면 클러스터만(binning+밀도임계+연결성분에서 점 최다 구간). 범례·원점 잡동사니
+  // 등 다른 좌표덩어리는 제외. + 12% 여백.
   const bounds = useMemo(() => {
     const xs: number[] = [], ys: number[] = [];
     for (const f of files) for (const e of f.doc.entities) for (const v of e.verts) {
       if (Number.isFinite(v.x) && Number.isFinite(v.y)) { xs.push(v.x); ys.push(v.y); }
     }
     if (xs.length < 2) return null;
-    xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
-    const q = (a: number[], p: number) => a[Math.min(a.length - 1, Math.max(0, Math.round(p * (a.length - 1))))];
-    const rng = (a: number[]): [number, number] => {
-      const p25 = q(a, 0.25), p50 = q(a, 0.5), p75 = q(a, 0.75);
-      const iqr = (p75 - p25) || Math.max(1, Math.abs(p50) * 0.01);
-      return [p50 - 2.5 * iqr, p50 + 2.5 * iqr];
-    };
-    const [minX, maxX] = rng(xs), [minY, maxY] = rng(ys);
-    return { minX, minY, maxX, maxY };
+    const [x0, x1] = mainRange(xs), [y0, y1] = mainRange(ys);
+    const mx = (x1 - x0) * 0.12 || 1, my = (y1 - y0) * 0.12 || 1;
+    return { minX: x0 - mx, maxX: x1 + mx, minY: y0 - my, maxY: y1 + my };
   }, [files]);
 
   // 이상치 엔티티 제외: ① 중심에서 너무 먼 vertex ② 자체 span 이 도면 폭 초과(도면→이상치 실선).

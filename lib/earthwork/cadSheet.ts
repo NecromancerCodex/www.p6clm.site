@@ -3,26 +3,20 @@
  * 비전 모델이 '모양'(격자=파일, 큰 닫힌선=경계, 평행선=흙막이)을 보고 분류하도록.
  * 클라이언트 전용(document/canvas).
  */
-import type { FileImport } from "./dxfImport";
+import { mainRange, type FileImport } from "./dxfImport";
 
 export interface SheetRef { n: number; file: string; layer: string; name: string; }
 
 const CELL = 200, PAD = 12, COLS = 5;
 
-// 레이어 엔티티들의 robust 범위(중앙값±2.5IQR — 이상치 제거).
+// 레이어 엔티티들의 범위 — 주 클러스터만(좌표덩어리 흩어짐 대응). + 10% 여백.
 function layerBounds(ents: FileImport["doc"]["entities"]) {
   const xs: number[] = [], ys: number[] = [];
   for (const e of ents) for (const v of e.verts) if (Number.isFinite(v.x) && Number.isFinite(v.y)) { xs.push(v.x); ys.push(v.y); }
   if (xs.length < 2) return null;
-  xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
-  const q = (a: number[], p: number) => a[Math.min(a.length - 1, Math.max(0, Math.round(p * (a.length - 1))))];
-  const rng = (a: number[]): [number, number] => {
-    const p25 = q(a, 0.25), p50 = q(a, 0.5), p75 = q(a, 0.75);
-    const iqr = (p75 - p25) || Math.max(1, Math.abs(p50) * 0.01);
-    return [p50 - 2.7 * iqr, p50 + 2.7 * iqr];
-  };
-  const [minX, maxX] = rng(xs), [minY, maxY] = rng(ys);
-  return { minX, minY, maxX, maxY };
+  const [x0, x1] = mainRange(xs), [y0, y1] = mainRange(ys);
+  const mx = (x1 - x0) * 0.1 || 1, my = (y1 - y0) * 0.1 || 1;
+  return { minX: x0 - mx, minY: y0 - my, maxX: x1 + mx, maxY: y1 + my };
 }
 
 function drawCell(ctx: CanvasRenderingContext2D, ents: FileImport["doc"]["entities"], ox: number, oy: number) {
