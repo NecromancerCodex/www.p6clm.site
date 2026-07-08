@@ -255,12 +255,14 @@ export default function FourDPage() {
       } else {
         const snap = await uploadSchedule(sf);
         const rawTasks = (snap.tasks ?? []) as unknown as Array<Record<string, unknown>>;
-        tasks = rawTasks.map((t) => ({
+        tasks = rawTasks.map((t, i) => ({
           code: String(t.activity_code ?? t.code ?? t.id ?? ""),
           name: t.name as string | undefined,
           start: (t.start ?? t.baseline_start_date ?? null) as string | null,
           end: (t.end ?? t.baseline_finish_date ?? null) as string | null,
           progress: t.progress as number | undefined,
+          wbs: (t.wbs_code as string | undefined) || undefined,  // 간트 WBS 그룹행(umd 자동 트리)
+          wbsRank: i,  // 백엔드가 이미 WBS 순 정렬 — 원 순서 보존
         }));
       }
       const codeCount = tasks.filter((t) => decodeActId(t.code)).length;
@@ -467,9 +469,13 @@ export default function FourDPage() {
   /** 위저드 → 4D 핸드오프: ?plan=X 면 그 플랜의 P6 공정표 + 슬롯 IFC(공종 태그)를 자동 로드·분석. */
   useEffect(() => {
     if (planLoadedRef.current) return;
-    const planId = new URLSearchParams(window.location.search).get("plan");
+    // ?plan= 없이 직접 진입해도 마지막 플랜 자동 복원 — IFC 는 S3·공정표는 DB 에 있는데
+    // 매번 파일을 다시 올리게 하지 않기 위함. 새 파일 드롭 시 그대로 대체 가능.
+    const planId = new URLSearchParams(window.location.search).get("plan")
+      || localStorage.getItem("fourd:lastPlan");
     if (!planId) return;
     planLoadedRef.current = true;
+    try { localStorage.setItem("fourd:lastPlan", planId); } catch { /* 시크릿 모드 등 */ }
     void (async () => {
       setBusy(true); setError(null); setProgress({ p: 0.02, msg: "플랜 IFC·공정표 로드 중…" });
       try {

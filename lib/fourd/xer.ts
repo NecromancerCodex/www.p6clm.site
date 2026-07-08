@@ -110,7 +110,7 @@ function buildWbsIndex(tables: Map<string, XerTable>): Map<string, { path: strin
   let rank = 0;
   const walk = (n: Node, path: string[]) => {
     const p = [...path, n.name];
-    out.set(n.id, { path: p.slice(1).join(" > ") || n.name, rank: rank++ }); // 루트(프로젝트명)는 경로에서 생략
+    out.set(n.id, { path: p.slice(1).join(".") || n.name, rank: rank++ }); // 루트(프로젝트명) 생략 · "." = frappe 포크의 WBS 그룹 구분자
     for (const c of (children.get(n.id) ?? []).sort(bySeq)) walk(c, p);
   };
   for (const r of roots.sort(bySeq)) walk(r, []);

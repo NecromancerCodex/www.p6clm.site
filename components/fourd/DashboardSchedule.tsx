@@ -77,7 +77,14 @@ function toGanttTasks(tasks: ScheduleTask[]): GanttTask[] {
     else nameToCode.set(t.name, t.code);
   }
   const rankOf = new Map<string, number>();
-  for (const t of tasks) if (t.wbsRank != null) rankOf.set(t.code, t.wbsRank);
+  const wbsFirstSeen = new Map<string, number>();
+  for (const t of tasks) {
+    if (t.wbsRank != null) { rankOf.set(t.code, t.wbsRank); continue; }
+    if (t.wbs) {  // rank 없으면 wbs 그룹 첫 등장 순 유지 (그룹이 흩어지지 않게)
+      if (!wbsFirstSeen.has(t.wbs)) wbsFirstSeen.set(t.wbs, wbsFirstSeen.size);
+      rankOf.set(t.code, wbsFirstSeen.get(t.wbs)!);
+    }
+  }
   return tasks
     .filter((t) => t.start && t.end) // 날짜 없는 활동은 간트에 못 그림
     .map((t) => {
