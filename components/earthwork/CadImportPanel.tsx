@@ -69,6 +69,13 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
   const setCat = (file: string, layer: string, c: Category) => setSel((p) => ({ ...p, [layerKey(file, layer)]: c }));
   const aiCount = Object.keys(aiMap).length;
 
+  // 파일 제거 — 단면도 등 부적합 파일을 통째로 빼기. 해당 파일 키(sel/aiMap)도 정리.
+  const removeFile = (name: string) => {
+    setFiles((p) => p.filter((f) => f.name !== name));
+    const prune = (m: Record<string, Category>) => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith(`${name} `)));
+    setSel(prune); setAiMap(prune);
+  };
+
   const data = useMemo(() => (files.length ? extractSelected(files, eff) : null), [files, eff]);
   const has = data && (data.boundary.length || data.piles.length || data.boreholes.length || data.terrain.length || data.walls.length);
 
@@ -111,6 +118,19 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
 
       {err && <div style={{ marginTop: 8, fontSize: 12, color: "var(--red)" }}>{err}</div>}
 
+      {/* 올린 파일 칩 — 단면도 등 부적합 파일 개별 제거 */}
+      {files.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+          {files.map((f) => (
+            <span key={f.name} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "var(--muted-strong)", background: "var(--surface-soft)", border: "1px solid var(--line)", borderRadius: 7, padding: "3px 8px" }}>
+              {f.name}
+              <button type="button" onClick={() => removeFile(f.name)} title="이 파일 제거" style={{ border: "none", background: "none", color: "var(--muted)", cursor: "pointer", padding: 0, lineHeight: 1 }}><X size={12} /></button>
+            </span>
+          ))}
+          <span style={{ fontSize: 10.5, color: "var(--muted)", alignSelf: "center" }}>※ 평면도만 사용 — <strong>단면도(단면·section)는 제거</strong>하세요 (좌표가 평면이 아님)</span>
+        </div>
+      )}
+
       {layers.length > 0 && (
         <div style={{ marginTop: 10, border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
           <div style={{ display: "flex", gap: 8, padding: "6px 12px", background: "var(--surface-soft)", fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>
@@ -121,10 +141,17 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
           {shown.map((l) => (
             <div key={l.file + "|" + l.layer} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderTop: "1px solid var(--surface-soft)", fontSize: 12.5 }}>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ color: "var(--muted-strong)", fontWeight: 600 }}>{l.layer || "(무명)"}</span>
-                <span style={{ color: "var(--muted)", fontSize: 11, marginLeft: 6 }}>{l.file}</span>
+                <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ color: "var(--muted-strong)", fontWeight: 600 }}>{l.layer || "(무명)"}</span>
+                  <span style={{ color: "var(--muted)", fontSize: 11, marginLeft: 6 }}>{l.file.replace(/\.dxf$/i, "")}</span>
+                </span>
+                {l.samples.length > 0 && (
+                  <span style={{ display: "block", fontSize: 10.5, color: "var(--teal)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    「{l.samples.join(", ")}」
+                  </span>
+                )}
               </span>
-              <span style={{ width: 130, textAlign: "right", fontSize: 10.5, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.types}</span>
+              <span style={{ width: 110, textAlign: "right", fontSize: 10.5, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.types}</span>
               <select
                 value={catOf(l.file, l.layer, l.suggested)}
                 onChange={(e) => setCat(l.file, l.layer, e.target.value as Category)}
