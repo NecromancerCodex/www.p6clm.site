@@ -247,7 +247,9 @@ export interface CodeIndex {
   moByStorey: Map<string, DateRange>; // 모듈러: canonStorey → 모듈 window (zone 무관 폴백)
   moByUnit: Map<string, DateRange>; // 모듈러: zone|canonStorey|unit → 호 단위 모듈 window (호 세분)
   earthworkWindow: DateRange | null; // 토공(흙막이/굴착/차수) 공통활동 기간 — 토목(CV) 매칭용
-  civilWallWindow: DateRange | null; // 흙막이 벽체(CIP·SCW·토류) 활동 기간 — 벽체 부재 정밀 매칭용
+  civilWallWindow: DateRange | null; // 흙막이 벽체(CIP·SCW) 활동 기간 — 벽체 부재 정밀 매칭용(전 구역 폴백)
+  ewByZone: Map<string, DateRange>; // 구역("[B구역]")별 토공 창 — 부재 zone 으로 구역 정밀(전 둘레 동시 색칠 방지)
+  wallByZone: Map<string, DateRange>; // 구역별 흙막이 벽체 창 — CIP 말뚝이 자기 구역 시공 기간에만 등장
   finishWindow: DateRange | null; // 마감(창호·문·마감재) 활동 기간 — 마감 부재(골조 후) 매칭용
   finishStoreys: string[]; // 구조 층 목록(시공순 rank) — 마감 창 층별 안분(LoB 근사)용
   mepWindow: DateRange | null; // 설비(배관·덕트·전기·소방·통신) 활동 기간 — MEP 부재 매칭용
@@ -261,8 +263,41 @@ export interface CodeIndex {
 // 공법명(CIP·SCW·PRD 등)만으로 명명된 활동도 window 기여 — "[A구역] CIP 벽체"가 흙막이 단어 없이
 // 미기여 → 토목 부재 전체 미매칭(no_earthwork)되던 실측. 라틴 토큰은 \b 로 오매칭(principal) 방지.
 const _EARTHWORK_KW = /흙막이|토공|굴착|터파기|차수|되메우|버림|토류|가시설|파일|말뚝|버팀|띠장|앵커|지보|지반개량|지하연속벽|슬러리월|디워터링|웰포인트|\bCIP\b|\bSCW\b|\bPRD\b|H-?pile/i;
-// 흙막이 벽체류 활동(CIP·SCW·토류벽 등) — 벽체 부재는 굴착 전체가 아니라 이 기간에 등장(정밀).
+// 흙막이 벽체류 **부재** 이름 신호(CIP·SCW·토류벽 등) — 벽체 부재는 굴착 전체가 아니라 벽체창에 등장.
 const _CIVIL_WALL_KW = /흙막이|토류|지하연속벽|슬러리월|엄지말뚝|\bCIP\b|\bSCW\b|\bPRD\b|H-?pile/i;
+// 흙막이 벽체 **활동**(벽체 시공·캡빔) — 단계 지보(N단 토류판·띠장)는 제외. '토류' 포함 시 8단 토류판
+// (공기 말)까지 합쳐져 벽체창이 6개월로 벌어지던 실측(부산: CIP 링 전체가 반년 내내 진행중).
+const _CIVIL_WALL_TASK = /흙막이\s*벽체|캡빔|지하연속벽|슬러리월|엄지말뚝|\bCIP\b|\bSCW\b|\bPRD\b|H-?pile/i;
+// 토목 파일의 기둥형 부재 = 말뚝(CIP·엄지말뚝) — 이름 단서 0(제네릭 'C:NNN')이어도 타입이 신호.
+//   범용 도메인 지식(토목 모델에 건물 기둥 없음) — 프로젝트 전용 휴리스틱 아님.
+const _CIVIL_PILE_TYPES = new Set(["IfcColumn", "IfcPile", "IfcColumnStandardCase"]);
+// 구역 정규화 — 활동 "[B구역]"·부재 "Zone B"/"ZB"/"B" → "B" 한 축으로.
+function canonZoneCivil(s?: string | null): string {
+  let t = (s || "").replace(/zone|구역|[[\]\s]/gi, "").toUpperCase();
+  if (/^Z[A-Z0-9]+$/.test(t) && t.length > 1) t = t.slice(1);
+  return t === "-" ? "" : t;
+}
+
+/** 토목 부재 매칭 — 구역(자기 구역 창) × 벽체(이름 또는 말뚝 타입 → 벽체 창) 2축 정밀, 전 구역 창 폴백.
+ *  간트(구역·차수 정확)와 4D(전 둘레 동시 색칠)가 어긋나 보이던 실측(부산) 해소. */
+function matchCivil(
+  el: { name?: string | null; ifcType?: string; zone?: string | null },
+  ewByZone: Map<string, DateRange>, wallByZone: Map<string, DateRange>,
+  earthworkWindow: DateRange | null, civilWallWindow: DateRange | null,
+): MatchResult {
+  const z = canonZoneCivil(el.zone);
+  const isWall = _CIVIL_WALL_KW.test(el.name || "") || _CIVIL_PILE_TYPES.has(el.ifcType || "");
+  if (isWall) {
+    const zw = z ? wallByZone.get(z) : undefined;
+    if (zw) return { range: zw, via: `earthwork:흙막이:${z}` };
+    if (civilWallWindow) return { range: civilWallWindow, via: "earthwork:흙막이" };
+  }
+  const zew = z ? ewByZone.get(z) : undefined;
+  if (zew) return { range: zew, via: `earthwork:토목:${z}` };
+  return earthworkWindow
+    ? { range: earthworkWindow, via: "earthwork:토목" }
+    : { range: null, via: "no_earthwork" };
+}
 // 되메우기·성토는 골조 후행(post) — 흙막이 부재 window 에서 제외(안 그러면 흙막이가 골조 끝까지 진행중).
 const _BACKFILL_KW = /되메우|성토|복구/;
 // 건축 마감 활동(4D 코드 없음) — 마감 부재(창호·문·마감재)가 이 기간(골조 후)에 매칭. architecture.py 활동명.
@@ -363,6 +398,8 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
   let ewEnd = -Infinity;
   let cwStart = Infinity;
   let cwEnd = -Infinity;
+  const ewByZone = new Map<string, DateRange>();
+  const wallByZone = new Map<string, DateRange>();
   let fwStart = Infinity;
   let fwEnd = -Infinity;
   let mwStart = Infinity;
@@ -382,9 +419,16 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
       ewEnd = Math.max(ewEnd, e);
       minD = Math.min(minD, s);
       maxD = Math.max(maxD, e);
-      if (_CIVIL_WALL_KW.test(t.name || "")) {
+      const _zn = canonZoneCivil(/^\[(.+?)구역\]/.exec(t.name || "")?.[1]);
+      const _acc = (m: Map<string, DateRange>) => {
+        const c = m.get(_zn);
+        m.set(_zn, c ? { start: Math.min(c.start, s), end: Math.max(c.end, e) } : { start: s, end: e });
+      };
+      if (_zn) _acc(ewByZone);
+      if (_CIVIL_WALL_TASK.test(t.name || "")) {
         cwStart = Math.min(cwStart, s);
         cwEnd = Math.max(cwEnd, e);
+        if (_zn) _acc(wallByZone);
       }
     }
     // 마감 공통활동(창호·문·마감재 등, 4D 코드 없음) → finish window 누적 (마감 부재 매칭, 골조 후).
@@ -463,6 +507,8 @@ export function buildCodeIndex(tasks: ScheduleTask[]): CodeIndex {
     finishStoreys,
     earthworkWindow: ewStart === Infinity ? null : { start: ewStart, end: ewEnd },
     civilWallWindow: cwStart === Infinity ? null : { start: cwStart, end: cwEnd },
+    ewByZone,
+    wallByZone,
     finishWindow: fwStart === Infinity ? null : { start: fwStart, end: fwEnd },
     mepWindow: mwStart === Infinity ? null : { start: mwStart, end: mwEnd },
     landscapeWindow: lwStart === Infinity ? null : { start: lwStart, end: lwEnd },
@@ -546,12 +592,7 @@ export function matchByCode(el: ProcElement, idx: CodeIndex): MatchResult {
   //   ② PSet Lv.2 Trade=CV — 태그된 모델
   // → 둘 중 하나면 토목으로 라우팅(구조 골조 폴백 방지 = 흙막이가 지하벽보다 먼저 표시).
   if (el.disc === "토목" || el.trade === "CV") {
-    // 흙막이 벽체 부재(CIP·SCW·토류)는 벽체 활동 기간에 정밀 매칭 — 굴착 전체 window 는 폴백.
-    if (_CIVIL_WALL_KW.test(el.name || "") && idx.civilWallWindow)
-      return { range: idx.civilWallWindow, via: "earthwork:흙막이" };
-    return idx.earthworkWindow
-      ? { range: idx.earthworkWindow, via: "earthwork:토목" }
-      : { range: null, via: "no_earthwork" };
+    return matchCivil(el, idx.ewByZone, idx.wallByZone, idx.earthworkWindow, idx.civilWallWindow);
   }
   // 가설(TW) → 층별 골조 추종 (비계·동바리가 각 층 시공 시 등장). zone 체계 달라도 storey 기준.
   if (el.trade === "TW") {
@@ -833,12 +874,10 @@ export function matchAll(
       continue;
     }
     if (el.disc === "토목" || el.trade === "CV") {
-      const _wall = _CIVIL_WALL_KW.test(el.name || "") && codeIdx?.civilWallWindow;
-      const rd: MatchResult = _wall
-        ? { range: codeIdx!.civilWallWindow, via: "earthwork:흙막이" }
-        : codeIdx?.earthworkWindow
-          ? { range: codeIdx.earthworkWindow, via: "earthwork:토목" }
-          : { range: null, via: "earthwork:no_act" };
+      const rd: MatchResult = codeIdx
+        ? matchCivil(el, codeIdx.ewByZone, codeIdx.wallByZone, codeIdx.earthworkWindow, codeIdx.civilWallWindow)
+        : { range: null, via: "earthwork:no_act" };
+      if (!rd.range) rd.via = "earthwork:no_act";
       ranges.set(el.globalId, rd);
       if (rd.range) matched++;
       byVia[rd.range ? "토목" : "토목무활동"] = (byVia[rd.range ? "토목" : "토목무활동"] ?? 0) + 1;
