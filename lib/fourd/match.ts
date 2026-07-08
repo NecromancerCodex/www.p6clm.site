@@ -833,9 +833,12 @@ export function matchAll(
       continue;
     }
     if (el.disc === "토목" || el.trade === "CV") {
-      const rd: MatchResult = codeIdx?.earthworkWindow
-        ? { range: codeIdx.earthworkWindow, via: "earthwork:토목" }
-        : { range: null, via: "earthwork:no_act" };
+      const _wall = _CIVIL_WALL_KW.test(el.name || "") && codeIdx?.civilWallWindow;
+      const rd: MatchResult = _wall
+        ? { range: codeIdx!.civilWallWindow, via: "earthwork:흙막이" }
+        : codeIdx?.earthworkWindow
+          ? { range: codeIdx.earthworkWindow, via: "earthwork:토목" }
+          : { range: null, via: "earthwork:no_act" };
       ranges.set(el.globalId, rd);
       if (rd.range) matched++;
       byVia[rd.range ? "토목" : "토목무활동"] = (byVia[rd.range ? "토목" : "토목무활동"] ?? 0) + 1;

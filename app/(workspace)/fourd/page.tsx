@@ -224,6 +224,14 @@ export default function FourDPage() {
   const loadExtraRef = useRef<Set<string>>(new Set());
   // 파일명 → 공종(disc). 위저드 플랜 모드에서 슬롯 공종을 전달(파일명 추측 X) → 부재 disc 태그 → 토목 매칭.
   const ifcDiscRef = useRef<Record<string, string>>({});
+  // 파일별 공종 UI 상태(ref 미러) — 이름 단서 없는 부재(CIP 말뚝 "C:14310" 등)는 파일 공종이 유일한
+  // 신호인데, 직접 업로드는 파일명 추측뿐이라 미지정 시 구조 층근사로 오매칭(실측: CIP가 'Zone D 5층').
+  const [fileDiscUi, setFileDiscUi] = useState<Record<string, string>>({});
+  const setFileDisc = (name: string, d: string) => {
+    if (d) ifcDiscRef.current[name] = d;
+    else delete ifcDiscRef.current[name];
+    setFileDiscUi((prev) => ({ ...prev, [name]: d }));
+  };
 
   const run = useCallback(async (sFile?: File, iFilesArg?: File[]) => {
     // 명시 인자(복원 시) 우선, 없으면 state. setState 는 비동기라 복원 직후 호출에 인자 전달.
@@ -523,6 +531,7 @@ export default function FourDPage() {
         const xml = await res.text();
         const schedFile = new File([xml], `plan-${planId}.xml`, { type: "application/xml" });
         ifcDiscRef.current = Object.fromEntries(planIfcs.map((x) => [x.file.name, x.discipline])); // 파일명→공종
+        setFileDiscUi(ifcDiscRef.current); // 파일칩 공종 셀렉트 미러(사용자가 확인·교정 가능)
         const files = planIfcs.map((x) => x.file);
         setScheduleFile(schedFile); setIfcFiles(files);
         void run(schedFile, files); // 공종 태그(ifcDiscRef) 적용 → 토목 부재는 토공 window 매칭
@@ -1006,14 +1015,27 @@ export default function FourDPage() {
             </div>
           )}
           {ifcFiles.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12 }}>
-              {ifcFiles.map((f) => (
-                <span key={f.name} style={{ background: "var(--green-soft)", border: "1px solid var(--green-soft)", borderRadius: 6, padding: "2px 8px", color: "var(--green)" }}>
-                  {f.name} ({Math.round(f.size / 1024 / 1024)}MB)
-                  <button onClick={() => setIfcFiles((prev) => prev.filter((x) => x.name !== f.name))}
-                          style={{ marginLeft: 6, border: "none", background: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700 }}>×</button>
-                </span>
-              ))}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12, alignItems: "center" }}>
+              {ifcFiles.map((f) => {
+                const cur = fileDiscUi[f.name] ?? ifcDiscRef.current[f.name] ?? discFromName(f.name) ?? "";
+                return (
+                  <span key={f.name} style={{ background: "var(--green-soft)", border: "1px solid var(--green-soft)", borderRadius: 6, padding: "2px 8px", color: "var(--green)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    {f.name} ({Math.round(f.size / 1024 / 1024)}MB)
+                    {/* 파일 공종 — 이름 단서 없는 부재(제네릭 말뚝 등)의 매칭 라우팅 기준. 미지정=구조 취급 위험 */}
+                    <select value={cur} onChange={(e) => setFileDisc(f.name, e.target.value)}
+                            title="이 파일의 공종 — 이름 단서 없는 부재가 이 공종으로 매칭됩니다"
+                            style={{ fontSize: 11, background: "var(--surface)", color: "var(--text)", border: "1px solid var(--line)", borderRadius: 4, padding: "1px 2px" }}>
+                      <option value="">공종?</option>
+                      {["토목", "구조", "건축", "MEP", "조경", "가설"].map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <button onClick={() => setIfcFiles((prev) => prev.filter((x) => x.name !== f.name))}
+                            style={{ border: "none", background: "none", color: "var(--red)", cursor: "pointer", fontWeight: 700 }}>×</button>
+                  </span>
+                );
+              })}
+              {ifcFiles.some((f) => !(fileDiscUi[f.name] ?? ifcDiscRef.current[f.name] ?? discFromName(f.name))) && (
+                <span style={{ color: "var(--amber)", fontSize: 11.5 }}>공종 미지정 파일은 구조로 취급될 수 있어요 — 토목 파일이면 꼭 지정</span>
+              )}
             </div>
           )}
           <button
