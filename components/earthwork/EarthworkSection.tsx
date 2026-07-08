@@ -83,7 +83,7 @@ export function EarthworkSection({ set, boreholes, ax, ay, bx, by, aLabel, bLabe
       {/* 표고 눈금 + 그리드 */}
       {view.ticks.map((v) => (
         <g key={v}>
-          <line x1={PL} y1={view.yS(v)} x2={PR} y2={view.yS(v)} stroke="#243042" strokeWidth={1} />
+          <line x1={PL} y1={view.yS(v)} x2={PR} y2={view.yS(v)} stroke="var(--surface-muted)" strokeWidth={1} />
           <text x={PL - 6} y={view.yS(v) + 3} fontSize={10} fill="var(--muted)" textAnchor="end">{v.toFixed(0)}</text>
         </g>
       ))}

@@ -1380,7 +1380,7 @@ function ReportModal({ report, onClose }: { report: ReportData; onClose: () => v
             { ok: report.seqViolations.length === 0, g: "순서 정상", b: `순서위반 ${report.seqViolations.length}` },
             { ok: report.clashes4d.length === 0, g: "Clash 없음", b: `Clash ${report.clashes4d.length}` },
           ].map((c, i) => (
-            <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: c.ok ? "var(--green-soft)" : "var(--surface)7ed", color: c.ok ? "var(--green)" : "#c2410c", border: `1px solid ${c.ok ? "var(--green-soft)" : "#fed7aa"}` }}>
+            <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: c.ok ? "var(--green-soft)" : "var(--surface)7ed", color: c.ok ? "var(--green)" : "#c2410c", border: `1px solid ${c.ok ? "var(--green-soft)" : "var(--amber-soft)"}` }}>
               {c.ok ? "" : ""}{c.ok ? c.g : c.b}
             </span>
           ))}

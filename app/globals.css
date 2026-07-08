@@ -804,7 +804,7 @@ select option {
 
 .dag-image-hint {
   padding: 8px 12px;
-  background: var(--teal-soft, #f0fdf9);
+  background: var(--teal-soft, var(--green-soft));
   border: 1px solid var(--teal, var(--teal));
   border-radius: 8px;
   color: var(--teal, var(--teal));
@@ -932,7 +932,7 @@ select option {
   font-weight: 700;
   letter-spacing: -0.01em;
   border-bottom: 1.5px solid var(--muted);
-  background: #f5f5f5;
+  background: var(--surface-soft);
 }
 
 /* Project row */
@@ -1010,7 +1010,7 @@ select option {
 
 .ncr-section-title {
   padding: 5px 10px;
-  background: #e8e8e8;
+  background: var(--surface-muted);
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--muted-strong);
@@ -1208,7 +1208,7 @@ select option {
 .dag-skel-block,
 .dag-skel-tall,
 .dag-skel-chip {
-  background: linear-gradient(90deg, var(--surface-muted) 25%, #e0e0e0 50%, var(--surface-muted) 75%);
+  background: linear-gradient(90deg, var(--surface-muted) 25%, var(--line-strong) 50%, var(--surface-muted) 75%);
   background-size: 800px 100%;
   animation: shimmer 1.4s infinite linear;
   border-radius: 6px;
@@ -2172,7 +2172,7 @@ select option {
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  background: #f8faff;
+  background: var(--surface-soft);
   border: 1px solid var(--line-strong);
   border-left: 3px solid var(--primary);
   padding: 5px 10px;
@@ -2197,7 +2197,7 @@ select option {
 }
 
 .sir-checklist-table th {
-  background: #e8edf7;
+  background: var(--surface-muted);
   border: 1px solid var(--line-strong);
   padding: 5px 8px;
   text-align: center;
@@ -2206,7 +2206,7 @@ select option {
 }
 
 .sir-checklist-table td {
-  border: 1px solid #d1d9e8;
+  border: 1px solid var(--line-strong);
   padding: 4px 8px;
   vertical-align: top;
 }
@@ -3142,7 +3142,7 @@ select option {
 }
 
 .progress-history-row.is-selected {
-  background: #ecfeff;
+  background: var(--teal-soft);
   border-color: var(--primary);
   box-shadow: 0 0 0 1px var(--teal);
 }
@@ -4653,7 +4653,7 @@ select option {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #0e1726;
+  background: var(--surface);
 }
 
 .plaza-bar {
@@ -5004,7 +5004,7 @@ select option {
   height: 84px; overflow-y: auto; padding: 6px 8px; border-radius: 8px;
   background: rgba(0,0,0,0.25); font-size: 0.8rem; line-height: 1.5;
 }
-.plaza-room-chatline { color: #d3dae3; }
+.plaza-room-chatline { color: var(--line-strong); }
 .plaza-room-chatline b { color: var(--primary); margin-right: 4px; }
 .plaza-room-chatform { display: flex; gap: 6px; }
 

@@ -1673,7 +1673,7 @@ export default function SchedulePlanWizard() {
                   </button>
                 </div>
                 {risks.map((r, i) => (
-                  <div key={i} style={{ fontSize: 12, padding: "3px 0", borderTop: i ? "1px solid #fde0e0" : undefined, color: col(r.severity).fg }}>
+                  <div key={i} style={{ fontSize: 12, padding: "3px 0", borderTop: i ? "1px solid var(--red-soft)" : undefined, color: col(r.severity).fg }}>
                     {col(r.severity).icon} <b>{r.title}</b> <span style={{ color: "var(--muted)" }}>— {r.detail}</span>
                     <br /><span style={{ color: "var(--primary-deep)" }}>→ {r.mitigation}</span>
                     {/* 동절기 타설 리스크 — 조강 원클릭(알폼 패턴). 감지·계산=시스템, 결정=클릭 1회(원가 할증은 사업 결정). */}
@@ -1841,13 +1841,13 @@ export default function SchedulePlanWizard() {
         .wz-rat-body p { margin: 0; font-size: 12.5px; color: var(--muted-strong); line-height: 1.65; }
         .wz-rat-body b { color: var(--text); }
         .wz-rat-stat { color: var(--primary); font-size: 11.5px; }
-        .wz-stream { border: 1px solid var(--primary-soft); background: #f5f7ff; border-radius: 10px; padding: 14px; }
+        .wz-stream { border: 1px solid var(--primary-soft); background: var(--surface-soft); border-radius: 10px; padding: 14px; }
         .wz-stream-head { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 12px; }
         .wz-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--primary); animation: wz-pulse 1s ease-in-out infinite; }
         @keyframes wz-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
         .wz-skel-rows { display: flex; flex-direction: column; gap: 9px; }
         .wz-skel-row { display: flex; align-items: center; gap: 10px; }
-        .wz-skel-label { width: 130px; height: 13px; border-radius: 4px; background: linear-gradient(90deg,var(--line) 25%,var(--surface-soft) 50%,var(--line) 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; flex-shrink: 0; }
+        .wz-skel-label { width: 130px; height: 13px; border-radius: 4px; background: linear-gradient(90deg,var(--surface-muted) 25%,rgba(233,229,220,0.10) 50%,var(--surface-muted) 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; flex-shrink: 0; }
         .wz-skel-bar { height: 16px; border-radius: 4px; background: linear-gradient(90deg,var(--primary-soft) 25%,var(--primary-soft) 50%,var(--primary-soft) 75%); background-size: 200% 100%; animation: wz-shim 1.4s linear infinite; }
         @keyframes wz-shim { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
       `}</style>

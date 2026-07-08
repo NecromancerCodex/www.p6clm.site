@@ -136,7 +136,7 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
           ))}
           {hiddenCount > 0 && (
             <button type="button" onClick={() => setShowAll((s) => !s)}
-              style={{ width: "100%", padding: "6px 12px", borderTop: "1px solid var(--surface-soft)", background: "#fafbfc", border: "none", cursor: "pointer", fontSize: 11.5, color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              style={{ width: "100%", padding: "6px 12px", borderTop: "1px solid var(--surface-soft)", background: "var(--surface-soft)", border: "none", cursor: "pointer", fontSize: 11.5, color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
               <ChevronDown size={12} style={{ transform: showAll ? "rotate(180deg)" : "none" }} />
               {showAll ? "무시 레이어 접기" : `무시 레이어 ${hiddenCount}개 더보기`}
             </button>
