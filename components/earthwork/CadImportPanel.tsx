@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FileUp, X, Download, ArrowRight, ChevronDown, Sparkles, ScanSearch } from "lucide-react";
 
 import {
-  readDxfFile, analyzeFiles, extractSelected, layerKey, suggestCategory,
+  readDxfFile, analyzeFiles, extractSelected, layerKey, suggestCategory, constrainCategory,
   CATS, CATEGORY_LABEL, type FileImport, type Category,
 } from "../../lib/earthwork/dxfImport";
 import { earthworkToCsv } from "../../lib/earthwork/csvExport";
@@ -66,10 +66,18 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
     return () => { alive = false; };
   }, [files]);
 
-  // 우선순위: 사용자 확정 > AI 추천 > 규칙(suggested)
-  const eff = useMemo(() => ({ ...aiMap, ...sel }), [aiMap, sel]);
-  const catOf = (file: string, layer: string, suggested: Category) => eff[layerKey(file, layer)] ?? suggested;
-  const catFor = (file: string, layer: string) => eff[layerKey(file, layer)] ?? suggestCategory(layer);
+  // 최종 카테고리 = 사용자 확정(그대로) > 기하제약(AI 추천 > 규칙).
+  //   기하제약: 텍스트만 있는 레이어를 경계/벽/파일로 오분류하는 걸 차단(진짜 기하 있어야 성립).
+  const resolved = useMemo(() => {
+    const r: Record<string, Category> = {};
+    for (const l of layers) {
+      const k = layerKey(l.file, l.layer);
+      r[k] = sel[k] ?? constrainCategory(aiMap[k] ?? l.suggested, l.ecount);
+    }
+    return r;
+  }, [layers, sel, aiMap]);
+  const catOf = (file: string, layer: string, _suggested?: Category) => resolved[layerKey(file, layer)] ?? "ignore";
+  const catFor = (file: string, layer: string) => resolved[layerKey(file, layer)] ?? "ignore";
   const setCat = (file: string, layer: string, c: Category) => setSel((p) => ({ ...p, [layerKey(file, layer)]: c }));
   const aiCount = Object.keys(aiMap).length;
 
@@ -122,7 +130,7 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
   };
   const visionTargets = layers.filter((l) => catOf(l.file, l.layer, l.suggested) === "ignore" && l.count >= 5).length;
 
-  const data = useMemo(() => (files.length ? extractSelected(files, eff) : null), [files, eff]);
+  const data = useMemo(() => (files.length ? extractSelected(files, resolved, false) : null), [files, resolved]);
   const has = data && (data.boundary.length || data.piles.length || data.boreholes.length || data.terrain.length || data.walls.length);
 
   const shown = showAll ? layers : layers.filter((l) => catOf(l.file, l.layer, l.suggested) !== "ignore");

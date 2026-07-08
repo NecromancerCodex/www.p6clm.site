@@ -48,13 +48,20 @@ export function CadLayerPreview({ files, catFor, selectedKey, onSelectLayer, hei
     return { minX, minY, maxX, maxY };
   }, [files]);
 
-  // 렌더 대상에서 제외할 극단 이상치 판단(-2억 좌표 등). bounds 폭의 30배 밖 vertex 있으면 스킵.
+  // 이상치 엔티티 제외: ① 중심에서 너무 먼 vertex ② 자체 span 이 도면 폭 초과(도면→이상치 실선).
   const sane = useMemo(() => {
     if (!bounds) return () => true;
     const cx = (bounds.minX + bounds.maxX) / 2, cy = (bounds.minY + bounds.maxY) / 2;
-    const lx = (bounds.maxX - bounds.minX) * 30 || 1e6, ly = (bounds.maxY - bounds.minY) * 30 || 1e6;
-    return (e: FileImport["doc"]["entities"][number]) =>
-      e.verts.every((v) => Math.abs(v.x - cx) < lx && Math.abs(v.y - cy) < ly);
+    const bw = (bounds.maxX - bounds.minX) || 1, bh = (bounds.maxY - bounds.minY) || 1;
+    const lim = Math.max(bw, bh) * 3, span = Math.max(bw, bh) * 2;
+    return (e: FileImport["doc"]["entities"][number]) => {
+      let mnx = Infinity, mny = Infinity, mxx = -Infinity, mxy = -Infinity;
+      for (const v of e.verts) {
+        if (Math.abs(v.x - cx) > lim || Math.abs(v.y - cy) > lim) return false;
+        if (v.x < mnx) mnx = v.x; if (v.x > mxx) mxx = v.x; if (v.y < mny) mny = v.y; if (v.y > mxy) mxy = v.y;
+      }
+      return (mxx - mnx) <= span && (mxy - mny) <= span;
+    };
   }, [bounds]);
 
   // 초기/리셋 뷰 (bounds·크기 변화 시 fit)
