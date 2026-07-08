@@ -9,11 +9,12 @@ import { useEffect, useMemo, useState } from "react";
 import { FileUp, X, Download, ArrowRight, ChevronDown, Sparkles } from "lucide-react";
 
 import {
-  readDxfFile, analyzeFiles, extractSelected, layerKey,
+  readDxfFile, analyzeFiles, extractSelected, layerKey, suggestCategory,
   CATS, CATEGORY_LABEL, type FileImport, type Category,
 } from "../../lib/earthwork/dxfImport";
 import { earthworkToCsv } from "../../lib/earthwork/csvExport";
 import { classifyCadLayers } from "../../lib/api/earthwork";
+import { CadLayerPreview } from "./CadLayerPreview";
 
 export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, label: string) => void }) {
   const [files, setFiles] = useState<FileImport[]>([]);
@@ -22,6 +23,7 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
   const [aiBusy, setAiBusy] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [err, setErr] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);   // 미리보기·행 선택(layerKey)
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = Array.from(e.target.files ?? []);
@@ -66,6 +68,7 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
   // 우선순위: 사용자 확정 > AI 추천 > 규칙(suggested)
   const eff = useMemo(() => ({ ...aiMap, ...sel }), [aiMap, sel]);
   const catOf = (file: string, layer: string, suggested: Category) => eff[layerKey(file, layer)] ?? suggested;
+  const catFor = (file: string, layer: string) => eff[layerKey(file, layer)] ?? suggestCategory(layer);
   const setCat = (file: string, layer: string, c: Category) => setSel((p) => ({ ...p, [layerKey(file, layer)]: c }));
   const aiCount = Object.keys(aiMap).length;
 
@@ -74,6 +77,27 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
     setFiles((p) => p.filter((f) => f.name !== name));
     const prune = (m: Record<string, Category>) => Object.fromEntries(Object.entries(m).filter(([k]) => !k.startsWith(`${name} `)));
     setSel(prune); setAiMap(prune);
+  };
+
+  // 캐스케이드 재분류 — 사용자가 확정한 레이어를 예시로 AI 가 나머지 추론(대지경계 하나 찍으면 유사 패턴 따라옴).
+  const reclassify = async () => {
+    if (!files.length) return;
+    const infos = analyzeFiles(files);
+    const examples: Record<string, string> = {};
+    for (const i of infos) { const k = layerKey(i.file, i.layer); if (sel[k]) examples[i.layer] = sel[k]; }
+    const byName = new Map<string, { name: string; types: string; samples: string[] }>();
+    for (const i of infos) {
+      const cur = byName.get(i.layer);
+      if (cur) { for (const s of i.samples) if (cur.samples.length < 3 && !cur.samples.includes(s)) cur.samples.push(s); }
+      else byName.set(i.layer, { name: i.layer, types: i.types, samples: [...i.samples] });
+    }
+    setAiBusy(true);
+    try {
+      const res = await classifyCadLayers([...byName.values()], examples);
+      const m: Record<string, Category> = {};
+      for (const i of infos) { const c = res[i.layer]; if (c && (CATS as string[]).includes(c)) m[layerKey(i.file, i.layer)] = c as Category; }
+      setAiMap(m);
+    } finally { setAiBusy(false); }
   };
 
   const data = useMemo(() => (files.length ? extractSelected(files, eff) : null), [files, eff]);
@@ -111,6 +135,13 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
             {aiBusy ? "AI 레이어 분류 중…" : aiCount > 0 ? `AI 추천 ${aiCount}개 적용` : "AI 추천 없음 (규칙 폴백)"}
           </span>
         )}
+        {files.length > 0 && Object.keys(sel).length > 0 && (
+          <button type="button" onClick={reclassify} disabled={aiBusy}
+            title="내가 지정한 레이어를 예시로 AI가 나머지를 다시 추론"
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "var(--primary)", background: "var(--primary-soft)", border: "1px solid var(--primary)", borderRadius: 7, padding: "2px 8px", cursor: aiBusy ? "default" : "pointer", opacity: aiBusy ? 0.5 : 1 }}>
+            <Sparkles size={11} /> AI 재분류 (내 지정 반영)
+          </button>
+        )}
         {files.length > 0 && (
           <button type="button" onClick={() => { setFiles([]); setSel({}); setAiMap({}); }} style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)", background: "none", border: "none", cursor: "pointer" }}>전체 지우기</button>
         )}
@@ -131,6 +162,16 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
         </div>
       )}
 
+      {/* 시각적 미리보기 — 기하를 그려 무엇이 어디인지 확인, 클릭으로 레이어 선택 */}
+      {files.length > 0 && (
+        <CadLayerPreview
+          files={files}
+          catFor={catFor}
+          selectedKey={selected}
+          onSelectLayer={(f, l) => setSelected(layerKey(f, l))}
+        />
+      )}
+
       {layers.length > 0 && (
         <div style={{ marginTop: 10, border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
           <div style={{ display: "flex", gap: 8, padding: "6px 12px", background: "var(--surface-soft)", fontSize: 11, fontWeight: 700, color: "var(--muted)" }}>
@@ -138,8 +179,12 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
             <span style={{ width: 130, textAlign: "right" }}>엔티티</span>
             <span style={{ width: 120 }}>의미</span>
           </div>
-          {shown.map((l) => (
-            <div key={l.file + "|" + l.layer} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderTop: "1px solid var(--surface-soft)", fontSize: 12.5 }}>
+          {shown.map((l) => {
+            const isSel = selected === layerKey(l.file, l.layer);
+            return (
+            <div key={l.file + "|" + l.layer}
+              onClick={() => setSelected(layerKey(l.file, l.layer))}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", borderTop: "1px solid var(--surface-soft)", fontSize: 12.5, cursor: "pointer", background: isSel ? "var(--primary-soft)" : "transparent" }}>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   <span style={{ color: "var(--muted-strong)", fontWeight: 600 }}>{l.layer || "(무명)"}</span>
@@ -154,13 +199,15 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
               <span style={{ width: 110, textAlign: "right", fontSize: 10.5, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.types}</span>
               <select
                 value={catOf(l.file, l.layer, l.suggested)}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setCat(l.file, l.layer, e.target.value as Category)}
                 style={{ width: 120, fontSize: 12, padding: "3px 6px", borderRadius: 6, border: "1px solid var(--line-strong)", background: "var(--surface)", color: "var(--muted-strong)" }}
               >
                 {CATS.map((c) => <option key={c} value={c}>{CATEGORY_LABEL[c]}</option>)}
               </select>
             </div>
-          ))}
+            );
+          })}
           {hiddenCount > 0 && (
             <button type="button" onClick={() => setShowAll((s) => !s)}
               style={{ width: "100%", padding: "6px 12px", borderTop: "1px solid var(--surface-soft)", background: "var(--surface-soft)", border: "none", cursor: "pointer", fontSize: 11.5, color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>

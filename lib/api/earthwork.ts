@@ -50,13 +50,13 @@ export async function loadBoreholes(): Promise<Borehole[]> {
 
 /** CAD 레이어 의미 분류 (gpt-5-mini) — {레이어명: 카테고리}. 실패 시 {} (클라 규칙기반 폴백). */
 export interface CadLayerMeta { name: string; types: string; samples: string[]; }
-export async function classifyCadLayers(layers: CadLayerMeta[]): Promise<Record<string, string>> {
+export async function classifyCadLayers(layers: CadLayerMeta[], examples: Record<string, string> = {}): Promise<Record<string, string>> {
   if (!layers.length) return {};
   try {
     const res = await fetch(`${API_BASE}/earthwork/cad/classify-layers`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ layers }),
+      body: JSON.stringify({ layers, examples }),
     });
     if (!res.ok) return {};
     return (await res.json()) as Record<string, string>;
