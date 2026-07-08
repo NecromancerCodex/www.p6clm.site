@@ -6,14 +6,15 @@
  * 레이어마다 카테고리 자동추천 + 드롭다운 확정. 생성 CSV 는 기존 CSV 임포트와 동일 파이프라인.
  */
 import { useEffect, useMemo, useState } from "react";
-import { FileUp, X, Download, ArrowRight, ChevronDown, Sparkles } from "lucide-react";
+import { FileUp, X, Download, ArrowRight, ChevronDown, Sparkles, ScanSearch } from "lucide-react";
 
 import {
   readDxfFile, analyzeFiles, extractSelected, layerKey, suggestCategory,
   CATS, CATEGORY_LABEL, type FileImport, type Category,
 } from "../../lib/earthwork/dxfImport";
 import { earthworkToCsv } from "../../lib/earthwork/csvExport";
-import { classifyCadLayers } from "../../lib/api/earthwork";
+import { renderContactSheet } from "../../lib/earthwork/cadSheet";
+import { classifyCadLayers, classifyCadLayersVision } from "../../lib/api/earthwork";
 import { CadLayerPreview } from "./CadLayerPreview";
 
 export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, label: string) => void }) {
@@ -100,6 +101,27 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
     } finally { setAiBusy(false); }
   };
 
+  // 비전 분류 — 텍스트로 못 가른 무시 레이어를 썸네일로 그려 gpt-5-mini 가 '모양'으로 판단.
+  const visionClassify = async () => {
+    const targets = layers
+      .filter((l) => catOf(l.file, l.layer, l.suggested) === "ignore" && l.count >= 5)
+      .slice(0, 40)
+      .map((l) => ({ file: l.file, layer: l.layer }));
+    if (!targets.length) return;
+    const sheet = renderContactSheet(files, targets);
+    if (!sheet) return;
+    setAiBusy(true);
+    try {
+      const res = await classifyCadLayersVision(sheet.b64, sheet.refs.map((r) => ({ n: r.n, name: r.name })));
+      setAiMap((prev) => {
+        const m = { ...prev };
+        for (const l of layers) { const c = res[l.layer]; if (c && (CATS as string[]).includes(c) && c !== "ignore") m[layerKey(l.file, l.layer)] = c as Category; }
+        return m;
+      });
+    } finally { setAiBusy(false); }
+  };
+  const visionTargets = layers.filter((l) => catOf(l.file, l.layer, l.suggested) === "ignore" && l.count >= 5).length;
+
   const data = useMemo(() => (files.length ? extractSelected(files, eff) : null), [files, eff]);
   const has = data && (data.boundary.length || data.piles.length || data.boreholes.length || data.terrain.length || data.walls.length);
 
@@ -134,6 +156,13 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
             <Sparkles size={12} />
             {aiBusy ? "AI 레이어 분류 중…" : aiCount > 0 ? `AI 추천 ${aiCount}개 적용` : "AI 추천 없음 (규칙 폴백)"}
           </span>
+        )}
+        {files.length > 0 && visionTargets > 0 && (
+          <button type="button" onClick={visionClassify} disabled={aiBusy}
+            title="텍스트로 못 가른 코드레이어를 그림(모양)으로 AI가 분류"
+            style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "var(--teal)", background: "var(--surface-soft)", border: "1px solid var(--teal)", borderRadius: 7, padding: "2px 8px", cursor: aiBusy ? "default" : "pointer", opacity: aiBusy ? 0.5 : 1 }}>
+            <ScanSearch size={11} /> 이미지로 분류 ({visionTargets})
+          </button>
         )}
         {files.length > 0 && Object.keys(sel).length > 0 && (
           <button type="button" onClick={reclassify} disabled={aiBusy}

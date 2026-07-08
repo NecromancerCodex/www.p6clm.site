@@ -65,6 +65,25 @@ export async function classifyCadLayers(layers: CadLayerMeta[], examples: Record
   }
 }
 
+/** CAD 레이어 이미지(비전) 분류 — 컨택트시트 PNG + 번호↔이름 → {레이어명: 카테고리}. */
+export async function classifyCadLayersVision(
+  imageB64: string,
+  layers: { n: number; name: string }[],
+): Promise<Record<string, string>> {
+  if (!imageB64 || !layers.length) return {};
+  try {
+    const res = await fetch(`${API_BASE}/earthwork/cad/classify-layers-vision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_b64: imageB64, layers }),
+    });
+    if (!res.ok) return {};
+    return (await res.json()) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
 /** CSV 업로드 데이터 저장 — 시추+extra 기존 행 교체(최신만 유지, owner 개인화). 적재 건수 반환. */
 export async function saveEarthwork(boreholes: Borehole[], extra: EarthworkExtra): Promise<number> {
   const res = await fetch(`${API_BASE}/earthwork/boreholes/import`, {
