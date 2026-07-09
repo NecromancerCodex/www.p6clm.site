@@ -292,7 +292,7 @@ export default function SchedulePlanWizard() {
     if (!file) return;
     setDiscBoq((s) => ({ ...s, [cardKey]: { loading: true } }));
     try {
-      const r = await parseBoq(file);
+      const r = await parseBoq(file, cardKey === "종합" ? undefined : cardKey);   // 카드 공종 → 멀티공종 파일 올바른 시트
       setDiscBoq((s) => ({ ...s, [cardKey]: { ...r, loading: false } }));
       // 예측 장비 + 작업조(+구조 크레인) → 자원 계획 자동 채움(추천 기본값, 수동 수정 가능).
       const auto: Record<string, number> = {};
