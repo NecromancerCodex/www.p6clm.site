@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FileUp, X, Download, ArrowRight, ChevronDown, Sparkles, ScanSearch } from "lucide-react";
 
 import {
-  readDxfFile, analyzeFiles, extractSelected, layerKey, suggestCategory, constrainCategory,
+  readDxfFile, analyzeFiles, extractSelected, layerKey, suggestCategory, constrainCategory, detectBoundaryLayer,
   CATS, CATEGORY_LABEL, type FileImport, type Category,
 } from "../../lib/earthwork/dxfImport";
 import { earthworkToCsv } from "../../lib/earthwork/csvExport";
@@ -68,14 +68,17 @@ export function CadImportPanel({ onGenerated }: { onGenerated: (csv: string, lab
 
   // 최종 카테고리 = 사용자 확정(그대로) > 기하제약(AI 추천 > 규칙).
   //   기하제약: 텍스트만 있는 레이어를 경계/벽/파일로 오분류하는 걸 차단(진짜 기하 있어야 성립).
+  const boundaryLayer = useMemo(() => detectBoundaryLayer(files), [files]);   // 기하 자동검출(강한 신호)
   const resolved = useMemo(() => {
     const r: Record<string, Category> = {};
     for (const l of layers) {
       const k = layerKey(l.file, l.layer);
-      r[k] = sel[k] ?? constrainCategory(aiMap[k] ?? l.suggested, l.ecount);
+      if (sel[k]) { r[k] = sel[k]; continue; }                 // 사용자 확정 최우선
+      if (k === boundaryLayer) { r[k] = "boundary"; continue; } // 경계 기하검출 > AI > 규칙
+      r[k] = constrainCategory(aiMap[k] ?? l.suggested, l.ecount);
     }
     return r;
-  }, [layers, sel, aiMap]);
+  }, [layers, sel, aiMap, boundaryLayer]);
   const catOf = (file: string, layer: string, _suggested?: Category) => resolved[layerKey(file, layer)] ?? "ignore";
   const catFor = (file: string, layer: string) => resolved[layerKey(file, layer)] ?? "ignore";
   const setCat = (file: string, layer: string, c: Category) => setSel((p) => ({ ...p, [layerKey(file, layer)]: c }));
