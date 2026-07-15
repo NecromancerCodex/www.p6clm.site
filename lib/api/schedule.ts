@@ -338,12 +338,25 @@ export interface P6EditResult {
   filename: string;
   error?: string;
 }
+/** P6 수정은 2~3분 걸려 Vercel 프록시(짧은 타임아웃)로는 502 → 백엔드로 직접 호출(Vercel 우회).
+ *  CORS 는 www/p6clm.site 오리진 + credentials 허용. 직접 URL 없으면 프록시 폴백(로컬 dev 등). */
+function p6DirectBase(): string | null {
+  const env = process.env.NEXT_PUBLIC_CLM_DIRECT;
+  if (env) return env.replace(/\/$/, "");
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname;
+    if (h.endsWith("p6clm.site")) return "https://ai.p6clm.site/api/v1";
+  }
+  return null;
+}
 export async function p6Edit(xerFile: File, dataFile: File, mode: string = "auto"): Promise<P6EditResult> {
   const form = new FormData();
   form.append("xer", xerFile);
   form.append("data", dataFile);
   form.append("mode", mode);
-  const res = await fetch(`${API_BASE}/schedule/p6-edit`, { method: "POST", body: form });
+  const direct = p6DirectBase();
+  const url = direct ? `${direct}/schedule/p6-edit` : `${API_BASE}/schedule/p6-edit`;
+  const res = await fetch(url, { method: "POST", body: form, credentials: direct ? "include" : "same-origin" });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new ScheduleApiError(res.status, String((body && (body.detail ?? body.error)) || `${res.status} ${res.statusText}`));
