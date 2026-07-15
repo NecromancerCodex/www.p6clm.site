@@ -341,31 +341,19 @@ export interface P6EditResult {
   filename: string;
   error?: string;
 }
-/** P6 수정은 2~3분 걸려 Vercel 프록시(짧은 타임아웃)로는 502 → 백엔드로 직접 호출(Vercel 우회).
- *  CORS 는 www/p6clm.site 오리진 + credentials 허용. 직접 URL 없으면 프록시 폴백(로컬 dev 등). */
-function p6DirectBase(): string | null {
-  const env = process.env.NEXT_PUBLIC_CLM_DIRECT;
-  if (env) return env.replace(/\/$/, "");
-  if (typeof window !== "undefined") {
-    const h = window.location.hostname;
-    if (h.endsWith("p6clm.site")) return "https://ai.p6clm.site/api/v1";
-  }
-  return null;
-}
-/** 비동기 잡 — 제출 후 상태 폴링(2~3분 소요, 동기 요청은 타임아웃). onStatus 로 진행 표시. */
+/** P6 수정은 **비동기 잡** — 제출(업로드+큐등록)은 1초, 처리는 백그라운드 → Vercel 프록시로 충분(CORS 불필요).
+ *  긴 처리 동안 /status 폴링(빠름). 예전 직접호출은 CORS·413(에러시 CORS헤더 없음) 문제 → 프록시로 복귀. */
 export async function p6Edit(
   xerFile: File, dataFile: File, mode: string = "auto",
   onStatus?: (s: string) => void,
 ): Promise<P6EditResult> {
-  const direct = p6DirectBase();
-  const base = direct ? `${direct}/schedule` : `${API_BASE}/schedule`;
-  const cred: RequestCredentials = direct ? "include" : "same-origin";
+  const base = `${API_BASE}/schedule`;
   // 1) 제출 → job_id
   const form = new FormData();
   form.append("xer", xerFile);
   form.append("data", dataFile);
   form.append("mode", mode);
-  const sub = await fetch(`${base}/p6-edit`, { method: "POST", body: form, credentials: cred });
+  const sub = await fetch(`${base}/p6-edit`, { method: "POST", body: form });
   if (!sub.ok) {
     const b = await sub.json().catch(() => null);
     throw new ScheduleApiError(sub.status, String((b && (b.detail ?? b.error)) || `${sub.status} ${sub.statusText}`));
@@ -376,7 +364,7 @@ export async function p6Edit(
   const deadline = Date.now() + 12 * 60 * 1000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 3000));
-    const st = await fetch(`${base}/p6-edit/status/${job_id}`, { credentials: cred });
+    const st = await fetch(`${base}/p6-edit/status/${job_id}`);
     if (!st.ok) continue;
     const job = (await st.json()) as { status: string; result?: P6EditResult; error?: string };
     if (job.status === "running") onStatus?.("AI 대조·수정안 도출 중…");
