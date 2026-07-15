@@ -20,6 +20,7 @@ const td: React.CSSProperties = { padding: "7px 10px", verticalAlign: "top", fon
 export default function P6EditPage() {
   const [xerFile, setXerFile] = useState<File | null>(null);
   const [dataFile, setDataFile] = useState<File | null>(null);
+  const [mode, setMode] = useState("auto");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState<P6EditResult | null>(null);
@@ -28,7 +29,7 @@ export default function P6EditPage() {
     if (!xerFile || !dataFile) return;
     setBusy(true); setErr(""); setResult(null);
     try {
-      setResult(await p6Edit(xerFile, dataFile));
+      setResult(await p6Edit(xerFile, dataFile, mode));
     } catch (e) {
       setErr(e instanceof ScheduleApiError ? e.message : e instanceof Error ? e.message : "처리 실패");
     } finally {
@@ -54,7 +55,7 @@ export default function P6EditPage() {
     <div className="ws-inner-pad" style={{ maxWidth: "none" }}>
       <div className="ws-section-title">P6 수정</div>
       <p className="ws-section-desc">
-        <b>XER + 거래처 엑셀</b>을 올리면 활동을 대조해 <b>날짜·진행률 수정안</b>을 만들고,
+        <b>XER + 거래처 엑셀</b>을 올리면 활동을 대조해 <b>날짜·진행률·원가 수정안</b>을 만들고,
         <b> 어떤 선후행(CPM) 때문에 날짜가 안 바뀌는지</b>까지 짚어줍니다. 검토 후 수정된 XER을 내려받으세요.
       </p>
 
@@ -69,6 +70,15 @@ export default function P6EditPage() {
           <div style={{ fontWeight: 700, marginBottom: 4 }}>② 갱신 자료 (.xlsx/.csv)</div>
           <input type="file" accept=".xlsx,.xlsm,.xls,.csv" onChange={(e) => setDataFile(e.target.files?.[0] ?? null)} />
           {dataFile && <div style={{ color: "var(--green)", fontSize: 11.5, marginTop: 2 }}>{dataFile.name} ({Math.round(dataFile.size / 1024)}KB)</div>}
+        </label>
+        <label style={{ fontSize: 13 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>③ 갱신 방식 (거래처별)</div>
+          <select className="wz-in" value={mode} onChange={(e) => setMode(e.target.value)} style={{ padding: "6px 8px" }}>
+            <option value="auto">자동 감지</option>
+            <option value="date">날짜</option>
+            <option value="progress">진행률 (Units % Complete)</option>
+            <option value="cost">원가 (Actual / At Completion Cost)</option>
+          </select>
         </label>
         <button className="wz-btn" disabled={!xerFile || !dataFile || busy}
                 style={{ background: "var(--primary)", color: "var(--surface)", fontWeight: 700, padding: "9px 18px" }}

@@ -338,10 +338,11 @@ export interface P6EditResult {
   filename: string;
   error?: string;
 }
-export async function p6Edit(xerFile: File, dataFile: File): Promise<P6EditResult> {
+export async function p6Edit(xerFile: File, dataFile: File, mode: string = "auto"): Promise<P6EditResult> {
   const form = new FormData();
   form.append("xer", xerFile);
   form.append("data", dataFile);
+  form.append("mode", mode);
   const res = await fetch(`${API_BASE}/schedule/p6-edit`, { method: "POST", body: form });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
