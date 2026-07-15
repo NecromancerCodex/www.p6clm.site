@@ -334,7 +334,10 @@ export interface P6EditResult {
   task_count: number;
   applied: number;
   blocked: number;
-  xer_b64: string;
+  no_column?: number;         // P6 엑셀: 갱신 필드 컬럼이 없어 못 채운 수
+  kind?: "excel" | "xer";     // 출력 종류
+  file_b64?: string;          // 수정 파일(xlsx/xer) base64
+  xer_b64?: string;           // (구) 호환
   filename: string;
   error?: string;
 }

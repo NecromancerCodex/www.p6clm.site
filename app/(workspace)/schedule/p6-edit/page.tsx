@@ -40,7 +40,8 @@ export default function P6EditPage() {
 
   const download = () => {
     if (!result) return;
-    const bin = atob(result.xer_b64);
+    const b64 = result.file_b64 || result.xer_b64 || "";
+    const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
@@ -49,22 +50,25 @@ export default function P6EditPage() {
     URL.revokeObjectURL(url);
   };
 
-  const applied = result?.edits.filter((e) => !e.blocked) ?? [];
-  const blocked = result?.edits.filter((e) => e.blocked) ?? [];
+  const isExcel = result?.kind === "excel";
+  // P6 엑셀: 전부 강제채움(막힘 없음). XER: 막힌 것 분리.
+  const applied = result?.edits.filter((e) => isExcel || !e.blocked) ?? [];
+  const blocked = isExcel ? [] : (result?.edits.filter((e) => e.blocked) ?? []);
 
   return (
     <div className="ws-inner-pad" style={{ maxWidth: "none" }}>
       <div className="ws-section-title">P6 수정</div>
       <p className="ws-section-desc">
-        <b>XER + 거래처 엑셀</b>을 올리면 활동을 대조해 <b>날짜·진행률·원가 수정안</b>을 만들고,
-        <b> 어떤 선후행(CPM) 때문에 날짜가 안 바뀌는지</b>까지 짚어줍니다. 검토 후 수정된 XER을 내려받으세요.
+        <b>P6 공정표 + 거래처 엑셀</b>을 올리면 활동을 의미 기반으로 대조해 <b>날짜·진행률·원가</b>를 채웁니다.
+        <b> P6 엑스포트 엑셀(.xlsx)</b>을 올리면 선후행에 막히지 않고 <b>요청값을 강제 반영</b>(재임포트용),
+        <b> .xer</b>를 올리면 <b>막는 선후행까지 진단</b>합니다.
       </p>
 
       {/* 업로드 */}
       <div style={{ ...CARD, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end" }}>
         <label style={{ fontSize: 13 }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>① P6 공정표 (.xer)</div>
-          <input type="file" accept=".xer" onChange={(e) => setXerFile(e.target.files?.[0] ?? null)} />
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>① P6 공정표 (.xer 또는 P6 엑셀)</div>
+          <input type="file" accept=".xer,.xlsx" onChange={(e) => setXerFile(e.target.files?.[0] ?? null)} />
           {xerFile && <div style={{ color: "var(--green)", fontSize: 11.5, marginTop: 2 }}>{xerFile.name} ({Math.round(xerFile.size / 1024)}KB)</div>}
         </label>
         <label style={{ fontSize: 13 }}>
@@ -96,13 +100,14 @@ export default function P6EditPage() {
             <div style={{ fontSize: 13 }}>
               <b>{result.summary}</b>
               <div style={{ color: "var(--muted)", fontSize: 12, marginTop: 3 }}>
-                활동 {result.task_count}개 · 반영 <b style={{ color: "var(--green)" }}>{result.applied}건</b>
-                {result.blocked > 0 && <> · 선후행에 막힘 <b style={{ color: "var(--red)" }}>{result.blocked}건</b></>}
+                활동 {result.task_count}개 · {isExcel ? "강제 채움" : "반영"} <b style={{ color: "var(--green)" }}>{result.applied}건</b>
+                {!isExcel && result.blocked > 0 && <> · 선후행에 막힘 <b style={{ color: "var(--red)" }}>{result.blocked}건</b></>}
+                {isExcel && (result.no_column ?? 0) > 0 && <> · 컬럼 없어 못 채움 <b style={{ color: "var(--amber)" }}>{result.no_column}건</b>(P6 엑스포트에 해당 컬럼 포함 필요)</>}
               </div>
             </div>
             <button className="wz-btn" onClick={download} disabled={!result.applied}
                     style={{ marginLeft: "auto", background: "var(--primary-deep)", color: "var(--surface)", fontWeight: 700 }}>
-              ⬇ 수정된 XER 다운로드
+              ⬇ 수정된 {isExcel ? "P6 엑셀" : "XER"} 다운로드
             </button>
           </div>
 
@@ -110,7 +115,7 @@ export default function P6EditPage() {
           {applied.length > 0 && (
             <div style={CARD}>
               <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 8px", color: "var(--green)" }}>
-                ✓ 반영되는 수정 {applied.length}건 (다운로드 XER에 포함)
+                ✓ {isExcel ? "채운 수정" : "반영되는 수정"} {applied.length}건 ({isExcel ? "P6 재임포트 시 선후행 무관 강제 반영" : "다운로드 XER에 포함"})
               </h3>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
