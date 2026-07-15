@@ -371,9 +371,9 @@ export async function p6Edit(
     throw new ScheduleApiError(sub.status, String((b && (b.detail ?? b.error)) || `${sub.status} ${sub.statusText}`));
   }
   const { job_id } = (await sub.json()) as { job_id: string };
-  // 2) 폴링 (최대 6분)
+  // 2) 폴링 (최대 12분 — 활동 많은 파일은 연속 루프로 5분+ 소요)
   onStatus?.("대기 중…");
-  const deadline = Date.now() + 6 * 60 * 1000;
+  const deadline = Date.now() + 12 * 60 * 1000;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 3000));
     const st = await fetch(`${base}/p6-edit/status/${job_id}`, { credentials: cred });
