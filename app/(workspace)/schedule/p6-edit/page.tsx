@@ -83,7 +83,7 @@ export default function P6EditPage() {
         <button className="wz-btn" disabled={!xerFile || !dataFile || busy}
                 style={{ background: "var(--primary)", color: "var(--surface)", fontWeight: 700, padding: "9px 18px" }}
                 onClick={() => void run()}>
-          {busy ? "AI 대조 중… (수십 초~1분)" : "대조 · 수정안 생성"}
+          {busy ? "AI 대조 중… (활동 많으면 2~3분)" : "대조 · 수정안 생성"}
         </button>
         {err && <span style={{ color: "var(--red)", fontSize: 12.5 }}>{err}</span>}
       </div>
