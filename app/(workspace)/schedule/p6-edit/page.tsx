@@ -22,14 +22,15 @@ export default function P6EditPage() {
   const [dataFile, setDataFile] = useState<File | null>(null);
   const [mode, setMode] = useState("auto");
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
   const [err, setErr] = useState("");
   const [result, setResult] = useState<P6EditResult | null>(null);
 
   const run = async () => {
     if (!xerFile || !dataFile) return;
-    setBusy(true); setErr(""); setResult(null);
+    setBusy(true); setErr(""); setResult(null); setStatus("");
     try {
-      setResult(await p6Edit(xerFile, dataFile, mode));
+      setResult(await p6Edit(xerFile, dataFile, mode, setStatus));
     } catch (e) {
       setErr(e instanceof ScheduleApiError ? e.message : e instanceof Error ? e.message : "처리 실패");
     } finally {
@@ -83,7 +84,7 @@ export default function P6EditPage() {
         <button className="wz-btn" disabled={!xerFile || !dataFile || busy}
                 style={{ background: "var(--primary)", color: "var(--surface)", fontWeight: 700, padding: "9px 18px" }}
                 onClick={() => void run()}>
-          {busy ? "AI 대조 중… (활동 많으면 2~3분)" : "대조 · 수정안 생성"}
+          {busy ? (status || "AI 대조 중…") + " (2~3분)" : "대조 · 수정안 생성"}
         </button>
         {err && <span style={{ color: "var(--red)", fontSize: 12.5 }}>{err}</span>}
       </div>

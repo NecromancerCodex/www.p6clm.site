@@ -349,19 +349,39 @@ function p6DirectBase(): string | null {
   }
   return null;
 }
-export async function p6Edit(xerFile: File, dataFile: File, mode: string = "auto"): Promise<P6EditResult> {
+/** 비동기 잡 — 제출 후 상태 폴링(2~3분 소요, 동기 요청은 타임아웃). onStatus 로 진행 표시. */
+export async function p6Edit(
+  xerFile: File, dataFile: File, mode: string = "auto",
+  onStatus?: (s: string) => void,
+): Promise<P6EditResult> {
+  const direct = p6DirectBase();
+  const base = direct ? `${direct}/schedule` : `${API_BASE}/schedule`;
+  const cred: RequestCredentials = direct ? "include" : "same-origin";
+  // 1) 제출 → job_id
   const form = new FormData();
   form.append("xer", xerFile);
   form.append("data", dataFile);
   form.append("mode", mode);
-  const direct = p6DirectBase();
-  const url = direct ? `${direct}/schedule/p6-edit` : `${API_BASE}/schedule/p6-edit`;
-  const res = await fetch(url, { method: "POST", body: form, credentials: direct ? "include" : "same-origin" });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new ScheduleApiError(res.status, String((body && (body.detail ?? body.error)) || `${res.status} ${res.statusText}`));
+  const sub = await fetch(`${base}/p6-edit`, { method: "POST", body: form, credentials: cred });
+  if (!sub.ok) {
+    const b = await sub.json().catch(() => null);
+    throw new ScheduleApiError(sub.status, String((b && (b.detail ?? b.error)) || `${sub.status} ${sub.statusText}`));
   }
-  return (await res.json()) as P6EditResult;
+  const { job_id } = (await sub.json()) as { job_id: string };
+  // 2) 폴링 (최대 6분)
+  onStatus?.("대기 중…");
+  const deadline = Date.now() + 6 * 60 * 1000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const st = await fetch(`${base}/p6-edit/status/${job_id}`, { credentials: cred });
+    if (!st.ok) continue;
+    const job = (await st.json()) as { status: string; result?: P6EditResult; error?: string };
+    if (job.status === "running") onStatus?.("AI 대조·수정안 도출 중…");
+    else if (job.status === "pending") onStatus?.("대기 중…");
+    if (job.status === "done" && job.result) return job.result;
+    if (job.status === "error") throw new ScheduleApiError(500, job.error || "처리 실패");
+  }
+  throw new ScheduleApiError(408, "시간 초과 — 활동·엑셀이 매우 많습니다. 나눠서 시도하세요.");
 }
 
 /** 내역서(.csv/.xlsx/.xlsm) 업로드 → 물량/원가 추출 (공종 카드별).
