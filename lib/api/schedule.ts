@@ -316,6 +316,40 @@ export interface BoqResult {
   equipment?: { equip: string; items: string[]; qty: number; unit: string }[]; // 내역서 규격 → 예측 장비
 }
 
+/** P6 수정 에이전트 — XER + 엑셀 대조 수정안 + 선후행 제약 진단 */
+export interface P6EditItem {
+  task_code: string;
+  task_name: string;
+  field: string;
+  field_ko: string;
+  old_value: string;
+  value: string;
+  reason: string;
+  blocked?: boolean;
+  binding?: { pred_code: string; pred_name: string; type: string; lag_days: number; earliest: string; note: string }[];
+}
+export interface P6EditResult {
+  edits: P6EditItem[];
+  summary: string;
+  task_count: number;
+  applied: number;
+  blocked: number;
+  xer_b64: string;
+  filename: string;
+  error?: string;
+}
+export async function p6Edit(xerFile: File, dataFile: File): Promise<P6EditResult> {
+  const form = new FormData();
+  form.append("xer", xerFile);
+  form.append("data", dataFile);
+  const res = await fetch(`${API_BASE}/schedule/p6-edit`, { method: "POST", body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ScheduleApiError(res.status, String((body && (body.detail ?? body.error)) || `${res.status} ${res.statusText}`));
+  }
+  return (await res.json()) as P6EditResult;
+}
+
 /** 내역서(.csv/.xlsx/.xlsm) 업로드 → 물량/원가 추출 (공종 카드별).
  *  discipline(카드 공종)을 넘기면 멀티공종 한 파일에서 그 공종 시트를 우선 채택(오독 방지). */
 export async function parseBoq(file: File, discipline?: string): Promise<BoqResult> {

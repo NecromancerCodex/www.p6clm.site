@@ -27,6 +27,7 @@ const PROCESS_GROUP = {
     { path: "/schedule/plan",     label: "공정표 빌더" },
     { path: "/schedule/progress", label: "공정 진도율" },
     { path: "/schedule/resource", label: "자원 계획" },
+    { path: "/schedule/p6-edit",  label: "P6 수정" },
   ] as { path: string; label: string; soon?: boolean }[],
 };
 
